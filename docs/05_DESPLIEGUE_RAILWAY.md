@@ -110,15 +110,26 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 `COOKIE_SECURE` no hace falta: con `ENV=prod` la app la fuerza a `true`.
 `DEV_LOGIN_ENABLED` tampoco: `/api/auth/dev-login` devuelve 404 en prod.
 
-**Acceso mientras OIDC no esté activo** — elegí uno:
+**Primer acceso.** La migración `0002` crea los cinco usuarios **sin correo y sin
+contraseña**, y en prod `dev-login` devuelve 404. O sea: recién desplegado no hay
+por dónde entrar. Dos salidas:
+
+```powershell
+# a) RECOMENDADO — crear el acceso real, sin redesplegar.
+#    Necesita el DATABASE_PUBLIC_URL del plugin (forma postgresql://, sin +psycopg).
+$env:DATABASE_URL = "postgresql://...@...proxy.rlwy.net:PUERTO/railway"
+python etl/set_password.py bismark --email fc@empresa.com
+```
 
 ```bash
-# a) contraseña compartida (demo / acceso rápido)
+# b) portón de contraseña compartida (demo). Entra como SHARED_LOGIN_USER.
 SHARED_PASSWORD=<clave larga>
 SHARED_LOGIN_USER=bismark
 ```
 
-o dejalo vacío y usá el login por correo + contraseña contra `user_credential`.
+Con (a) entrás como `bismark`, que es `controller` y tiene `admin.users`: desde
+`/admin` cargás correo y contraseña de los otros cuatro. `set_password.py` es
+también la salida si alguien queda afuera.
 
 **OIDC Microsoft 365**, cuando el dueño del tenant registre la app:
 

@@ -12,3 +12,6 @@ api/.venv/
 .ruff_cache/
 api/.env
 .claude/worktrees/
+
+# Clave de arranque que escribe etl/set_password.py --random
+clave_inicial.txt
