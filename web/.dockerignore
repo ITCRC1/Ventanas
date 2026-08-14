@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+.vercel
+
+# Secretos locales
+.env.local
+
+.git
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+.dockerignore
+README.md

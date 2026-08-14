@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Números tabulares para columnas de dinero */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Impresión: hoja horizontal, colores de fondo, y AJUSTAR la tabla al ancho de la
+   hoja (sin cortar a la derecha). Los print:hidden (Tailwind) se ocultan. */
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+  body {
+    background: #ffffff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Los contenedores con scroll NO deben recortar al imprimir */
+  .overflow-x-auto,
+  .overflow-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  /* La tabla se ajusta al ancho de la hoja (fixed = reparte y envuelve, no corta) */
+  table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  th,
+  td {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    padding: 1px 2px !important;
+    font-size: 7px !important;
+    /* Anula anchos fijos (inline) de las columnas congeladas para que la tabla
+       reparta y QUEPA en el ancho de la hoja (si no, se titea en varias páginas). */
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    /* desactiva las columnas congeladas (sticky) al imprimir, si no se solapan/cortan */
+    position: static !important;
+  }
+  /* Columnas marcadas para ocultarse al imprimir (ej. la grilla de meses del Job
+     Cost — en papel va el resumen financiero, no el detalle semanal/mensual). */
+  [data-print="hide"] {
+    display: none !important;
+  }
+  /* Los inputs de nota/monto no deben forzar ancho: se ven como texto */
+  input,
+  select,
+  textarea {
+    width: 100% !important;
+    min-width: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    font-size: 8px !important;
+  }
+}

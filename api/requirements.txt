@@ -1,0 +1,23 @@
+# API — DASHBOARD VENTANAS (Fase 3)
+fastapi>=0.115
+uvicorn[standard]>=0.30
+gunicorn>=22.0 ; sys_platform != "win32"   # prod (uvicorn workers); en Windows se usa uvicorn
+sqlalchemy>=2.0.30
+psycopg[binary]>=3.1          # driver PostgreSQL (§1 DECISIONES)
+alembic>=1.13
+pydantic>=2.7
+pydantic-settings>=2.3
+authlib>=1.3                  # OIDC contra Microsoft 365
+httpx>=0.27                   # cliente HTTP del flujo OIDC
+pyjwt>=2.8                    # sesión JWT en cookie httponly
+bcrypt>=4.1                   # hash de contraseñas (login correo+clave / perfiles)
+itsdangerous>=2.2            # firma de la sesión de Starlette (state OIDC)
+structlog>=24.1              # logs en JSON
+python-multipart>=0.0.9     # formularios
+openpyxl>=3.1               # Excel (compartido con el ETL)
+weasyprint>=62             # PDF (fase 6). Import DIFERIDO; en el Docker van las libs GTK.
+pdfplumber>=0.11           # ingesta del estado de cuenta LAFISE en PDF (conciliación)
+xlrd>=2.0                  # estado de cuenta LAFISE en .xls (banca en línea)
+
+# --- Fases posteriores ---
+#   apscheduler -> tareas de fondo (fases 9+).

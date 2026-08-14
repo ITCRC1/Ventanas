@@ -1,0 +1,3 @@
+# Dependencias de fases posteriores (no requeridas por la API base / Fase 3)
+weasyprint>=62     # PDF — fase 6. En Windows necesita las libs GTK instaladas aparte.
+apscheduler>=3.10  # tareas de fondo — fases 9+

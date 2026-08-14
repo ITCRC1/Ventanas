@@ -1,0 +1,41 @@
+# Contexto de build de la API.
+#
+# OJO: la imagen de la API se construye desde la RAÍZ del repo, no desde api/.
+# La migración 0001 lee db/schema_v2.sql con una ruta relativa a la raíz, así
+# que db/ tiene que entrar al contexto. Todo lo demás se recorta acá.
+
+.git
+.gitignore
+.claude/
+.github/
+
+# Secretos: jamás dentro de la imagen (los .env.example sí quedan, son plantillas).
+# Los dos últimos son redundantes con el glob; en secretos, redundar sale gratis.
+**/.env
+**/.env.local
+.env
+api/.env
+
+# El front es otro servicio, con su propio contexto (web/.dockerignore)
+web/
+
+# Insumos y salidas de trabajo: no van a producción
+data/
+entregables/
+docs/
+etl/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+api/tests/
+
+# Documentación de la raíz (README, CLAUDE, DECISIONES). Sin `**`, así que sólo
+# alcanza el nivel de arriba: api/README.md sí entra.
+*.md

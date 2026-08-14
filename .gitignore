@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+*.db-journal
+/tmp/
+
+# venv de la API
+api/.venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+api/.env
+.claude/worktrees/

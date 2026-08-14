@@ -1,0 +1,94 @@
+wbs,task_title,task_owner,category,phase,status,budget_original,budget_change,budget_revised,spend,remaining,forecast,variance,src_row
+0,Property Holding Expenses,,,,,,,,,,,,12
+0.0001,Due Diligence / Closing Costs,HOVDE,0-Property Acquisition,Phase 1,Completed,388000.0,415720.07,803720.0700000001,803720.0700000001,0.0,803720.0700000001,0.0,13
+0.0002,Property Acquisition,Partnership,0-Property Acquisition,Phase 1,In process,11250000.0,0.0,11250000.0,9382599.7,1867400.3000000007,11257599.7,7599.699999999255,14
+0.1,Property Interest,Partnership,Overhead,Phase 2,Approved,787500.0,0.0,787500.0,450000.0,337500.0,787500.0,0.0,18
+0.1.1,Insurance,Partnership,Overhead,Phase 2,Approved,20000.0,0.0,20000.0,0.0,20000.0,20000.0,0.0,19
+0.1.2,Titled Property Annual Taxes,Partnership,Overhead,Phase 2,Attention,75000.0,0.0,75000.0,0.0,75000.0,75000.0,0.0,20
+0.1.3,Holding Corporation Taxes,Partnership,Overhead,Phase 2,Attention,12600.0,0.0,12600.0,6233.63,6366.37,18833.63,6233.630000000001,21
+0.2,Concession/Land Use Leases,Partnership,Overhead,Phase 2,Approved,87000.0,0.0,87000.0,82507.5,4492.5,87000.0,0.0,22
+0.3,Escrow and Legal Fees,Sergio Amador,Overhead,Phase 2,Attention,40000.0,10795.05,50795.05,50795.05,0.0,50795.05,0.0,23
+0.3.1,Corporation Management,Sergio Amador,Overhead,Phase 2,Attention,15000.0,4686.1,19686.1,19686.1,0.0,19686.1,0.0,24
+0.4,Admin Fee Budget + Financial Controller 25% Salary,Partnership,Overhead,Phase 2,Attention,86250.0,7500.0,93750.0,71200.0,22550.0,115700.0,21950.0,25
+0.5,Travel Expenses / Ownership,Partnership,Overhead,Phase 2,Approved,24000.0,19641.38,43641.380000000005,43641.38,0.0,43641.38,0.0,26
+0.6.1,Farm Manager,Alexis,Overhead,Phase 2,Attention,23000.0,19334.4,42334.4,20437.88,21896.52,42334.399999999994,0.0,27
+0.6.2,Farm Worker,TBD,Overhead,Phase 2,Attention,13800.0,2569.41,16369.41,12068.23,4301.18,23668.23,7298.82,28
+0.6.3,CCSS Employee Benefits,,Overhead,Phase 2,Attention,18400.0,0.0,18400.0,0.0,18400.0,18400.000000000004,0.0,29
+0.6.4,Main. Equip. / Expendables / Truck / Mula,Blake,Overhead,Phase 2,Approved,62500.0,0.0,62500.0,26043.39,36456.61,63541.39,1041.3899999999994,30
+0.6.5,Procore (If we want to implement is system),Blake,Overhead,Phase 2,Approved,21000.0,0.0,21000.0,0.0,21000.0,21000.0,0.0,31
+0.7,Development Director,Blake,Overhead,Phase 2,Attention,324874.99999999994,68170.0,393044.99999999994,280045.0,112999.99999999994,449545.0,56500.00000000006,32
+0.8,Road Repairs,FyF,Overhead,Phase 2,In process,30000.0,0.0,30000.0,0.0,30000.0,30000.0,0.0,35
+0.9,Fallen Trees / Cutting Grass,Alexis/Gustavo,Overhead,Phase 2,Approved,16000.0,24000.0,40000.0,2159.8,37840.2,40000.0,0.0,36
+0.911,Property Gates,Blake,Overhead,Phase 2,In process,6000.0,1400.0,7400.0,8280.01,-880.0100000000002,8280.01,880.0100000000002,37
+1,Preparing Property for Sales,,,,,,,,,,,,39
+1.1,Gravel Existing Roads,FyF,Overhead,Phase 3,Attention,80000.0,0.0,80000.0,0.0,80000.0,80000.0,0.0,40
+1.2,Opening Views,Tree Man Co.,Overhead,Phase 3,Approved,52800.0,0.0,52800.0,6820.0,45980.0,52800.0,0.0,41
+1.3,Opening Paths to Important Areas,Alexis,Overhead,Phase 3,Attention,6480.0,0.0,6480.0,6480.0,0.0,6480.0,0.0,42
+1.4,Water System,Blake,Overhead,Phase 3,Attention,155000.0,50314.4,205314.4,205447.31647058824,-132.9164705882431,205447.31647058824,132.9164705882431,43
+2,Master Planning,,,,,,,,,,,,46
+2.1.1,Pre Workshop,EDSA,CFIA Condo,DESIGN,In process,14500.0,0.0,14500.0,0.0,14500.0,14500.0,0.0,47
+2.1.2,Workshop,EDSA,CFIA Condo,DESIGN,Approved,24500.0,29631.6,54131.6,54131.6,0.0,54131.6,0.0,48
+2.1.3,Post Workshop / Conceptual Enlargements,EDSA,CFIA Condo,DESIGN,Approved,48500.0,0.0,48500.0,7500.0,41000.0,48500.0,0.0,49
+2.1.4,Travel Expenses MP,EDSA,CFIA Condo,DESIGN,Approved,5000.0,0.0,5000.0,0.0,5000.0,5000.0,0.0,50
+2.2,Schematic Design,EDSA,CFIA Condo,DESIGN,Approved,100000.0,0.0,100000.0,0.0,100000.0,100000.0,0.0,51
+3,Environmental Permitting,,,,,,,,,,,,53
+3.1,"Preliminary environmental study, D1 form",DEHC,Setena D1,STUDIES,In process,14577.0,130000.0,144577.0,141627.22,2949.779999999999,177387.08000000002,32810.080000000016,54
+3.2,Register Plans with Master Plan Roads,Surveyor,Setena D1,ENGINEERING,Approved,8000.0,30702.5,38702.5,38702.5,0.0,38702.5,0.0,55
+3.3,Hydrological study / Discharge Permit,DEHC,Setena D1,STUDIES,In process,8362.0,0.0,8362.0,0.0,8362.0,8362.0,0.0,56
+3.4,Master plan analysis and condominium strategy,DEHC,Setena D1,ENGINEERING,In process,12994.999999999998,0.0,12994.999999999998,74.0,12920.999999999998,13069.0,74.00000000000182,57
+3.5,Civil Engineering,,Setena D1,ENGINEERING,Approved,,0.0,0.0,0.0,0.0,0.0,0.0,58
+3.5.1,- Schematic design,DEHC,Setena D1,ENGINEERING,Approved,117067.99999999999,0.0,117067.99999999999,35120.399999999994,81947.59999999999,117068.0,0.0,59
+3.52,- Construction drawings & quantities,DEHC,Setena D1,ENGINEERING,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,60
+3.6,SETENA review,Government,Setena D1,ENGINEERING,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,61
+3.7,Annexed information / Answer Questions,DEHC / Blake,Setena D1,ENGINEERING,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,62
+3.8,SETENA Final review,Blake,Setena D1,GOV,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,63
+3.9,SETENA (VA) Approval,DEHC / Blake,Setena D1,ENGINEERING,Approved,1457.6999999999998,0.0,1457.6999999999998,0.0,1457.6999999999998,1457.6999999999998,0.0,64
+3.101,Treatment Plant,Treatment Plant Eng.,Setena D1,GOV,Approved,50000.0,0.0,50000.0,0.0,50000.0,50000.0,0.0,65
+3.11,Superficial infiltration test,Complete,Setena D1,GOV,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,66
+4,Water,,,,,,,,,,,,68
+4.1,Water Source Strategy,Blake,Setena D1,WATER,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,69
+4.2.1,Water Department Negotiations,Blake,Setena D1,WATER,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,70
+4.2.2,Water Department Installation (We pay and Donate),Sierra,Setena D1,WATER,Approved,50000.0,0.0,50000.0,0.0,50000.0,50000.0,0.0,71
+4.2.3,Water Department System Installation,Aguatech,Setena D1,WATER,Approved,150000.0,0.0,150000.0,0.0,150000.0,0.0,-150000.0,72
+4.3,Spring Concession (Based on Strategy),Blake,Setena D1,WATER,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,73
+4.4,Deep Well Concession / Casing  x 2 Wells,PV Drilling,Setena D1,WATER,In process,126227.0,0.0,126227.0,0.0,126227.0,0.0,-126227.0,74
+5,Concessions,,,,,,,,,,,,76
+5.1,"Preliminar Study for PNE applications in ACOSA, SINAC, and Muni",Eduardo,Concessions,SETENA Regional Review,In process,0.0,5000.0,5000.0,0.0,5000.0,5000.0,0.0,77
+5.2,Engineering diagnosis to apply reversion of Patrimony areas to Muni ( to apply later for concessions ),Eduardo consultant,Concessions,SETENA Regional Review,In process,9943.999999999998,0.0,9943.999999999998,0.0,9943.999999999998,9944.0,0.0,78
+5.3,Application/ project description for PNE MINAET,Eduardo,Concessions,SETENA Regional Review,Approved,15876.499999999998,0.0,15876.499999999998,0.0,15876.499999999998,15876.499999999998,0.0,79
+5.4,Survey new plans - Adjust to Government Regs,Surveyor,Concessions,SETENA Regional Review,Approved,72207.0,0.0,72207.0,0.0,72207.0,72207.0,0.0,80
+5.5,Create Draft Plans for Development,Randall,Concessions,SETENA Regional Review,Approved,30000.0,0.0,30000.0,0.0,30000.0,30000.0,0.0,81
+5.6,Legal Expenses - Concession MUNI,Herbet,Concessions,SETENA Regional Review,In process,100000.0,0.0,100000.0,0.0,100000.0,100000.0,0.0,82
+5.7,Legal Expenses - Land Use SINAC,Eduardo,Concessions,SETENA Regional Review,Approved,50000.0,0.0,50000.0,0.0,50000.0,50000.0,0.0,83
+5.8,Legal Expenses - Land Use Concessions (ALTA BATALLA)},Roberto,Concessions,SETENA Regional Review,In process,14500.0,,14500.0,0.0,14500.0,14500.0,0.0,84
+6.1,Trim Trees to See View,Tree Man Co.,Overhead,PROPERTY,Approved,7500.0,0.0,7500.0,0.0,7500.0,7500.0,0.0,87
+6.2,Survey Water Easement and Register,Marvin,Overhead,PROPERTY,Approved,7500.0,5450.0,12950.0,10450.0,2500.0,12950.0,0.0,88
+6.3,Cut Driveway and Building Pad + Gravel + Culverts,Sibaja,Overhead,PROPERTY,Approved,20000.0,20000.0,40000.0,17583.15,22416.85,40000.0,0.0,89
+6.4,Closing Costs,Karol,Overhead,PROPERTY,Approved,48000.0,0.0,48000.0,0.0,48000.0,48000.0,0.0,90
+6,Property Sale,Karol,Overhead,PROPERTY,,-480000.0,0.0,-480000.0,,-480000.0,0.0,480000.0,92
+9,CFIA/APC Construction Permitting (Infrastructure),,,,,,,,,,,,94
+9.1.1,Phase 1/2/3 Pre Consultations,DEHC,CFIA Infrastructure,Phase 1,In process,0.0,5423.999999999999,5423.999999999999,7344.999999999999,-1921.0,5423.999999999999,0.0,95
+9.1.2,Phase 1/2/3 Discharge permit MOPT and Municipality,DEHC,CFIA Infrastructure,Phase 2,In process,,1355.9999999999998,1355.9999999999998,2033.9999999999998,-678.0,1355.9999999999998,0.0,96
+9.1.3,Phase 1 Permit (Includes topo of the existing road),DEHC,CFIA Infrastructure,Phase 1,Approved,,16385.0,16385.0,16385.0,0.0,16385.0,0.0,97
+9.2.1,Phase 2 Permit,DEHC,CFIA Infrastructure,Phase 2,Approved,,8814.0,8814.0,0.0,8814.0,8814.0,0.0,98
+9.3.1,Phase 3 Permit,DEHC,CFIA Infrastructure,Phase 3,Approved,,1355.9999999999998,1355.9999999999998,0.0,1355.9999999999998,1355.9999999999998,0.0,99
+Other Items,,,,,,,,,,,,,104
+Project Estimate:,10000000,,,,,,,,,,,,105
+7,Items for Conveyance,,,,,,,,,,,,106
+7.1,Project information,Blake,,,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,107
+7.2,Plan and approval of the two condominiums,Blake,CFIA Infrastructure,Phase 3,Approved,0.0,0.0,0.0,0.0,0.0,0.0,0.0,108
+7.3,Cadastre Plan (only when we want to convey),Surveyor,CFIA Infrastructure,Phase 3,Approved,102162.45,0.0,102162.45,0.0,102162.45,102162.45,0.0,109
+7.4,CFIA  (1%) - Whole Project,Blake,CFIA Infrastructure,Phase 3,Approved,265000.0,0.0,265000.0,0.0,265000.0,265000.0,0.0,110
+7.5,INS (1.298%) - Phase Only,Blake,CFIA Infrastructure,Phase 3,Approved,129800.0,0.0,129800.0,0.0,129800.0,129800.0,0.0,111
+7.6,SETENA Bond (1.5% Value) - Phase Only,Partnership,CFIA Infrastructure,Phase 3,Approved,300000.0,0.0,300000.0,0.0,300000.0,300000.0,0.0,112
+7.7,Municipality (1%) - Phase Only,Permit Engineer,CFIA Infrastructure,Phase 3,Approved,100000.0,0.0,100000.0,0.0,100000.0,100000.0,0.0,113
+8,Internal Bonuses,,,,,,,,,,,,116
+8.1,Water Department Negotiations,Blake,Setena D1,Phase 1,Approved,28249.999999999996,0.0,28249.999999999996,0.0,28249.999999999996,28249.999999999996,0.0,117
+8.2,SETENA (VA) Approval,Blake,Setena D1,Phase 1,Approved,42374.99999999999,0.0,42374.99999999999,0.0,42374.99999999999,42375.0,0.0,118
+8.3,Finalize Creation of Concessions,Blake,Concessions,,Approved,42374.99999999999,0.0,42374.99999999999,0.0,42374.99999999999,42375.0,0.0,119
+8.4,Obtain Beach Club Permits,Blake,Setena D1,BEACH CLUB P1,Approved,14124.999999999998,0.0,14124.999999999998,0.0,14124.999999999998,14124.999999999998,0.0,120
+Green,Completed,,,,,,,,,,,,129
+Blue,Approved,,,,,,,,,,,,130
+Red,Attention,,,,,,,,,,,,131
+Yellow,In process,,,,,,,,,,,,132
+Grey,Not Started,,,,,,,,,,,,133

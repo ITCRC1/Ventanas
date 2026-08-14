@@ -1,0 +1,4 @@
+# ETL y validación — DASHBOARD VENTANAS
+openpyxl>=3.1          # lectura/escritura .xlsm y .xlsx
+xlrd>=2.0              # estado de cuenta LAFISE (.xls legacy)
+psycopg[binary]>=3.1   # PostgreSQL
