@@ -11,12 +11,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# A dónde reenvía /api/*. TIENE que estar en tiempo de BUILD: Next resuelve los
-# rewrites hacia .next/routes-manifest.json, no en tiempo de ejecución. Cambiar
-# la variable en Railway sin volver a construir no surte efecto.
-# El default asume que el servicio de la API se llama "api" y escucha en 8080.
-ARG API_PROXY_TARGET=http://api.railway.internal:8080
-ENV API_PROXY_TARGET=$API_PROXY_TARGET
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
@@ -27,6 +21,11 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=8080 \
     HOSTNAME=::
+
+# A dónde reenvía /api/*. Se lee EN CADA PEDIDO (app/api/[...path]/route.ts), así
+# que cambiarla en Railway sólo necesita un reinicio, no reconstruir la app.
+# El default asume que el servicio de la API se llama "api" y escucha en 8080.
+ENV API_PROXY_TARGET=http://api.railway.internal:8080
 
 RUN addgroup -g 10001 nodejs && adduser -u 10001 -G nodejs -S nextjs
 
