@@ -60,30 +60,29 @@ def restaurar(ruta: Path, url: str, dry: bool) -> None:
 
     try:
         with ruta.open("r", encoding="utf-8", errors="replace") as f:
-            en_copia = False
-            copia = None
             for linea in f:
-                if en_copia:
-                    if linea.startswith("\\."):
-                        en_copia = False
-                        if not dry:
-                            copia.__exit__(None, None, None)
-                        copia = None
-                    else:
-                        filas_copiadas += 1
-                        if not dry:
-                            copia.write(linea)
-                    continue
-
                 if _COPY.match(linea):
                     volcar_sql()
                     copias += 1
                     tabla = linea.split()[1]
-                    print(f"  COPY {tabla}", flush=True)
-                    if not dry:
-                        copia = cur.copy(linea.rstrip("\n"))
-                        copia.__enter__()
-                    en_copia = True
+
+                    # El bloque de datos se consume ACÁ, dentro del `with`. Antes
+                    # esto era una máquina de estados entre iteraciones y el COPY
+                    # podía quedar abierto: el servidor esperando datos que nadie
+                    # mandaba, bloqueando de paso a la API.
+                    if dry:
+                        for datos in f:
+                            if datos.startswith("\\."):
+                                break
+                            filas_copiadas += 1
+                    else:
+                        with cur.copy(linea.rstrip("\n")) as copia:
+                            for datos in f:
+                                if datos.startswith("\\."):
+                                    break
+                                filas_copiadas += 1
+                                copia.write(datos)
+                    print(f"  {tabla} ({copias}/51)", file=sys.stderr, flush=True)
                     continue
 
                 if _LOCK.match(linea):

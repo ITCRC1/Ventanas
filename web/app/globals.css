@@ -4,15 +4,95 @@
 
 :root {
   color-scheme: light;
+  /* Tipografía del sistema: sin descargas, y con las variantes que hacen falta
+     para que las columnas de dinero queden alineadas. */
+  --fuente: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+html {
+  font-family: var(--fuente);
+  /* Los ceros con barra y las mayúsculas más angostas ayudan en tablas densas. */
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
 
-/* Números tabulares para columnas de dinero */
-.tabular {
+/* --- Números -------------------------------------------------------------
+   Todo lo que sea plata tiene que alinearse en columna. `tabular` ya se usaba
+   en varias pantallas; ahora además cubre inputs y celdas numéricas. */
+.tabular,
+input[type="number"],
+td.num,
+th.num {
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* --- Foco visible --------------------------------------------------------
+   Antes cada control mostraba el anillo por defecto del navegador (azul chillón
+   en Chrome, nada en algunos casos). Un solo anillo, y sólo con teclado. */
+*:focus-visible {
+  outline: 2px solid theme("colors.brand.500");
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
+/* --- Barras de scroll ----------------------------------------------------
+   Las tablas anchas viven scrolleando; la barra gruesa de Windows se comía
+   espacio y cortaba la última fila. */
+@media (pointer: fine) {
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-auto {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.slate.300") transparent;
+  }
+  .overflow-x-auto::-webkit-scrollbar,
+  .overflow-y-auto::-webkit-scrollbar,
+  .overflow-auto::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .overflow-x-auto::-webkit-scrollbar-thumb,
+  .overflow-y-auto::-webkit-scrollbar-thumb,
+  .overflow-auto::-webkit-scrollbar-thumb {
+    background: theme("colors.slate.300");
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  .overflow-x-auto:hover::-webkit-scrollbar-thumb,
+  .overflow-y-auto:hover::-webkit-scrollbar-thumb,
+  .overflow-auto:hover::-webkit-scrollbar-thumb {
+    background: theme("colors.slate.400");
+    background-clip: content-box;
+  }
+}
+
+::selection {
+  background: theme("colors.brand.200");
+}
+
+/* --- Primitivas reutilizables -------------------------------------------
+   Para que las pantallas nuevas no vuelvan a inventar su propio estilo. */
+@layer components {
+  .card {
+    @apply rounded-lg border border-slate-200 bg-white shadow-card;
+  }
+  .card-pad {
+    @apply card p-4;
+  }
+  /* Encabezado de tabla: el navy de marca, en versalitas y discreto. */
+  .th-brand {
+    @apply sticky top-0 z-10 bg-brand-700 px-2 py-1.5 text-left text-micro font-semibold
+      uppercase tracking-wide text-white;
+  }
+  .row-hover {
+    @apply transition-colors hover:bg-brand-50;
+  }
 }
 
 /* Impresión: hoja horizontal, colores de fondo, y AJUSTAR la tabla al ancho de la

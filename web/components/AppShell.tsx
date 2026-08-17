@@ -143,32 +143,43 @@ function Dropdown({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-sm transition ${
-          active || open ? "bg-white/15 font-medium text-white" : "text-slate-300 hover:bg-white/10"
+        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition ${
+          active || open
+            ? "bg-white/15 font-medium text-white"
+            : "text-brand-200 hover:bg-white/10 hover:text-white"
         }`}
       >
         {label}
-        <span className={`text-[9px] transition ${open ? "rotate-180" : ""}`}>▼</span>
+        <span
+          aria-hidden
+          className={`text-[8px] leading-none transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          ▼
+        </span>
       </button>
       {open ? (
-        <div className="absolute left-0 z-50 mt-1 w-72 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+        <div className="absolute left-0 z-50 mt-1.5 w-72 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-pop">
           {items.map((i) => (
             <Link
               key={i.href}
               href={i.href}
               onClick={onClose}
-              className={`block px-3 py-2 ${
-                pathname === i.href ? "bg-slate-50" : "hover:bg-slate-50"
+              className={`block border-l-2 px-3 py-2 transition-colors ${
+                pathname === i.href
+                  ? "border-brand-700 bg-brand-50"
+                  : "border-transparent hover:bg-slate-50"
               }`}
             >
               <span
                 className={`block text-sm ${
-                  pathname === i.href ? "font-semibold text-[#2d3a5c]" : "text-slate-700"
+                  pathname === i.href ? "font-semibold text-brand-700" : "text-slate-700"
                 }`}
               >
                 {i.label}
               </span>
-              {i.hint ? <span className="block text-[11px] text-slate-400">{i.hint}</span> : null}
+              {i.hint ? (
+                <span className="mt-0.5 block text-mini text-slate-400">{i.hint}</span>
+              ) : null}
             </Link>
           ))}
         </div>
@@ -251,16 +262,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-40 bg-[#2d3a5c] text-white shadow-sm print:hidden">
+      <header className="sticky top-0 z-40 bg-brand-700 text-white print:hidden">
         <div className="flex items-center gap-4 px-5 py-2">
           {/* Marca */}
-          <Link href="/job-cost" className="flex shrink-0 items-center gap-2">
+          <Link href="/job-cost" className="flex shrink-0 items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/15 text-sm font-bold">
               V
             </span>
             <span className="leading-tight">
-              <span className="block text-sm font-semibold">Dashboard Ventanas</span>
-              <span className="block text-[10px] uppercase tracking-wider text-slate-300">
+              <span className="block text-sm font-semibold tracking-tight">Dashboard Ventanas</span>
+              <span className="block text-micro uppercase tracking-[0.12em] text-brand-300">
                 Project financial control
               </span>
             </span>
@@ -290,7 +301,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={`rounded-md px-3 py-1.5 text-sm transition ${
                     pathname === n.href
                       ? "bg-white/15 font-medium text-white"
-                      : "text-slate-300 hover:bg-white/10"
+                      : "text-brand-200 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {n.label}
@@ -307,12 +318,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
               <span className="hidden leading-tight sm:block">
                 <span className="block text-xs font-medium">{me.data.full_name}</span>
-                <span className="block text-[10px] text-slate-300">{me.data.role}</span>
+                <span className="block text-micro uppercase tracking-wide text-brand-300">
+                  {me.data.role}
+                </span>
               </span>
             </div>
             <button
               type="button"
-              className="rounded-md border border-white/30 px-3 py-1 text-xs text-white transition hover:bg-white/10"
+              className="rounded-md border border-white/25 px-3 py-1 text-xs text-white transition hover:border-white/50 hover:bg-white/10"
               onClick={async () => {
                 await logout.mutateAsync();
                 router.replace("/login");
@@ -324,16 +337,29 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* Dónde estoy */}
+      {/* Dónde estoy. El separador ' · ' se dibuja aparte para que el grupo pese
+          menos que la pantalla concreta. */}
       {here ? (
-        <div className="border-b border-slate-200 bg-white px-6 py-2 print:hidden">
-          <span className="text-sm font-semibold text-slate-700">{here}</span>
+        <div className="border-b border-slate-200 bg-white px-6 py-2.5 print:hidden">
+          <span className="flex items-baseline gap-1.5 text-sm">
+            {here.includes(" · ") ? (
+              <>
+                <span className="text-slate-400">{here.split(" · ")[0]}</span>
+                <span aria-hidden className="text-slate-300">
+                  /
+                </span>
+                <span className="font-semibold text-slate-800">{here.split(" · ")[1]}</span>
+              </>
+            ) : (
+              <span className="font-semibold text-slate-800">{here}</span>
+            )}
+          </span>
         </div>
       ) : null}
 
       <main className="p-6">
         {blocked ? (
-          <div className="mx-auto max-w-md rounded-lg border border-slate-200 bg-white p-8 text-center">
+          <div className="card mx-auto max-w-md p-8 text-center">
             <p className="text-lg font-semibold text-slate-700">This section is not available</p>
             <p className="mt-1 text-sm text-slate-500">
               Your profile ({me.data.role}) doesn&apos;t include access to this page.

@@ -15,3 +15,9 @@ api/.env
 
 # Clave de arranque que escribe etl/set_password.py --random
 clave_inicial.txt
+
+# Respaldos de la base: llevan datos reales y hashes de contraseñas.
+# (db/schema_v2.sql y db/test_suite.sql SÍ van al repo: son el modelo, no datos)
+/ventanas_db_*.sql
+/respaldos/
+*.dump
