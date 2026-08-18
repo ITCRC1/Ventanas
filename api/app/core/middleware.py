@@ -20,8 +20,12 @@ _SECURITY_HEADERS = {
 }
 
 # ventana deslizante por IP, sólo en memoria (por worker). Suficiente para frenar
-# fuerza bruta sobre la contraseña compartida; no es un WAF.
-_LOGIN_PATHS = frozenset({"/api/auth/shared-login", "/api/auth/dev-login"})
+# fuerza bruta sobre la contraseña; no es un WAF.
+#
+# OJO: /api/auth/login TIENE que estar. Es el único camino de acceso real en
+# producción —dev-login devuelve 404 con ENV=prod y shared-login está apagado—,
+# y sin él quedaba admitiendo intentos de contraseña sin límite.
+_LOGIN_PATHS = frozenset({"/api/auth/login", "/api/auth/shared-login", "/api/auth/dev-login"})
 _hits: dict[str, deque[float]] = defaultdict(deque)
 
 
