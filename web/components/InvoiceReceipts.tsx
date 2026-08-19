@@ -758,6 +758,9 @@ export function InvoiceReceipts() {
   // Resultado de la última corrida (mientras no se dispare otra).
   const running = st?.sync_running ?? false;
   const lastRun = st?.sync_last;
+  // Sin buzón configurado el sync no puede correr. Los botones tienen que verse
+  // apagados: en teal parecían activos y el clic no hacía nada (se leía como link roto).
+  const notConfigured = !st?.configured;
 
   return (
     <div className="space-y-4">
@@ -811,6 +814,11 @@ export function InvoiceReceipts() {
             </span>
           ) : null}
           {syncMsg ? <span className="text-xs text-slate-600">{syncMsg}</span> : null}
+          {notConfigured ? (
+            <span className="text-xs font-medium text-amber-700">
+              ⚠ Sync off until the mailbox is connected — see how, below
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => setJustifyOpen(true)}
@@ -834,7 +842,11 @@ export function InvoiceReceipts() {
             type="button"
             disabled={sync.isPending || running || !st?.configured}
             onClick={() => runSync(false)}
-            className="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+            className={
+              notConfigured
+                ? "cursor-not-allowed rounded bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-500"
+                : "rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+            }
             title={
               st?.configured
                 ? "Fetch what arrived since the last sync (a few seconds)"
@@ -854,7 +866,11 @@ export function InvoiceReceipts() {
               )
                 runSync(true);
             }}
-            className="rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+            className={
+              notConfigured
+                ? "cursor-not-allowed rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-400"
+                : "rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+            }
             title="Full scan of the mailbox (slow)"
           >
             ⟳ Full
