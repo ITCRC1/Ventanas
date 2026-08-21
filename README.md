@@ -23,8 +23,10 @@ DASHBOARD_VENTANAS/
 │  │                               dependencias, 21 hallazgos y anotaciones
 │  ├─ 02_PLAN_FASES_Y_MODELOS.md   Stack, 11 fases, qué modelo usar en cada una,
 │  │                               wires y comisiones, conciliación LAFISE
-│  └─ 05_DESPLIEGUE_RAILWAY.md     Runbook de producción: servicios, variables,
-│                                  primer deploy y trampas resueltas
+│  ├─ 05_DESPLIEGUE_RAILWAY.md     Runbook de producción: servicios, variables,
+│  │                               primer deploy y trampas resueltas
+│  └─ 06_INVENTARIO.md             Dónde vive cada pieza: repo, Railway, entorno
+│                                  local, respaldos y cómo cargar el proyecto
 │
 ├─ db/
 │  ├─ schema_v2.sql       El modelo: 38 tablas, 22 vistas. Corre limpio en PG16
