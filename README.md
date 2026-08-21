@@ -25,8 +25,9 @@ DASHBOARD_VENTANAS/
 │  │                               wires y comisiones, conciliación LAFISE
 │  ├─ 05_DESPLIEGUE_RAILWAY.md     Runbook de producción: servicios, variables,
 │  │                               primer deploy y trampas resueltas
-│  └─ 06_INVENTARIO.md             Dónde vive cada pieza: repo, Railway, entorno
-│                                  local, respaldos y cómo cargar el proyecto
+│  ├─ 06_INVENTARIO.md             Dónde vive cada pieza: repo, Railway, entorno
+│  │                               local, respaldos y cómo cargar el proyecto
+│  └─ 07_TRASPASO_A_FINANCE.md     Runbook para pasar la titularidad a finance@
 │
 ├─ db/
 │  ├─ schema_v2.sql       El modelo: 38 tablas, 22 vistas. Corre limpio en PG16
