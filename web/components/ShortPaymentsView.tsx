@@ -17,7 +17,9 @@ import {
   useUpdateDisbNo,
   useUpdateShortLine,
   useWbsList,
+  useWbsSuggestions,
 } from "@/lib/hooks";
+import type { WbsSuggestion } from "@/lib/hooks";
 import type { Category, Payee, Phase, ShortPaymentBatch, ShortPaymentLine, Wbs } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -88,35 +90,54 @@ function WbsEdit({
   line,
   wbsList,
   save,
+  suggestion,
 }: {
   line: ShortPaymentLine;
   wbsList: Wbs[];
   save: (body: { wbs_id: number | null }) => void;
+  suggestion?: WbsSuggestion;
 }) {
   const [code, setCode] = useState(line.wbs_code ?? "");
   const match = wbsList.find((w) => w.wbs_code === code.trim());
+  // Solo se ofrece si la línea sigue sin proyecto: es una propuesta, no un default.
+  const show = suggestion && !line.wbs_code && !code.trim();
   return (
-    <input
-      list="wbs-codes"
-      value={code}
-      placeholder="WBS"
-      title={match?.title ?? line.wbs_title ?? "Project number"}
-      onChange={(e) => setCode(e.target.value)}
-      onBlur={() => {
-        const v = code.trim();
-        if (v === (line.wbs_code ?? "")) return;
-        if (v === "") return save({ wbs_id: null });
-        const w = wbsList.find((x) => x.wbs_code === v);
-        if (!w) {
-          setCode(line.wbs_code ?? ""); // no existe ese proyecto → revertir
-          return;
-        }
-        save({ wbs_id: w.id });
-      }}
-      className={`w-16 rounded border px-1 py-0.5 font-mono text-[11px] ${
-        code && !match ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
-      }`}
-    />
+    <div className="flex flex-col gap-0.5">
+      <input
+        list="wbs-codes"
+        value={code}
+        placeholder="WBS"
+        title={match?.title ?? line.wbs_title ?? "Project number"}
+        onChange={(e) => setCode(e.target.value)}
+        onBlur={() => {
+          const v = code.trim();
+          if (v === (line.wbs_code ?? "")) return;
+          if (v === "") return save({ wbs_id: null });
+          const w = wbsList.find((x) => x.wbs_code === v);
+          if (!w) {
+            setCode(line.wbs_code ?? ""); // no existe ese proyecto → revertir
+            return;
+          }
+          save({ wbs_id: w.id });
+        }}
+        className={`w-16 rounded border px-1 py-0.5 font-mono text-[11px] ${
+          code && !match ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
+        }`}
+      />
+      {show && suggestion ? (
+        <button
+          type="button"
+          title={`${suggestion.wbs_title ?? ""} — ${suggestion.reason}. Click to use it.`}
+          onClick={() => {
+            setCode(suggestion.wbs_code);
+            save({ wbs_id: suggestion.wbs_id });
+          }}
+          className="w-16 rounded bg-amber-100 px-1 font-mono text-[10px] text-amber-800 hover:bg-amber-200"
+        >
+          ≈ {suggestion.wbs_code}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -227,6 +248,57 @@ function BatchNo({ b, editable }: { b: ShortPaymentBatch; editable: boolean }) {
   );
 }
 
+// Cuerpo de la tabla de una tanda. Es un componente propio para poder pedir acá
+// las sugerencias de proyecto de ESA tanda: un hook no puede vivir dentro del
+// .map de tandas.
+function LinesBody({
+  batch,
+  editable,
+  showBank,
+  payees,
+  categories,
+  phases,
+  wbsList,
+  preCols,
+}: {
+  batch: ShortPaymentBatch;
+  editable: boolean;
+  showBank: boolean;
+  payees: Payee[];
+  categories: Category[];
+  phases: Phase[];
+  wbsList: Wbs[];
+  preCols: number;
+}) {
+  // Solo en borrador: en una tanda cerrada no hay nada que asignar.
+  const sug = useWbsSuggestions(batch.id, editable);
+  const byLine = useMemo(() => {
+    const m = new Map<number, WbsSuggestion>();
+    for (const x of sug.data ?? []) m.set(x.line_id, x);
+    return m;
+  }, [sug.data]);
+
+  return (
+    <tbody className="divide-y divide-slate-100">
+      {batch.lines.map((l) => (
+        <LineRow
+          key={l.id ?? l.line_no}
+          line={l}
+          disbId={batch.id}
+          editable={editable}
+          showBank={showBank}
+          payees={payees}
+          categories={categories}
+          phases={phases}
+          wbsList={wbsList}
+          suggestion={l.id != null ? byLine.get(l.id) : undefined}
+        />
+      ))}
+      {editable ? <AddLineRow disbId={batch.id} preCols={preCols} /> : null}
+    </tbody>
+  );
+}
+
 function LineRow({
   line,
   disbId,
@@ -236,6 +308,7 @@ function LineRow({
   categories,
   phases,
   wbsList,
+  suggestion,
 }: {
   line: ShortPaymentLine;
   disbId: number;
@@ -245,6 +318,7 @@ function LineRow({
   categories: Category[];
   phases: Phase[];
   wbsList: Wbs[];
+  suggestion?: WbsSuggestion;
 }) {
   const upd = useUpdateShortLine();
   const del = useDeleteShortLine();
@@ -306,7 +380,7 @@ function LineRow({
     <tr className="hover:bg-blue-50/40">
       <td className="px-2 py-1 text-slate-400">{line.line_no}</td>
       <td className="px-1 py-0.5">
-        <WbsEdit line={line} wbsList={wbsList} save={save} />
+        <WbsEdit line={line} wbsList={wbsList} save={save} suggestion={suggestion} />
       </td>
       <td className="px-1 py-0.5">
         <input
@@ -852,22 +926,16 @@ export function ShortPaymentsView() {
                     {editable ? <th className="px-2 py-1.5" /> : null}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {b.lines.map((l) => (
-                    <LineRow
-                      key={l.id ?? l.line_no}
-                      line={l}
-                      disbId={b.id}
-                      editable={editable}
-                      showBank={showBank}
-                      payees={payees}
-                      categories={categories}
-                      phases={phases}
-                      wbsList={wbsList}
-                    />
-                  ))}
-                  {editable ? <AddLineRow disbId={b.id} preCols={preCols} /> : null}
-                </tbody>
+                <LinesBody
+                  batch={b}
+                  editable={editable}
+                  showBank={showBank}
+                  payees={payees}
+                  categories={categories}
+                  phases={phases}
+                  wbsList={wbsList}
+                  preCols={preCols}
+                />
                 <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
                   <tr>
                     <td className="px-2 py-1.5" colSpan={preCols}>

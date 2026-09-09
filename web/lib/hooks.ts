@@ -1031,7 +1031,31 @@ export function useUpdateShortLine() {
   return useMutation({
     mutationFn: (v: { disbId: number; lineId: number; body: ShortLineBody }) =>
       api.patch(`/disbursements/${v.disbId}/lines/${v.lineId}`, v.body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["short-payments"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["short-payments"] });
+      // Al asignarle proyecto a una línea cambia lo que se sugiere para el resto.
+      qc.invalidateQueries({ queryKey: ["wbs-suggestions"] });
+    },
+  });
+}
+
+export interface WbsSuggestion {
+  line_id: number;
+  line_no: number;
+  wbs_id: number;
+  wbs_code: string;
+  wbs_title: string | null;
+  times: number;
+  reason: string;
+}
+
+// Proyecto sugerido para las líneas de la tanda que no tienen uno: se busca en la
+// historia el mismo concepto (o el mismo proveedor) ya clasificado.
+export function useWbsSuggestions(disbId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["wbs-suggestions", disbId],
+    queryFn: () => api.get<WbsSuggestion[]>(`/disbursements/${disbId}/wbs-suggestions`),
+    enabled,
   });
 }
 
@@ -1117,6 +1141,44 @@ export function useSavePlanningNote() {
       move_to_month?: string | null;
     }) => api.put("/planning/note", v),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["planning"] }),
+  });
+}
+
+// --- Planning → Short Payment ---------------------------------------------
+
+export interface PlanningToSpResult {
+  ok: boolean;
+  disbursement_id: number;
+  disb_no: number;
+  disb_sub: number;
+  period_month: string;
+  month: string;
+  added: { wbs_id: number; wbs_code: string; line_id: number; line_no: number; amount: string }[];
+  skipped: { wbs_id: number; wbs_code: string | null; reason: string }[];
+  total_added: string;
+}
+
+// Manda las líneas marcadas del Planning al final del Short Payment abierto.
+export function usePlanningToShortPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: {
+      month: string;
+      lines: { wbs_id: number; amount: number | null }[];
+      disbursement_id?: number | null;
+      force?: boolean;
+    }) =>
+      api.post<PlanningToSpResult>("/planning/to-short-payment", {
+        month: v.month,
+        lines: v.lines,
+        disbursement_id: v.disbursement_id ?? null,
+        force: v.force ?? false,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["short-payments"] });
+      qc.invalidateQueries({ queryKey: ["disbursements"] });
+      qc.invalidateQueries({ queryKey: ["invoice-receipts", "open-short-payment"] });
+    },
   });
 }
 

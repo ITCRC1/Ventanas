@@ -72,6 +72,35 @@ def next_disb_no(db: Session) -> int:
     )
 
 
+def open_batch(db: Session, disb_id: int | None = None) -> dict[str, Any] | None:
+    """La tanda ABIERTA del Short Payment (el borrador más reciente), o la pedida.
+
+    La usan el "＋ SP" de Invoice Receipts y el envío de líneas desde Planning:
+    los dos escriben en la misma tanda, así que la consulta vive en un solo lado.
+    """
+    where = "d.id = :id" if disb_id else "d.status = 'draft'"
+    row = (
+        db.execute(
+            text(
+                f"""
+                SELECT d.id, d.disb_no, d.disb_sub, d.period_month, d.send_date, d.status,
+                       d.total_amount,
+                       (SELECT count(*) FROM disbursement_line l WHERE l.disbursement_id = d.id)
+                         AS n_lines
+                FROM disbursement d
+                WHERE {where}
+                ORDER BY d.period_month DESC, d.disb_no DESC, d.disb_sub DESC
+                LIMIT 1
+                """
+            ),
+            {"id": disb_id} if disb_id else {},
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None
+
+
 def next_line_no(db: Session, disb_id: int) -> int:
     return int(
         db.execute(

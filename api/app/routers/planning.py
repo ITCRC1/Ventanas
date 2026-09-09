@@ -20,15 +20,20 @@ from sqlalchemy.orm import Session
 from app.core.permissions import require_permission
 from app.core.problems import Problem
 from app.deps import get_current_user, get_db
+from app.repositories import disbursement as disb_repo
 from app.repositories import schedule as sched_repo
 from app.repositories import wbs as wbs_repo
+from app.schemas.disbursement import LineIn
 from app.schemas.schedule import CellBulkItem
+from app.services import disbursement as disb_svc
 from app.services import schedule as sched_service
 
 router = APIRouter(prefix="/planning", tags=["planning"], dependencies=[Depends(get_current_user)])
 
 _can_view = Depends(require_permission("report.view"))
 _can_edit = Depends(require_permission("schedule.edit"))
+# Mandar líneas al Short Payment es crear desembolso, no editar el plan.
+_can_disb = Depends(require_permission("disb.create"))
 
 
 class NoteIn(BaseModel):
@@ -353,3 +358,165 @@ def delete_package(pid: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     if r is None:
         raise Problem(status_code=404, title="Paquete no encontrado")
     return {"ok": True}
+
+
+# --- Planning → Short Payment ---------------------------------------------
+#
+# Desde el tab Planning el owner marca líneas de un MES y las manda al Short
+# Payment abierto. Cada una entra como línea NUEVA al final de la tanda (misma
+# puerta que el "＋ SP" de Invoice Receipts: disb_svc.add_line numera al final).
+#
+# El monto lo confirma el usuario en la pantalla antes de mandar; si no viene,
+# se usa el plan del mes. Nunca se inventa: sin monto, la línea se reporta como
+# salteada en vez de entrar en cero.
+
+
+class SpLineIn(BaseModel):
+    wbs_id: int
+    amount: Decimal | None = None  # confirmado en pantalla; si falta, el plan del mes
+
+
+class ToShortPaymentIn(BaseModel):
+    month: str  # 'YYYY-MM' — el mes que se está mandando
+    lines: list[SpLineIn]
+    disbursement_id: int | None = None  # por defecto, la tanda abierta
+    force: bool = False  # agregar aunque el proyecto ya esté en la tanda
+
+
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _month_label(ym: str) -> str:
+    """'2026-09' → 'Sep 2026' (mismo formato corto que usa el front)."""
+    mon = _MONTHS[int(ym[5:7]) - 1]
+    return f"{mon} {ym[:4]}"
+
+
+def _planned_for_month(db: Session, wbs_id: int, ym: str) -> Decimal:
+    """Lo planificado para ese proyecto en ese mes: la suma de las semanas cuyo
+    lunes cae en el mes — el mismo criterio con el que el tab arma la columna."""
+    v = db.execute(
+        text(
+            "SELECT COALESCE(sum(planned_amount), 0) FROM schedule_cell "
+            "WHERE wbs_id = :w AND to_char(week_start, 'YYYY-MM') = :m"
+        ),
+        {"w": wbs_id, "m": ym},
+    ).scalar()
+    return Decimal(str(v or 0))
+
+
+@router.post("/to-short-payment", dependencies=[_can_disb], status_code=201)
+def to_short_payment(data: ToShortPaymentIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Agrega las líneas marcadas del Planning al final del Short Payment abierto."""
+    ym = data.month or ""
+    if len(ym) != 7 or ym[4] != "-" or not ym[:4].isdigit() or not (1 <= int(ym[5:7] or 0) <= 12):
+        raise Problem(status_code=400, title="Mes inválido", detail="Se espera 'YYYY-MM'.")
+    if not data.lines:
+        raise Problem(status_code=400, title="No hay líneas", detail="Marcá al menos un proyecto.")
+
+    batch = disb_repo.open_batch(db, data.disbursement_id)
+    if batch is None:
+        raise Problem(
+            status_code=409,
+            title="No hay Short Payment abierto",
+            detail="Creá la tanda del mes en el tab Disbursements y volvé a intentar.",
+        )
+    if batch["status"] != "draft":
+        raise Problem(
+            status_code=409,
+            title="La tanda no está abierta",
+            detail=f"El Disbursement #{batch['disb_no']}.{batch['disb_sub']} está en "
+            f'"{batch["status"]}"; solo se agregan líneas a un borrador.',
+        )
+
+    # Proyectos que YA están en la tanda: sin --force no se repiten.
+    already: dict[int, int] = {
+        int(r[0]): int(r[1])
+        for r in db.execute(
+            text(
+                "SELECT wbs_id, min(line_no) FROM disbursement_line "
+                "WHERE disbursement_id = :d AND wbs_id IS NOT NULL GROUP BY wbs_id"
+            ),
+            {"d": batch["id"]},
+        ).all()
+    }
+
+    label = _month_label(ym)
+    added: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+
+    # En el orden del tab (por número de proyecto), no en el orden de los clics.
+    wanted = {ln.wbs_id: ln for ln in data.lines}
+    rows = (
+        db.execute(
+            text(
+                "SELECT id, wbs_code, title FROM wbs_item "
+                "WHERE id = ANY(:ids) ORDER BY string_to_array(wbs_code, '.')::int[]"
+            ),
+            {"ids": list(wanted)},
+        )
+        .mappings()
+        .all()
+    )
+    faltantes = set(wanted) - {r["id"] for r in rows}
+    for wid in faltantes:
+        skipped.append({"wbs_id": wid, "wbs_code": None, "reason": "El proyecto no existe"})
+
+    for r in rows:
+        ln = wanted[r["id"]]
+        amount = ln.amount if ln.amount is not None else _planned_for_month(db, r["id"], ym)
+        amount = Decimal(amount).quantize(Decimal("0.01"))
+        if amount == 0:
+            skipped.append(
+                {
+                    "wbs_id": r["id"],
+                    "wbs_code": r["wbs_code"],
+                    "reason": f"Sin monto planificado en {label}",
+                }
+            )
+            continue
+        if r["id"] in already and not data.force:
+            skipped.append(
+                {
+                    "wbs_id": r["id"],
+                    "wbs_code": r["wbs_code"],
+                    "reason": f"Ya está en la tanda (línea {already[r['id']]})",
+                }
+            )
+            continue
+
+        # Category y Type NO se copian: la vista los hereda del WBS, que es el
+        # regente. Name/Note quedan vacíos, igual que la línea que llega de una
+        # factura — los llena el owner en Disbursements.
+        line = disb_svc.add_line(
+            db,
+            batch["id"],
+            LineIn(
+                description=f"{label} · {r['title'] or r['wbs_code']}",
+                amount=amount,
+                currency="USD",
+                wbs_id=r["id"],
+                transfer="SEND",
+            ),
+        )
+        added.append(
+            {
+                "wbs_id": r["id"],
+                "wbs_code": r["wbs_code"],
+                "line_id": line.id,
+                "line_no": line.line_no,
+                "amount": str(amount),
+            }
+        )
+
+    return {
+        "ok": True,
+        "disbursement_id": batch["id"],
+        "disb_no": batch["disb_no"],
+        "disb_sub": batch["disb_sub"],
+        "period_month": batch["period_month"],
+        "month": ym,
+        "added": added,
+        "skipped": skipped,
+        "total_added": str(sum((Decimal(a["amount"]) for a in added), Decimal(0))),
+    }

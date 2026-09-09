@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Response, UploadFile
 from sqlalchemy import select, text
@@ -47,6 +47,7 @@ from app.schemas.disbursement import (
     ShortPaymentLine,
 )
 from app.services import disbursement as svc
+from app.services import wbs_suggest
 
 router = APIRouter(tags=["desembolsos"], dependencies=[Depends(get_current_user)])
 
@@ -195,6 +196,16 @@ def short_payments(
                 )
             )
     return list(batches.values())
+
+
+@disb.get("/{disb_id}/wbs-suggestions")
+def wbs_suggestions(disb_id: int, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    """Proyecto sugerido para las líneas de la tanda que todavía no tienen uno.
+
+    Mira la historia: el mismo concepto (o el mismo proveedor) ya clasificado antes.
+    No escribe nada — la línea la asigna el owner desde la pantalla.
+    """
+    return wbs_suggest.suggest_for_batch(db, disb_id)
 
 
 @disb.get("/cycle-status")

@@ -7,7 +7,6 @@ asocie cada factura al asiento del ledger donde está el desembolso.
 from __future__ import annotations
 
 import re
-import unicodedata
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -17,10 +16,12 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core import text as text_util
 from app.core.config import Settings, get_settings
 from app.core.permissions import require_permission
 from app.core.problems import Problem
 from app.deps import get_current_user, get_db
+from app.repositories import disbursement as disb_repo
 from app.schemas.disbursement import LineIn
 from app.services import disbursement as disb_svc
 from app.services import invoice_mail, invoice_scheduler
@@ -457,24 +458,9 @@ def sync(
 
 
 def _open_batch(db: Session, disb_id: int | None = None) -> dict[str, Any] | None:
-    """La tanda ABIERTA del Short Payment (el borrador más reciente), o la pedida."""
-    where = "d.id = :id" if disb_id else "d.status = 'draft'"
-    row = db.execute(
-        text(
-            f"""
-            SELECT d.id, d.disb_no, d.disb_sub, d.period_month, d.send_date, d.status,
-                   d.total_amount,
-                   (SELECT count(*) FROM disbursement_line l WHERE l.disbursement_id = d.id)
-                     AS n_lines
-            FROM disbursement d
-            WHERE {where}
-            ORDER BY d.period_month DESC, d.disb_no DESC, d.disb_sub DESC
-            LIMIT 1
-            """
-        ),
-        {"id": disb_id} if disb_id else {},
-    ).mappings().first()
-    return dict(row) if row else None
+    """La tanda ABIERTA del Short Payment (el borrador más reciente), o la pedida.
+    La consulta vive en el repositorio: Planning agrega líneas a la misma tanda."""
+    return disb_repo.open_batch(db, disb_id)
 
 
 @router.get("/open-short-payment", dependencies=[_can_view])
@@ -860,22 +846,10 @@ def ledger_options(q: str = "", db: Session = Depends(get_db)) -> list[dict[str,
 
 # ---- Auto-match: cruzar facturas con desembolsos y aplicar los obvios --------
 
-_STOP = {
-    "sa", "srl", "ltda", "limitada", "sociedad", "responsabilidad", "anonima",
-    "de", "del", "la", "el", "los", "las", "y", "cr", "inc", "company", "the",
-    "s", "a", "l",
-}
-
-
-def _norm(s: str | None) -> str:
-    if not s:
-        return ""
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9 ]", " ", s.lower())
-
-
-def _tokens(s: str | None) -> set[str]:
-    return {t for t in _norm(s).split() if len(t) >= 3 and t not in _STOP}
+# Normalización compartida con la sugerencia de proyecto del Short Payment.
+_STOP = text_util.STOP
+_norm = text_util.norm
+_tokens = text_util.tokens
 
 
 def _digits(s: str | None) -> str:

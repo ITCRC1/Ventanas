@@ -2,6 +2,7 @@
 
 import { moneyUsd, num } from "@/lib/format";
 import {
+  type OpenShortPayment,
   type PackageSubmission,
   type PlanningNote,
   type PlanningPackage,
@@ -14,14 +15,17 @@ import {
   useFinancials,
   useLinkSubmissions,
   useMe,
+  useOpenShortPayment,
   usePackageSubmissions,
   usePlanningDoc,
   usePlanningPackages,
+  usePlanningToShortPayment,
   useSavePlanningComments,
   useSavePlanningNote,
   useScheduleCells,
   useScheduleWeeks,
 } from "@/lib/hooks";
+import type { PlanningToSpResult } from "@/lib/hooks";
 import type { WbsFinancials } from "@/lib/types";
 import { useMemo, useState } from "react";
 
@@ -33,6 +37,23 @@ const cash = (n: number) =>
 
 // Celda cruda del cronograma (autenticada o pública comparten forma).
 type Cell = { wbs_id: number; week_start: string; planned_amount: string | number | null };
+
+// Envío de líneas al Short Payment. Es OPCIONAL a propósito: la vista pública
+// del Planning (link sin login) NO lo recibe, así que ahí no aparece nada de esto.
+export type SpTarget = {
+  batch: OpenShortPayment | null;
+  send: (v: {
+    month: string;
+    lines: { wbs_id: number; amount: number | null }[];
+  }) => Promise<PlanningToSpResult>;
+  sending: boolean;
+};
+
+const spTitle = (b: OpenShortPayment) => {
+  const d = new Date(`${b.send_date ?? b.period_month}T00:00:00`);
+  const m = d.toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" });
+  return `#${b.disb_no}.${b.disb_sub} · ${m}`;
+};
 
 type SaveNote = (
   wbsId: number,
@@ -55,6 +76,7 @@ export function PlanningDoc({
   shareUrl,
   loading,
   defaultMonths,
+  sp,
 }: {
   financials: WbsFinancials[];
   cells: Cell[];
@@ -68,6 +90,7 @@ export function PlanningDoc({
   shareUrl?: string | null;
   loading?: boolean;
   defaultMonths?: number;
+  sp?: SpTarget;
 }) {
   const printedOn = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -80,6 +103,10 @@ export function PlanningDoc({
   const [onlyPlanned, setOnlyPlanned] = useState(true);
   const [filter, setFilter] = useState("");
   const [startYm, setStartYm] = useState<string | null>(null);
+  // Selección para mandar al Short Payment (solo con `sp`).
+  const [sel, setSel] = useState<Set<number>>(() => new Set());
+  const [spMonth, setSpMonth] = useState<string | null>(null);
+  const [spOpen, setSpOpen] = useState(false);
 
   const plannedByWbsMonth = useMemo(() => {
     const m = new Map<number, Map<string, number>>();
@@ -165,6 +192,29 @@ export function PlanningDoc({
   const grandRev = rows.reduce((s, r) => s + num(r.budget_revised), 0);
   const grandSpend = rows.reduce((s, r) => s + num(r.spend), 0);
   const grandRem = rows.reduce((s, r) => s + num(r.remaining), 0);
+
+  // --- Selección → Short Payment
+  const spSelectable = !!sp;
+  const spTargetMonth =
+    spMonth && windowMonths.includes(spMonth) ? spMonth : (windowMonths[0] ?? "");
+  const spAmountOf = (r: WbsFinancials) => {
+    // Lo que se va a proponer: la instrucción del aprobador si existe, si no el
+    // plan del mes. El usuario lo confirma (y corrige) antes de mandar.
+    const sug = noteMap.get(r.id)?.suggested_amount;
+    return sug != null && String(sug) !== "" ? num(sug) : planOf(r.id, spTargetMonth);
+  };
+  const selRows = rows.filter((r) => sel.has(r.id));
+  const selTotal = selRows.reduce((t, r) => t + spAmountOf(r), 0);
+  const toggleSel = (id: number) =>
+    setSel((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const allVisibleSelected = rows.length > 0 && rows.every((r) => sel.has(r.id));
+  const toggleAllVisible = () =>
+    setSel(allVisibleSelected ? new Set() : new Set(rows.map((r) => r.id)));
 
   const startLabel = windowMonths[0] ? monthLabel(windowMonths[0]) : "—";
   const endLabel = windowMonths.length ? monthLabel(windowMonths[windowMonths.length - 1]) : "—";
@@ -288,13 +338,100 @@ export function PlanningDoc({
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
+
+        {/* Mandar al Short Payment — solo en la vista con login */}
+        {sp ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-teal-200 bg-white px-3 py-1.5 text-xs print:hidden">
+            <span className="font-semibold text-teal-900">→ Short Payment</span>
+            <label>
+              Month:{" "}
+              <select
+                className={INP}
+                value={spTargetMonth}
+                onChange={(e) => setSpMonth(e.target.value)}
+              >
+                {windowMonths.map((mm) => (
+                  <option key={mm} value={mm}>
+                    {monthLabel(mm)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="text-slate-600">
+              {selRows.length} selected ·{" "}
+              <span className="font-semibold text-teal-800">{moneyUsd(selTotal)}</span>
+            </span>
+            {sel.size > 0 ? (
+              <button
+                type="button"
+                onClick={() => setSel(new Set())}
+                className="text-slate-500 underline hover:text-slate-700"
+              >
+                clear
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={selRows.length === 0 || !sp.batch || sp.sending}
+              onClick={() => setSpOpen(true)}
+              className={
+                selRows.length === 0 || !sp.batch || sp.sending
+                  ? "cursor-not-allowed rounded bg-slate-200 px-3 py-1 font-medium text-slate-500"
+                  : "rounded bg-teal-600 px-3 py-1 font-medium text-white hover:bg-teal-700"
+              }
+              title={
+                sp.batch
+                  ? "Add the selected project #s as new lines at the end of the batch"
+                  : "There is no open Short Payment"
+              }
+            >
+              ＋ Add to Short Payment
+            </button>
+            {sp.batch ? (
+              <span className="text-slate-500">
+                goes to <b className="text-indigo-800">{spTitle(sp.batch)}</b> · {sp.batch.n_lines}{" "}
+                lines
+              </span>
+            ) : (
+              <span className="font-medium text-amber-700">
+                ⚠ No open Short Payment — create the month's batch in Disbursements
+              </span>
+            )}
+          </div>
+        ) : null}
       </div>
+
+      {spOpen && sp?.batch ? (
+        <SendToSpModal
+          rows={selRows}
+          month={spTargetMonth}
+          monthName={monthLabel(spTargetMonth)}
+          batch={sp.batch}
+          amountOf={spAmountOf}
+          sending={sp.sending}
+          onSend={sp.send}
+          onDone={(ok) => {
+            setSpOpen(false);
+            if (ok) setSel(new Set());
+          }}
+        />
+      ) : null}
 
       {/* Tabla */}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[900px] text-xs">
           <thead className="sticky top-0 bg-[#0d6b72] text-left uppercase text-white">
             <tr>
+              {spSelectable ? (
+                <th className="w-8 px-2 py-2 text-center print:hidden">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleAllVisible}
+                    title="Select every project # in view"
+                  />
+                </th>
+              ) : null}
               <th className="px-2 py-2">No. Proyecto</th>
               <th className="px-2 py-2">Task / Phase</th>
               <th className="px-2 py-2 text-right">Budget</th>
@@ -325,12 +462,15 @@ export function PlanningDoc({
                 rowWindowTotal={rowWindowTotal}
                 noteMap={noteMap}
                 saveNote={onSaveNote}
+                selectable={spSelectable}
+                sel={sel}
+                onToggle={toggleSel}
               />
             ))}
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9 + windowMonths.length}
+                  colSpan={9 + (spSelectable ? 1 : 0) + windowMonths.length}
                   className="px-3 py-8 text-center text-slate-400"
                 >
                   {loading ? "Loading…" : "No project #s match — adjust the filters."}
@@ -402,6 +542,158 @@ export function PlanningDoc({
   );
 }
 
+// Confirmación antes de mandar: el owner ve exactamente qué línea y con qué
+// monto va a entrar a la tanda, y puede corregir cada uno. Nada entra a ciegas.
+function SendToSpModal({
+  rows,
+  month,
+  monthName,
+  batch,
+  amountOf,
+  sending,
+  onSend,
+  onDone,
+}: {
+  rows: WbsFinancials[];
+  month: string;
+  monthName: string;
+  batch: OpenShortPayment;
+  amountOf: (r: WbsFinancials) => number;
+  sending: boolean;
+  onSend: (v: {
+    month: string;
+    lines: { wbs_id: number; amount: number | null }[];
+  }) => Promise<PlanningToSpResult>;
+  onDone: (ok: boolean) => void;
+}) {
+  const [amounts, setAmounts] = useState<Record<number, string>>(() =>
+    Object.fromEntries(rows.map((r) => [r.id, String(amountOf(r).toFixed(2))])),
+  );
+  const [res, setRes] = useState<PlanningToSpResult | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const value = (r: WbsFinancials) => Number(amounts[r.id] ?? 0) || 0;
+  const total = rows.reduce((t, r) => t + value(r), 0);
+  const zeros = rows.filter((r) => Math.abs(value(r)) < 0.005).length;
+
+  const send = async () => {
+    setErr(null);
+    try {
+      setRes(
+        await onSend({
+          month,
+          lines: rows.map((r) => ({ wbs_id: r.id, amount: value(r) })),
+        }),
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo agregar a la tanda.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 print:hidden">
+      <div className="mt-10 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="text-sm font-semibold text-slate-800">
+            Add {rows.length} project #{rows.length === 1 ? "" : "s"} to {spTitle(batch)}
+          </div>
+          <div className="text-xs text-slate-500">
+            {monthName} plan · they go in as new lines at the end of the batch. Amounts are
+            editable — check them before sending.
+          </div>
+        </div>
+
+        {res ? (
+          <div className="space-y-2 px-4 py-3 text-xs">
+            <div className="font-medium text-teal-800">
+              ✓ {res.added.length} line{res.added.length === 1 ? "" : "s"} added ·{" "}
+              {moneyUsd(num(res.total_added))}
+            </div>
+            {res.added.length ? (
+              <div className="text-slate-600">
+                {res.added.map((a) => (
+                  <div key={a.line_id}>
+                    line {a.line_no} · {a.wbs_code} · {moneyUsd(num(a.amount))}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {res.skipped.length ? (
+              <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-amber-800">
+                <b>Skipped ({res.skipped.length}):</b>
+                {res.skipped.map((k) => (
+                  <div key={`${k.wbs_id}`}>
+                    {k.wbs_code ?? k.wbs_id} — {k.reason}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="max-h-[50vh] overflow-y-auto px-4 py-2">
+            <table className="w-full text-xs">
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="py-1 pr-2 font-medium text-blue-700">{r.wbs_code}</td>
+                    <td className="py-1 pr-2 text-slate-700">{r.title}</td>
+                    <td className="py-1 text-right">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={amounts[r.id] ?? ""}
+                        onChange={(e) =>
+                          setAmounts((a) => ({ ...a, [r.id]: e.target.value }))
+                        }
+                        className="w-28 rounded border border-slate-300 px-1 py-0.5 text-right"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-300 font-semibold">
+                  <td className="py-1.5" colSpan={2}>
+                    TOTAL
+                  </td>
+                  <td className="py-1.5 text-right text-teal-800">{moneyUsd(total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            {zeros ? (
+              <div className="mt-1 text-[11px] text-amber-700">
+                ⚠ {zeros} in zero — those are reported as skipped, they do not enter the batch.
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {err ? <div className="px-4 pb-2 text-xs text-red-600">{err}</div> : null}
+
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-2.5">
+          <button
+            type="button"
+            onClick={() => onDone(!!res)}
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            {res ? "Close" : "Cancel"}
+          </button>
+          {res ? null : (
+            <button
+              type="button"
+              disabled={sending}
+              onClick={send}
+              className="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+            >
+              {sending ? "Adding…" : `Add ${rows.length} to the batch`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GroupRows({
   cat,
   ls,
@@ -411,6 +703,9 @@ function GroupRows({
   rowWindowTotal,
   noteMap,
   saveNote,
+  selectable,
+  sel,
+  onToggle,
 }: {
   cat: string;
   ls: WbsFinancials[];
@@ -420,13 +715,16 @@ function GroupRows({
   rowWindowTotal: (r: WbsFinancials) => number;
   noteMap: Map<number, PlanningNote>;
   saveNote: SaveNote;
+  selectable?: boolean;
+  sel?: Set<number>;
+  onToggle?: (id: number) => void;
 }) {
   const sub = (fn: (r: WbsFinancials) => number) => ls.reduce((s, r) => s + fn(r), 0);
   return (
     <>
       <tr className="border-t-4 border-slate-700 bg-slate-200">
         <td
-          colSpan={9 + windowMonths.length}
+          colSpan={9 + (selectable ? 1 : 0) + windowMonths.length}
           className="px-2 py-1.5 text-[12px] font-bold uppercase text-slate-800"
         >
           {cat}
@@ -435,7 +733,19 @@ function GroupRows({
       {ls.map((r) => {
         const n = noteMap.get(r.id);
         return (
-          <tr key={r.id} className="hover:bg-teal-50/40">
+          <tr
+            key={r.id}
+            className={sel?.has(r.id) ? "bg-teal-50" : "hover:bg-teal-50/40"}
+          >
+            {selectable ? (
+              <td className="px-2 py-1 text-center print:hidden">
+                <input
+                  type="checkbox"
+                  checked={sel?.has(r.id) ?? false}
+                  onChange={() => onToggle?.(r.id)}
+                />
+              </td>
+            ) : null}
             <td className="px-2 py-1 font-medium text-blue-700">{r.wbs_code}</td>
             <td className="px-2 py-1 text-slate-700">
               {r.title}
@@ -882,6 +1192,8 @@ export function PlanningView() {
   const doc = usePlanningDoc();
   const saveNoteMut = useSavePlanningNote();
   const saveCommentsMut = useSavePlanningComments();
+  const openSp = useOpenShortPayment();
+  const toSpMut = usePlanningToShortPayment();
 
   const notes = doc.data?.notes ?? [];
   const noteByWbs = useMemo(() => {
@@ -938,6 +1250,11 @@ export function PlanningView() {
         onSaveComments={(c) => saveCommentsMut.mutate(c)}
         shareUrl={shareUrl}
         loading={fin.isLoading}
+        sp={{
+          batch: openSp.data ?? null,
+          sending: toSpMut.isPending,
+          send: (v) => toSpMut.mutateAsync(v),
+        }}
       />
     </div>
   );
