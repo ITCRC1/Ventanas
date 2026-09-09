@@ -2,7 +2,6 @@
 
 import { moneyUsd, num } from "@/lib/format";
 import {
-  type OpenShortPayment,
   type PackageSubmission,
   type PlanningNote,
   type PlanningPackage,
@@ -11,6 +10,7 @@ import {
   useCutoff,
   useDeleteLinkSubmission,
   useDeletePackage,
+  useDisbursements,
   useDeleteSubmission,
   useFinancials,
   useLinkSubmissions,
@@ -26,7 +26,7 @@ import {
   useScheduleWeeks,
 } from "@/lib/hooks";
 import type { PlanningToSpResult } from "@/lib/hooks";
-import type { WbsFinancials } from "@/lib/types";
+import type { Disbursement, WbsFinancials } from "@/lib/types";
 import { useMemo, useState } from "react";
 
 const MON = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -41,15 +41,19 @@ type Cell = { wbs_id: number; week_start: string; planned_amount: string | numbe
 // Envío de líneas al Short Payment. Es OPCIONAL a propósito: la vista pública
 // del Planning (link sin login) NO lo recibe, así que ahí no aparece nada de esto.
 export type SpTarget = {
-  batch: OpenShortPayment | null;
+  /** Tandas en BORRADOR: son las únicas que aceptan líneas nuevas. */
+  batches: Disbursement[];
+  /** La tanda abierta (la más reciente): el destino por defecto. */
+  openId: number | null;
   send: (v: {
     month: string;
     lines: { wbs_id: number; amount: number | null }[];
+    disbursement_id: number;
   }) => Promise<PlanningToSpResult>;
   sending: boolean;
 };
 
-const spTitle = (b: OpenShortPayment) => {
+const spTitle = (b: { disb_no: number; disb_sub: number; send_date?: string | null; period_month: string }) => {
   const d = new Date(`${b.send_date ?? b.period_month}T00:00:00`);
   const m = d.toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" });
   return `#${b.disb_no}.${b.disb_sub} · ${m}`;
@@ -106,6 +110,7 @@ export function PlanningDoc({
   // Selección para mandar al Short Payment (solo con `sp`).
   const [sel, setSel] = useState<Set<number>>(() => new Set());
   const [spMonth, setSpMonth] = useState<string | null>(null);
+  const [spBatchId, setSpBatchId] = useState<number | null>(null);
   const [spOpen, setSpOpen] = useState(false);
 
   const plannedByWbsMonth = useMemo(() => {
@@ -195,6 +200,13 @@ export function PlanningDoc({
 
   // --- Selección → Short Payment
   const spSelectable = !!sp;
+  // Destino: el que se elija, o la tanda abierta, o la primera en borrador.
+  const spBatch = sp
+    ? ((spBatchId != null ? sp.batches.find((b) => b.id === spBatchId) : undefined) ??
+      sp.batches.find((b) => b.id === sp.openId) ??
+      sp.batches[0] ??
+      null)
+    : null;
   const spTargetMonth =
     spMonth && windowMonths.includes(spMonth) ? spMonth : (windowMonths[0] ?? "");
   const spAmountOf = (r: WbsFinancials) => {
@@ -370,46 +382,58 @@ export function PlanningDoc({
                 clear
               </button>
             ) : null}
+            {sp.batches.length ? (
+              <label>
+                To:{" "}
+                <select
+                  className={INP}
+                  value={spBatch?.id ?? ""}
+                  onChange={(e) => setSpBatchId(Number(e.target.value))}
+                  title="Which Short Payment batch the lines go to (drafts only)"
+                >
+                  {sp.batches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {spTitle(b)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <button
               type="button"
-              disabled={selRows.length === 0 || !sp.batch || sp.sending}
+              disabled={selRows.length === 0 || !spBatch || sp.sending}
               onClick={() => setSpOpen(true)}
               className={
-                selRows.length === 0 || !sp.batch || sp.sending
+                selRows.length === 0 || !spBatch || sp.sending
                   ? "cursor-not-allowed rounded bg-slate-200 px-3 py-1 font-medium text-slate-500"
                   : "rounded bg-teal-600 px-3 py-1 font-medium text-white hover:bg-teal-700"
               }
               title={
-                sp.batch
+                spBatch
                   ? "Add the selected project #s as new lines at the end of the batch"
-                  : "There is no open Short Payment"
+                  : "There is no Short Payment batch in draft"
               }
             >
               ＋ Add to Short Payment
             </button>
-            {sp.batch ? (
-              <span className="text-slate-500">
-                goes to <b className="text-indigo-800">{spTitle(sp.batch)}</b> · {sp.batch.n_lines}{" "}
-                lines
-              </span>
-            ) : (
+            {spBatch ? null : (
               <span className="font-medium text-amber-700">
-                ⚠ No open Short Payment — create the month's batch in Disbursements
+                ⚠ No Short Payment in draft — create the month's batch in Disbursements
               </span>
             )}
           </div>
         ) : null}
       </div>
 
-      {spOpen && sp?.batch ? (
+      {spOpen && sp && spBatch ? (
         <SendToSpModal
           rows={selRows}
           month={spTargetMonth}
           monthName={monthLabel(spTargetMonth)}
-          batch={sp.batch}
+          batch={spBatch}
           amountOf={spAmountOf}
           sending={sp.sending}
-          onSend={sp.send}
+          onSend={(v) => sp.send({ ...v, disbursement_id: spBatch.id })}
           onDone={(ok) => {
             setSpOpen(false);
             if (ok) setSel(new Set());
@@ -557,7 +581,7 @@ function SendToSpModal({
   rows: WbsFinancials[];
   month: string;
   monthName: string;
-  batch: OpenShortPayment;
+  batch: Disbursement;
   amountOf: (r: WbsFinancials) => number;
   sending: boolean;
   onSend: (v: {
@@ -1193,7 +1217,21 @@ export function PlanningView() {
   const saveNoteMut = useSavePlanningNote();
   const saveCommentsMut = useSavePlanningComments();
   const openSp = useOpenShortPayment();
+  const disbs = useDisbursements();
   const toSpMut = usePlanningToShortPayment();
+  // Solo las tandas en borrador aceptan líneas nuevas; la más reciente primero.
+  const draftBatches = useMemo(
+    () =>
+      (disbs.data ?? [])
+        .filter((d) => d.status === "draft")
+        .sort(
+          (a, b) =>
+            b.period_month.localeCompare(a.period_month) ||
+            b.disb_no - a.disb_no ||
+            b.disb_sub - a.disb_sub,
+        ),
+    [disbs.data],
+  );
 
   const notes = doc.data?.notes ?? [];
   const noteByWbs = useMemo(() => {
@@ -1251,7 +1289,8 @@ export function PlanningView() {
         shareUrl={shareUrl}
         loading={fin.isLoading}
         sp={{
-          batch: openSp.data ?? null,
+          batches: draftBatches,
+          openId: openSp.data?.id ?? null,
           sending: toSpMut.isPending,
           send: (v) => toSpMut.mutateAsync(v),
         }}
