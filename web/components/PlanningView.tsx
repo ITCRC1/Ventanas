@@ -353,8 +353,16 @@ export function PlanningDoc({
 
         {/* Mandar al Short Payment — solo en la vista con login */}
         {sp ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-teal-200 bg-white px-3 py-1.5 text-xs print:hidden">
-            <span className="font-semibold text-teal-900">→ Short Payment</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t-2 border-teal-500 bg-teal-100 px-3 py-2 text-xs print:hidden">
+            <span className="rounded bg-teal-700 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+              Send to Short Payment
+            </span>
+            {selRows.length === 0 ? (
+              <span className="text-teal-900">
+                ① Tick the lines you want (click anywhere on the row) · ② pick the month and the
+                batch · ③ press the button
+              </span>
+            ) : null}
             <label>
               Month:{" "}
               <select
@@ -450,6 +458,7 @@ export function PlanningDoc({
                 <th className="w-8 px-2 py-2 text-center print:hidden">
                   <input
                     type="checkbox"
+                    className="h-4 w-4 accent-teal-600"
                     checked={allVisibleSelected}
                     onChange={toggleAllVisible}
                     title="Select every project # in view"
@@ -759,12 +768,26 @@ function GroupRows({
         return (
           <tr
             key={r.id}
-            className={sel?.has(r.id) ? "bg-teal-50" : "hover:bg-teal-50/40"}
+            // Marcar clickeando CUALQUIER punto de la fila: la casilla sola era
+            // demasiado discreta y no se encontraba.
+            onClick={
+              selectable
+                ? (e) => {
+                    const t = e.target as HTMLElement;
+                    if (t.closest("input, select, button, textarea, a")) return;
+                    onToggle?.(r.id);
+                  }
+                : undefined
+            }
+            className={`${selectable ? "cursor-pointer " : ""}${
+              sel?.has(r.id) ? "bg-teal-100 ring-1 ring-inset ring-teal-400" : "hover:bg-teal-50/40"
+            }`}
           >
             {selectable ? (
               <td className="px-2 py-1 text-center print:hidden">
                 <input
                   type="checkbox"
+                  className="h-4 w-4 accent-teal-600"
                   checked={sel?.has(r.id) ?? false}
                   onChange={() => onToggle?.(r.id)}
                 />
