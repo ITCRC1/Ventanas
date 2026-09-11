@@ -35,7 +35,7 @@ _can_report = Depends(require_permission("report.view"))
 
 # Columnas de texto editables del LEDGER (whitelist para el UPDATE dinámico).
 _TEXT_FIELDS = (
-    "entry_date", "invoice_no", "payee", "description", "paid_total",
+    "entry_date", "invoice_no", "payee", "beneficiary", "description", "paid_total",
     "date_paid", "payment_info", "bank_paid_from", "request", "notes",
 )  # fmt: skip
 
@@ -179,10 +179,11 @@ def import_disbursement(data: ImportDisbursement, db: Session = Depends(get_db))
                     # (auto-asigna el # de proyecto a los recurrentes; los demás quedan
                     # en blanco para asignar a mano).
                     "SELECT dl.id, dl.description, dl.invoice_no, dl.vendor, dl.amount, "
-                    "       dl.amount_paid, w.wbs_code, w.title "
+                    "       dl.amount_paid, w.wbs_code, w.title, pe.name AS beneficiary "
                     "FROM disbursement_line dl "
                     "LEFT JOIN recurring_item ri ON ri.id = dl.recurring_id "
                     "LEFT JOIN wbs_item w ON w.id = COALESCE(dl.wbs_id, ri.wbs_id) "
+                    "LEFT JOIN payee pe ON pe.id = dl.payee_id "
                     "WHERE dl.disbursement_id = :id ORDER BY dl.line_no"
                 ),
                 {"id": d["id"]},
@@ -196,6 +197,8 @@ def import_disbursement(data: ImportDisbursement, db: Session = Depends(get_db))
                 "cc": ln["wbs_code"],
                 "ac": ln["title"],
                 "pe": label,
+                # Nombre escrito en la columna Beneficiary del Short Payment.
+                "bf": ln["beneficiary"],
                 "de": ln["description"],
                 "inv": ln["invoice_no"],
                 # ISO: es la fecha que usan el auto-match (mismo mes) y los reportes.
@@ -216,6 +219,9 @@ def import_disbursement(data: ImportDisbursement, db: Session = Depends(get_db))
                           cost_code  = COALESCE(cost_code, :cc),
                           account    = COALESCE(account, :ac),
                           payee      = :pe,
+                          -- el Short Payment manda; si viene vacio, no borra lo
+                          -- que se haya escrito a mano en el Ledger.
+                          beneficiary = COALESCE(:bf, beneficiary),
                           description = :de,
                           invoice_no = COALESCE(:inv, invoice_no),
                           entry_date = :dt,
@@ -239,11 +245,11 @@ def import_disbursement(data: ImportDisbursement, db: Session = Depends(get_db))
                 db.execute(
                     text("""
                         INSERT INTO ledger_sheet_row
-                          (row_no, section, kind, cost_code, account, payee, description,
-                           invoice_no, entry_date, amount, amount_paid, amount_due, src_disb_no,
-                           source, notes, src_line_id)
+                          (row_no, section, kind, cost_code, account, payee, beneficiary,
+                           description, invoice_no, entry_date, amount, amount_paid, amount_due,
+                           src_disb_no, source, notes, src_line_id)
                         VALUES
-                          (:rn, 'Ledger', 'data', :cc, :ac, :pe, :de,
+                          (:rn, 'Ledger', 'data', :cc, :ac, :pe, :bf, :de,
                            :inv, :dt, :am, :ap, :ad, :src, 'import', :nt, :sl)
                     """),
                     {

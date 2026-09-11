@@ -123,6 +123,13 @@ class DisbursementLine(Base):
     )
 
     disbursement: Mapped[Disbursement] = relationship(back_populates="lines")
+    # Beneficiario ya resuelto: el front muestra y edita el NOMBRE, no el id
+    # (ver LineUpdate.payee_name). lazy="joined" evita el N+1 al listar lineas.
+    payee: Mapped[Payee | None] = relationship(lazy="joined")
+
+    @property
+    def payee_name(self) -> str | None:
+        return self.payee.name if self.payee is not None else None
 
 
 class CreditApplication(Base):

@@ -34,7 +34,7 @@ function num(v: string | null): number {
 }
 
 // 16 columnas: etiqueta (6) · Amount/Paid/Due · 7 finales (incl. Pago).
-const COLS = 16;
+const COLS = 17;
 
 function EscrowPanel() {
   const draws = useEscrowDraws();
@@ -129,7 +129,7 @@ function dropEmptySections(body: LedgerSheetRow[]): LedgerSheetRow[] {
 function GrandTotalRow({ amount, paid, due }: { amount: number; paid: number; due: number }) {
   return (
     <tr className="border-t-4 border-double border-slate-500 bg-slate-800 text-sm font-bold normal-case text-white">
-      <td colSpan={6} className="px-2 py-1.5 text-right">
+      <td colSpan={7} className="px-2 py-1.5 text-right">
         GRAND TOTAL
       </td>
       <td className="tabular px-2 py-1.5 text-right">{usd2(amount)}</td>
@@ -344,6 +344,7 @@ type TextField =
   | "entry_date"
   | "invoice_no"
   | "payee"
+  | "beneficiary"
   | "description"
   | "paid_total"
   | "date_paid"
@@ -428,6 +429,8 @@ function LedgerRow({
       <EditCell value={r.entry_date} onSave={(v) => saveText("entry_date", v)} size="date" />
       <EditCell value={r.invoice_no} onSave={(v) => saveText("invoice_no", v)} size="md" />
       <EditCell value={r.payee} onSave={(v) => saveText("payee", v)} size="lg" />
+      {/* Beneficiario: lo trae el import del Short Payment y se puede corregir aca. */}
+      <EditCell value={r.beneficiary} onSave={(v) => saveText("beneficiary", v)} size="lg" />
       <EditCell value={r.description} onSave={(v) => saveText("description", v)} size="xl" />
       <td className="tabular px-2 py-1 text-right text-blue-700">{usd2(r.amount)}</td>
       {/* Amount Paid editable con formato $ (recalcula varianza y subtotal en vivo).
@@ -522,7 +525,7 @@ export function LedgerView() {
       : body.filter(
           (r) =>
             r.kind !== "data" ||
-            [r.cost_code, r.account, r.payee, r.description].some((v) =>
+            [r.cost_code, r.account, r.payee, r.beneficiary, r.description].some((v) =>
               String(v ?? "")
                 .toLowerCase()
                 .includes(q),
@@ -703,7 +706,7 @@ export function LedgerView() {
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         {/* Ancho mínimo acorde a las columnas anchas (Payee/Descripción/# factura). */}
-        <table className="w-full min-w-[2150px] border-collapse text-[11px]">
+        <table className="w-full min-w-[2350px] border-collapse text-[11px]">
           <thead className="sticky top-0 bg-slate-100 text-left uppercase text-slate-500">
             <tr>
               <th className="whitespace-nowrap px-2 py-1">Cost Code</th>
@@ -711,6 +714,7 @@ export function LedgerView() {
               <th className="whitespace-nowrap px-2 py-1">Date</th>
               <th className="whitespace-nowrap px-2 py-1">Invoice #</th>
               <th className="whitespace-nowrap px-2 py-1">Payee</th>
+              <th className="whitespace-nowrap px-2 py-1">Beneficiary</th>
               <th className="whitespace-nowrap px-2 py-1">Description</th>
               <th className="px-2 py-1 text-right">Amount</th>
               <th className="px-2 py-1 text-right">Amount Paid</th>
@@ -743,7 +747,7 @@ export function LedgerView() {
                     key={`st-${it.gid}`}
                     className="border-y-2 border-blue-400 bg-blue-100 font-semibold text-blue-900"
                   >
-                    <td colSpan={6} className="px-2 py-1.5 text-right">
+                    <td colSpan={7} className="px-2 py-1.5 text-right">
                       Subtotal {it.key}
                     </td>
                     <td className="tabular px-2 py-1.5 text-right">{usd2(it.amount)}</td>

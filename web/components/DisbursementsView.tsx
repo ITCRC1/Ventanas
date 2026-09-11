@@ -228,20 +228,13 @@ function HeaderEditor({ d }: { d: DisbursementDetail }) {
 
 // Fila de línea editable inline (borrador). Guarda onBlur; el total lo recomputa
 // el trigger de la base y la vista refetchea.
-function EditableLineRow({
-  ln,
-  disbId,
-  payees,
-}: {
-  ln: DisbLine;
-  disbId: number;
-  payees: Payee[];
-}) {
+function EditableLineRow({ ln, disbId }: { ln: DisbLine; disbId: number }) {
   const upd = useUpdateLine();
   const del = useDeleteLine();
   const [desc, setDesc] = useState(ln.description);
   const [vendor, setVendor] = useState(ln.vendor ?? "");
   const [nota, setNota] = useState(ln.reason ?? "");
+  const [payee, setPayee] = useState(ln.payee_name ?? "");
 
   const save = (body: Parameters<typeof upd.mutate>[0]["body"]) =>
     upd.mutate({ disbId, lineId: ln.id, body });
@@ -276,18 +269,19 @@ function EditableLineRow({
         />
       </td>
       <td className="px-1">
-        <select
+        {/* Texto libre: se escribe el nombre del beneficiario tal cual va al
+            Ledger. El datalist solo sugiere los ya usados; no obliga a elegir. */}
+        <input
           className={CELL}
-          value={ln.payee_id ?? ""}
-          onChange={(e) => save({ payee_id: e.target.value ? Number(e.target.value) : null })}
-        >
-          <option value="">—</option>
-          {payees.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          list="disb-payees"
+          placeholder="Beneficiary"
+          value={payee}
+          onChange={(e) => setPayee(e.target.value)}
+          onBlur={() => {
+            const nm = payee.trim();
+            if (nm !== (ln.payee_name ?? "")) save({ payee_name: nm || null });
+          }}
+        />
       </td>
       <td className="px-1 text-center">
         {/* Muestra $#,##0.00; al enfocar deja el número plano para editarlo. */}
@@ -342,7 +336,7 @@ export function DisbursementsView() {
 
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
-  const [linePayee, setLinePayee] = useState<number | "">("");
+  const [linePayee, setLinePayee] = useState("");
   const [creditAmount, setCreditAmount] = useState("");
   const qc = useQueryClient();
   const [uploading, setUploading] = useState(false);
@@ -383,11 +377,14 @@ export function DisbursementsView() {
   // Reabrir (des-enviar / des-aprobar) para corregir: aprobado exige aprobar.
   const canReopen =
     (d?.status === "submitted" && canSubmit) || (d?.status === "approved" && canApprove);
-  const payeeName = (id: number | null) =>
-    id === null ? "" : (payees.data?.find((p) => p.id === id)?.name ?? "");
-
   return (
     <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+      {/* Sugerencias para la columna Beneficiary; el campo admite cualquier nombre. */}
+      <datalist id="disb-payees">
+        {(payees.data ?? []).map((p) => (
+          <option key={p.id} value={p.name} />
+        ))}
+      </datalist>
       {/* Lista */}
       <div className="space-y-3">
         {canCreate ? (
@@ -553,19 +550,14 @@ export function DisbursementsView() {
                   <tbody className="divide-y divide-slate-100">
                     {d.lines.map((ln) =>
                       editable ? (
-                        <EditableLineRow
-                          key={ln.id}
-                          ln={ln}
-                          disbId={d.id}
-                          payees={payees.data ?? []}
-                        />
+                        <EditableLineRow key={ln.id} ln={ln} disbId={d.id} />
                       ) : (
                         <tr key={ln.id} className="hover:bg-slate-50/60">
                           <td className="w-8 px-2 py-1.5 text-xs text-slate-400">{ln.line_no}</td>
                           <td className="px-2 py-1.5 text-slate-700">{ln.description}</td>
                           <td className="px-2 py-1.5 text-slate-500">{ln.vendor ?? ""}</td>
                           <td className="px-2 py-1.5 text-slate-500">{ln.reason ?? ""}</td>
-                          <td className="px-2 py-1.5 text-slate-500">{payeeName(ln.payee_id)}</td>
+                          <td className="px-2 py-1.5 text-slate-500">{ln.payee_name ?? ""}</td>
                           <td className="tabular px-2 py-1.5 text-center">{usd2(ln.amount)}</td>
                         </tr>
                       ),
@@ -638,18 +630,13 @@ export function DisbursementsView() {
                       value={desc}
                       onChange={(e) => setDesc(e.target.value)}
                     />
-                    <select
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                    <input
+                      className="w-52 rounded border border-slate-300 px-2 py-1 text-sm"
+                      list="disb-payees"
+                      placeholder="Beneficiary…"
                       value={linePayee}
-                      onChange={(e) => setLinePayee(e.target.value ? Number(e.target.value) : "")}
-                    >
-                      <option value="">Beneficiary…</option>
-                      {(payees.data ?? []).map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(e) => setLinePayee(e.target.value)}
+                    />
                     <input
                       type="number"
                       className="w-28 rounded border border-slate-300 px-2 py-1 text-sm"
@@ -667,7 +654,7 @@ export function DisbursementsView() {
                           body: {
                             description: desc,
                             amount: Number(amount),
-                            payee_id: linePayee ? Number(linePayee) : null,
+                            payee_name: linePayee.trim() || null,
                           },
                         });
                         setDesc("");

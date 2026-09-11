@@ -373,6 +373,8 @@ function invalidateDisb(qc: ReturnType<typeof useQueryClient>, id: number) {
   qc.invalidateQueries({ queryKey: ["disbursement", id] });
   qc.invalidateQueries({ queryKey: ["disbursements"] });
   qc.invalidateQueries({ queryKey: ["short-payments"] });
+  // Un beneficiario escrito a mano puede haber creado un payee nuevo.
+  qc.invalidateQueries({ queryKey: ["payees"] });
 }
 
 function useDisbMutation<T>(fn: (id: number, body?: T) => Promise<unknown>) {
@@ -417,6 +419,7 @@ export function useUpdateLine() {
         amount?: number;
         reason?: string | null;
         payee_id?: number | null;
+        payee_name?: string | null;
         transfer?: string | null;
       };
     }) => api.patch(`/disbursements/${v.disbId}/lines/${v.lineId}`, v.body),
@@ -437,9 +440,11 @@ export function useCreateDisbursement() {
 }
 
 export function useAddLine() {
-  return useDisbMutation<{ description: string; amount: number; payee_id: number | null }>(
-    (id, body) => api.post(`/disbursements/${id}/lines`, body),
-  );
+  return useDisbMutation<{
+    description: string;
+    amount: number;
+    payee_name: string | null;
+  }>((id, body) => api.post(`/disbursements/${id}/lines`, body));
 }
 
 export function useDeleteLine() {
@@ -952,6 +957,7 @@ type LedgerRowPatch = {
   entry_date?: string;
   invoice_no?: string;
   payee?: string;
+  beneficiary?: string;
   description?: string;
   paid_total?: string;
   date_paid?: string;

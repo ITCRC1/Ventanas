@@ -78,6 +78,7 @@ class LedgerSheetPatch(BaseModel):
     entry_date: str | None = None
     invoice_no: str | None = None
     payee: str | None = None
+    beneficiary: str | None = None
     description: str | None = None
     paid_total: str | None = None
     date_paid: str | None = None

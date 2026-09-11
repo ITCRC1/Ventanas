@@ -164,10 +164,15 @@ def _require_draft(db: Session, disb_id: int) -> Disbursement:
 
 def add_line(db: Session, disb_id: int, data: LineIn) -> DisbursementLine:
     _require_draft(db, disb_id)
+    fields = data.model_dump()
+    # Name escrito a mano: resuelve (o crea) el proveedor; vacio lo deja sin uno.
+    name = fields.pop("payee_name", None)
+    if name is not None:
+        fields["payee_id"] = resolve_payee_id(db, name)
     line = DisbursementLine(
         disbursement_id=disb_id,
         line_no=repo.next_line_no(db, disb_id),
-        **data.model_dump(),
+        **fields,
     )
     db.add(line)
     db.flush()  # dispara disb_lines_locked (rechaza si no es borrador) + total
@@ -185,6 +190,10 @@ def update_line(db: Session, line_id: int, data: LineUpdate) -> DisbursementLine
     for field, value in fields.items():
         setattr(line, field, value)
     db.flush()
+    # El beneficiario ya cargado queda viejo al cambiar payee_id: se expira para
+    # que la respuesta traiga el nombre nuevo, no el anterior.
+    if "payee_id" in fields:
+        db.expire(line, ["payee"])
     return line
 
 

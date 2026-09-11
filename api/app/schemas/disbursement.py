@@ -109,6 +109,7 @@ class LineOut(BaseModel):
     phase_id: int | None
     reason: str | None
     payee_id: int | None
+    payee_name: str | None = None  # nombre del beneficiario (se edita a mano)
     recurring_id: int | None
     transfer: str | None
 
@@ -124,6 +125,8 @@ class LineIn(BaseModel):
     phase_id: int | None = None
     reason: str | None = None
     payee_id: int | None = None
+    # Nombre escrito a mano: se resuelve al payee (lo crea si no existe).
+    payee_name: str | None = None
     transfer: str | None = None
 
 

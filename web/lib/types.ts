@@ -164,6 +164,7 @@ export interface DisbLine {
   phase_id: number | null;
   reason: string | null;
   payee_id: number | null;
+  payee_name: string | null; // nombre del beneficiario (se escribe a mano)
   recurring_id: number | null;
   transfer: string | null;
 }
@@ -430,7 +431,8 @@ export interface LedgerSheetRow {
   account: string | null;
   entry_date: string | null;
   invoice_no: string | null;
-  payee: string | null;
+  payee: string | null; // etiqueta del Disbursement ("Disbursement #26 - 08/01/2026")
+  beneficiary: string | null; // nombre del beneficiario que viene del Short Payment
   description: string | null;
   colones: string | null;
   amount: string | null;
