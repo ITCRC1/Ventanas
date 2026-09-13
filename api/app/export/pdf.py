@@ -12,7 +12,7 @@ from decimal import Decimal
 from html import escape
 from typing import Any
 
-from app.core.holding import HOLDING_SEND
+from app.core.holding import HOLDING_BANK, HOLDING_SEND
 
 
 def _ordinal(day: int) -> str:
@@ -65,6 +65,8 @@ def _usd(v: Decimal | float | None) -> str:
 # Destino fijo del holding para transferencias SEND (cuenta LAFISE de Ventanas
 # Holding). Se muestra combinado en el Breakdown; confirmado por el owner.
 _HOLDING_SEND = HOLDING_SEND
+# Nombre de la sociedad tal como va en la columna "Name" del Breakdown.
+_HOLDING_BANK = HOLDING_BANK
 
 
 _CSS_BD = """
@@ -101,9 +103,9 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
     suelto y por la página 3 de la Instrucción.
 
     Mapeo columna→campo (según cómo está cargada la data del Short Payment):
-      Category←reason · Type←payee_name · Name←bank_name · Transfer←beneficiary ·
-      Account←account. El destino (Name/Transfer/Bank/Beneficiary/Account/TOTAL) es
-      UNO solo por desembolso → se combina (rowspan).
+      Category←reason · Type←payee_name · Account←account. El destino
+      (Name/Transfer/Bank/Beneficiary/Account/TOTAL) es UNO solo por desembolso
+      → se combina (rowspan).
     """
     n = len(rows) or 1
 
@@ -113,15 +115,18 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
                 return escape(str(r[field]))
         return ""
 
-    name = first("bank_name")
-    transfer = first("beneficiary")
     total = Decimal(str(disb.total_amount or 0))
-    # Destino combinado: en SEND es la cuenta LAFISE del holding (fija). El IBAN
-    # solo se muestra con permiso bancario.
+    # Destino: lo que se le pide a corporativo entra SIEMPRE a la cuenta del
+    # holding (§ app/core/holding.py), así que el bloque es fijo y no depende de
+    # los campos bancarios del payee de la línea. Antes salía de ahí, y un
+    # beneficiario escrito a mano —que nace solo con nombre— dejaba las cinco
+    # celdas en blanco o metía la cédula del proveedor en Transfer.
+    transfer = first("transfer") or "SEND"
     is_send = transfer.strip().upper() == "SEND"
+    name = _HOLDING_BANK if is_send else first("bank_name")
     bank_name = _HOLDING_SEND["bank"] if is_send else ""
     beneficiary = _HOLDING_SEND["beneficiary"] if is_send else first("beneficiary")
-    account = (first("account") or (_HOLDING_SEND["iban"] if is_send else "")) if show_bank else ""
+    account = (_HOLDING_SEND["iban"] if is_send else first("account")) if show_bank else ""
 
     # Cabecera: primera celda roja "To be sent …", resto centradas.
     # Sin columna "Reason" (iba vacía). Anchos con holgura (suman 98%); TOTAL más
@@ -143,11 +148,15 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
     body = ""
     for i, r in enumerate(rows):
         amt = _usd(Decimal(str(r["amount"] or 0)))
+        # Type: la fase de la línea (Overhead / Personnel, Permit, Due Diligence).
+        # Si la línea no la tiene, se cae al payee como toda la vida — que es de
+        # donde salía el Type en las tandas viejas.
+        tipo = r.get("type") or r.get("payee_name") or ""
         left = (
             f'<td class="desc">{escape(r["description"] or "")}</td>'
             f'<td class="num">{amt}</td>'
             f'<td>{escape(r["reason"] or "")}</td>'
-            f'<td>{escape(r["payee_name"] or "")}</td>'
+            f'<td>{escape(str(tipo))}</td>'
         )
         # Bloque de transferencia: solo en la 1ª fila, con rowspan sobre todas y
         # centrado vertical (vertical-align: middle) para que quede en la misma línea.
