@@ -262,6 +262,9 @@ export function useSetCutoff() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["schedule", "cutoff"] });
       qc.invalidateQueries({ queryKey: ["wbs"] }); // el forecast depende del cutoff
+      // El encabezado del Job Cost muestra el mismo corte pero lo lee por
+      // /meta/project: sin esto se queda con la fecha vieja hasta recargar.
+      qc.invalidateQueries({ queryKey: ["meta", "project"] });
     },
   });
 }
