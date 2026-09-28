@@ -579,6 +579,10 @@ const FROZEN_W = LCX[LCW.length - 1] + LCW[LCW.length - 1];
 // Ancho FORZADO (min=max=width, box-sizing) para que el real coincida con el
 // offset sticky y no haya deriva al scrollear.
 const fcls = (bg: string, z = "z-20") => `sticky ${z} ${bg} overflow-hidden`;
+// Cabecera congelada: pegajosa en los DOS ejes. Un <th> sticky abre su propio
+// contexto, asi que el `sticky top-0` del <thead> no le llega: sin `top` propio
+// la mitad izquierda del encabezado se perdia al bajar.
+const fhead = (bg: string) => `${fcls(bg, "z-30")} top-0`;
 const fst = (i: number): CSSProperties => ({
   left: LCX[i],
   width: LCW[i],
@@ -1371,71 +1375,68 @@ export function JobCostFull() {
         <table className="border-collapse text-[11px]">
           <thead className="sticky top-0 z-20 bg-[#434343] text-left text-white">
             <tr>
-              <th
-                className={`${fcls("bg-[#434343]", "z-30")} px-1 py-2 text-center`}
-                style={fst(0)}
-              >
+              <th className={`${fhead("bg-[#434343]")} px-1 py-2 text-center`} style={fst(0)}>
                 St
               </th>
-              <th className={`${fcls("bg-[#434343]", "z-30")} px-1 py-2`} style={fst(1)}>
+              <th className={`${fhead("bg-[#434343]")} px-1 py-2`} style={fst(1)}>
                 WBS
               </th>
-              <th className={`${fcls("bg-[#434343]", "z-30")} px-1 py-2`} style={fst(2)}>
+              <th className={`${fhead("bg-[#434343]")} px-1 py-2`} style={fst(2)}>
                 Task Title
               </th>
               <ColHead
                 label="Orig. Budget"
                 help={COL_HELP.orig}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(3)}
                 align="right"
               />
               <ColHead
                 label="Changes"
                 help={COL_HELP.changes}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(4)}
                 align="right"
               />
               <ColHead
                 label="Revised"
                 help={COL_HELP.revised}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(5)}
                 align="right"
               />
               <ColHead
                 label="Spend"
                 help={COL_HELP.spend}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(6)}
                 align="right"
               />
               <ColHead
                 label="Remaining"
                 help={COL_HELP.remaining}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(7)}
                 align="right"
               />
               <ColHead
                 label="% Compl"
                 help={COL_HELP.pct}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(8)}
                 align="right"
               />
               <ColHead
                 label="Forecast"
                 help={COL_HELP.forecast}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(9)}
                 align="right"
               />
               <ColHead
                 label="Over/Under"
                 help={COL_HELP.overunder}
-                className={`${fcls("bg-[#434343]", "z-30")} ${MONEYTH}`}
+                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
                 style={fst(10)}
                 align="right"
               />
