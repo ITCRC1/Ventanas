@@ -245,6 +245,20 @@ def apply_plan(db: Session, codes: list[str] | None = None) -> dict[str, Any]:
                 },
             )
             escritas += 1
+
+    # El horizonte que dibuja el cronograma sale de settings; si un pago cae
+    # antes (o despues) de ese rango, su celda existe pero la pantalla ni la
+    # lista y el Timeline Total la pierde -> Control muestra un hueco falso.
+    # Se ensancha para cubrir todo lo que hay escrito.
+    horizonte = db.execute(
+        text(
+            "UPDATE settings SET horizon_start = LEAST(COALESCE(horizon_start, c.lo), c.lo), "
+            "                    horizon_end   = GREATEST(COALESCE(horizon_end, c.hi), c.hi) "
+            "FROM (SELECT MIN(week_start) AS lo, MAX(week_start) AS hi FROM schedule_cell) c "
+            "WHERE c.lo IS NOT NULL "
+            "RETURNING horizon_start, horizon_end"
+        )
+    ).first()
     return {
         "ok": True,
         "cutoff_date": corte,
@@ -253,4 +267,5 @@ def apply_plan(db: Session, codes: list[str] | None = None) -> dict[str, Any]:
         "celdas_escritas": escritas,
         "ajuste_total": sum((f["diferencia"] for f in elegidas), Decimal(0)),
         "wbs": [f["wbs_code"] for f in elegidas],
+        "horizonte": [horizonte[0], horizonte[1]] if horizonte else None,
     }
