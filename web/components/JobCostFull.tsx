@@ -560,6 +560,9 @@ function AddWbsForm({
 }
 
 const MONEYTH = "px-2 py-2 text-right text-[10px] font-semibold uppercase whitespace-nowrap";
+// Cada <th> de la cabecera se pega por su cuenta: un <thead> sticky NO sirve si
+// alguna celda ya es sticky (la celda abre su propio contexto y se va al bajar).
+const THH = "sticky top-0 z-30 bg-[#434343]";
 
 // Bloque CONGELADO: St … Over/Under (17 columnas). Al scrollear el cronograma,
 // estas quedan fijas para ver el presupuesto mientras se asignan recursos.
@@ -582,7 +585,7 @@ const fcls = (bg: string, z = "z-20") => `sticky ${z} ${bg} overflow-hidden`;
 // Cabecera congelada: pegajosa en los DOS ejes. Un <th> sticky abre su propio
 // contexto, asi que el `sticky top-0` del <thead> no le llega: sin `top` propio
 // la mitad izquierda del encabezado se perdia al bajar.
-const fhead = (bg: string) => `${fcls(bg, "z-30")} top-0`;
+const fhead = (bg: string) => `${fcls(bg, "z-40")} top-0`;
 const fst = (i: number): CSSProperties => ({
   left: LCX[i],
   width: LCW[i],
@@ -1373,7 +1376,7 @@ export function JobCostFull() {
         className="max-h-[72vh] overflow-auto rounded-lg border border-slate-200 bg-white"
       >
         <table className="border-collapse text-[11px]">
-          <thead className="sticky top-0 z-20 bg-[#434343] text-left text-white">
+          <thead className="bg-[#434343] text-left text-white">
             <tr>
               <th className={`${fhead("bg-[#434343]")} px-1 py-2 text-center`} style={fst(0)}>
                 St
@@ -1440,25 +1443,25 @@ export function JobCostFull() {
                 style={fst(10)}
                 align="right"
               />
-              <th className="px-2 py-2">Owner</th>
-              <th className="px-2 py-2">Category</th>
-              <th className="px-2 py-2">Phase</th>
-              <th className="px-2 py-2 text-[10px] uppercase whitespace-nowrap">Start</th>
-              <th className="px-2 py-2 text-[10px] uppercase whitespace-nowrap">Due</th>
+              <th className={`${THH} px-2 py-2`}>Owner</th>
+              <th className={`${THH} px-2 py-2`}>Category</th>
+              <th className={`${THH} px-2 py-2`}>Phase</th>
+              <th className={`${THH} px-2 py-2 text-[10px] uppercase whitespace-nowrap`}>Start</th>
+              <th className={`${THH} px-2 py-2 text-[10px] uppercase whitespace-nowrap`}>Due</th>
               <th
-                className="px-2 py-2 text-center text-[10px] uppercase"
+                className={`${THH} px-2 py-2 text-center text-[10px] uppercase`}
                 title="Duration in days (DAYS360 between Start and Due, like Excel)"
               >
                 Dur
               </th>
               <th
-                className="px-2 py-2 text-center text-[10px] uppercase"
+                className={`${THH} px-2 py-2 text-center text-[10px] uppercase`}
                 title="Current draw (last disbursement that touches the line)"
               >
                 Curr Draw
               </th>
               <th
-                className="px-2 py-2 text-center text-[10px] uppercase"
+                className={`${THH} px-2 py-2 text-center text-[10px] uppercase`}
                 title="First draw in which the line appears"
               >
                 Draw #
@@ -1468,7 +1471,7 @@ export function JobCostFull() {
                   key={c.key}
                   data-wk={String(c.weeks[0] ?? c.key)}
                   data-print="hide"
-                  className={`px-1 py-1 text-center text-[10px]${cutBorder(i)}`}
+                  className={`${THH} px-1 py-1 text-center text-[10px]${cutBorder(i)}`}
                   style={{ minWidth: 58 }}
                 >
                   <div>{c.label}</div>
@@ -1476,14 +1479,14 @@ export function JobCostFull() {
                 </th>
               ))}
               <th
-                className="bg-[#1a7f4b] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-[10px] uppercase"
                 style={{ minWidth: 90 }}
                 title="Actual = timeline ANTES del Forecast Cut-off (ejecutado/pagado del ledger)"
               >
                 Actual
               </th>
               <th
-                className="bg-[#856404] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#856404] px-2 py-2 text-right text-[10px] uppercase"
                 style={{ minWidth: 90 }}
                 title="Forecast = timeline DESDE el Forecast Cut-off en adelante (plan)"
               >
@@ -1492,19 +1495,19 @@ export function JobCostFull() {
               <ColHead
                 label="Timeline Total"
                 help={COL_HELP.tltotal}
-                className="bg-[#2d3a5c] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#2d3a5c] px-2 py-2 text-right text-[10px] uppercase"
                 style={{ minWidth: 90 }}
                 align="right"
               />
               <ColHead
                 label="Control"
                 help={COL_HELP.control}
-                className="bg-[#1a7f4b] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-[10px] uppercase"
                 style={{ minWidth: 80 }}
                 align="right"
               />
               <th
-                className="bg-[#0d6b72] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#0d6b72] px-2 py-2 text-right text-[10px] uppercase"
                 style={{ minWidth: 90 }}
                 title={`Total of the selected year(s): ${activeYears.join(", ")}`}
               >
