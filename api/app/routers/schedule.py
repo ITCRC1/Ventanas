@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ from app.deps import get_current_user, get_db
 from app.models.schedule import ScheduleCell
 from app.repositories import schedule as repo
 from app.schemas.schedule import CellIn, CellOut, CellsBulkIn, WeeksOut
+from app.services import ledger_history
 from app.services import schedule as service
 
 router = APIRouter(
@@ -39,6 +41,28 @@ def set_cutoff(data: CutoffIn, db: Session = Depends(get_db)) -> dict[str, date]
     db.execute(text("UPDATE settings SET cutoff_date = :d"), {"d": data.cutoff_date})
     db.commit()
     return {"cutoff_date": data.cutoff_date}
+
+
+class LedgerHistoryIn(BaseModel):
+    """Aplicar el historial del LEDGER. `wbs_codes` acota a esas líneas; vacío = todas."""
+
+    wbs_codes: list[str] | None = None
+
+
+@router.get("/ledger-history")
+def ledger_history_preview(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Qué cambiaría al traer el historial del LEDGER. No toca nada."""
+    return ledger_history.preview(db)
+
+
+@router.post("/ledger-history", dependencies=[_can_edit])
+def ledger_history_apply(
+    data: LedgerHistoryIn, db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    """Reescribe las semanas anteriores al corte con los pagos del LEDGER."""
+    out = ledger_history.apply_plan(db, data.wbs_codes or None)
+    db.commit()
+    return out
 
 
 @router.get("/weeks", response_model=WeeksOut)

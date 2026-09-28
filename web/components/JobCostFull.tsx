@@ -6,12 +6,14 @@ import { evalMath } from "@/lib/calc";
 import { COL_HELP, ColHead } from "@/lib/colhelp";
 import { num } from "@/lib/format";
 import {
+  useApplyLedgerHistory,
   useCategories,
   useClearCell,
   useCreateWbs,
   useCutoff,
   useEditWbsMeta,
   useFinancials,
+  useLedgerHistoryPreview,
   useMe,
   usePhases,
   useProjectMeta,
@@ -677,6 +679,10 @@ export function JobCostFull() {
   );
 
   const canEdit = me.data?.permissions.includes("wbs.edit") ?? false;
+  // Traer historial del LEDGER: la vista previa se pide solo al abrir el modal.
+  const [histOpen, setHistOpen] = useState(false);
+  const hist = useLedgerHistoryPreview(histOpen);
+  const histApply = useApplyLedgerHistory();
   const canSched = me.data?.permissions.includes("schedule.edit") ?? false;
   const paint = usePaintTool();
   const weekList = weeks.data?.weeks ?? []; // TODAS las semanas (Timeline Total / Control usan esto)
@@ -1133,6 +1139,16 @@ export function JobCostFull() {
           >
             {financials.isFetching ? "Recalculating…" : "🔄 Recalculate"}
           </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => setHistOpen(true)}
+              className="rounded border border-amber-600 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-100"
+              title="Rewrite the weeks before the cut-off with the real LEDGER payments, each in the week it was paid. Shows a preview first."
+            >
+              ⬅ Traer historial del LEDGER
+            </button>
+          ) : null}
           {me.data?.permissions.includes("report.view") ? (
             <a
               href="/api/export/excel"
@@ -2032,6 +2048,135 @@ export function JobCostFull() {
           </tfoot>
         </table>
       </div>
+
+      {/* Traer historial del LEDGER: vista previa primero, aplicar despues. */}
+      {histOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[85vh] w-full max-w-4xl overflow-auto rounded-lg bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold">Traer historial del LEDGER</h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Reescribe las semanas anteriores al corte con los pagos reales del LEDGER, cada
+                  uno en la semana en que se pagó. No toca nada desde el corte en adelante.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistOpen(false)}
+                className="rounded px-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            {hist.isPending ? <p className="text-sm text-slate-500">Calculando…</p> : null}
+            {hist.error ? (
+              <p className="text-sm text-red-600">No se pudo calcular la vista previa.</p>
+            ) : null}
+
+            {hist.data ? (
+              <>
+                <div className="mb-3 grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs sm:grid-cols-4">
+                  <div>
+                    <div className="text-slate-500">Corte</div>
+                    <div className="font-semibold">{hist.data.cutoff_date}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Se reconstruyen</div>
+                    <div className="font-semibold">{hist.data.a_reconstruir} líneas</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Celdas</div>
+                    <div className="font-semibold">
+                      −{hist.data.celdas_a_borrar} / +{hist.data.celdas_a_escribir}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Ajuste total</div>
+                    <div className="tabular font-semibold">{m(num(hist.data.ajuste_total))}</div>
+                  </div>
+                </div>
+
+                {hist.data.bloqueadas_sin_fecha > 0 ? (
+                  <p className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    ⚠ {hist.data.bloqueadas_sin_fecha} línea(s) quedan intactas: tienen pagos sin
+                    fecha en el LEDGER y no hay forma de saber en qué semana van. Poneles la fecha
+                    en el tab Ledger y volvé a correr esto.
+                  </p>
+                ) : null}
+
+                <div className="overflow-x-auto rounded border border-slate-200">
+                  <table className="w-full text-[11px]">
+                    <thead className="bg-slate-100 text-left text-slate-600">
+                      <tr>
+                        <th className="px-2 py-1">WBS</th>
+                        <th className="px-2 py-1">Línea</th>
+                        <th className="px-2 py-1 text-right">Pintado hoy</th>
+                        <th className="px-2 py-1 text-right">Queda en</th>
+                        <th className="px-2 py-1 text-right">Cambio</th>
+                        <th className="px-2 py-1">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {hist.data.detalle.map((d) => (
+                        <tr
+                          key={d.wbs_code}
+                          className={d.estado === "sin_fecha" ? "bg-amber-50/60" : undefined}
+                        >
+                          <td className="px-2 py-1 font-medium text-blue-700">{d.wbs_code}</td>
+                          <td className="px-2 py-1" title={d.nota}>
+                            {d.title}
+                          </td>
+                          <td className="tabular px-2 py-1 text-right">
+                            {m(num(d.pintado_actual))}
+                          </td>
+                          <td className="tabular px-2 py-1 text-right">
+                            {d.estado === "sin_fecha" ? "—" : m(num(d.pintado_nuevo))}
+                          </td>
+                          <td
+                            className={`tabular px-2 py-1 text-right ${
+                              num(d.diferencia) < 0 ? "text-red-600" : "text-emerald-700"
+                            }`}
+                          >
+                            {d.estado === "sin_fecha" ? "—" : m(num(d.diferencia))}
+                          </td>
+                          <td className="px-2 py-1 text-slate-500">
+                            {d.estado === "sin_fecha" ? "sin fecha — no se toca" : "se reconstruye"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHistOpen(false)}
+                    className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={hist.data.a_reconstruir === 0 || histApply.isPending}
+                    onClick={async () => {
+                      await histApply.mutateAsync(undefined);
+                      setHistOpen(false);
+                    }}
+                    className="rounded bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {histApply.isPending
+                      ? "Aplicando…"
+                      : `Aplicar a ${hist.data.a_reconstruir} línea(s)`}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

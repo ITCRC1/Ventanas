@@ -269,6 +269,56 @@ export function useSetCutoff() {
   });
 }
 
+// Historial del cronograma traido del LEDGER (el ledger prevalece). La vista
+// previa no toca nada; aplicar reescribe solo las semanas anteriores al corte.
+export interface LedgerHistoryLine {
+  wbs_code: string;
+  title: string;
+  estado: "reconstruir" | "sin_fecha" | "sin_cambios";
+  spend: string;
+  pintado_actual: string;
+  pintado_nuevo: string;
+  diferencia: string;
+  celdas_actuales: number;
+  celdas_nuevas: number;
+  monto_sin_fecha: string;
+  nota: string;
+}
+
+export interface LedgerHistoryPreview {
+  cutoff_date: string;
+  lineas: number;
+  a_reconstruir: number;
+  bloqueadas_sin_fecha: number;
+  sin_cambios: number;
+  celdas_a_borrar: number;
+  celdas_a_escribir: number;
+  ajuste_total: string;
+  detalle: LedgerHistoryLine[];
+}
+
+export function useLedgerHistoryPreview(enabled: boolean) {
+  return useQuery({
+    queryKey: ["schedule", "ledger-history"],
+    queryFn: () => api.get<LedgerHistoryPreview>("/schedule/ledger-history"),
+    enabled,
+  });
+}
+
+export function useApplyLedgerHistory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (wbs_codes?: string[]) =>
+      api.post<{ lineas_reescritas: number; celdas_escritas: number }>("/schedule/ledger-history", {
+        wbs_codes: wbs_codes ?? null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedule"] });
+      qc.invalidateQueries({ queryKey: ["wbs"] });
+    },
+  });
+}
+
 export function useScheduleCells() {
   return useQuery({
     queryKey: ["schedule", "cells"],
