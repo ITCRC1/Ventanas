@@ -1070,6 +1070,8 @@ export interface ReportCatalog {
   groups: string[];
   reports: ReportMeta[];
   cutoff_date: string | null;
+  /** Reportes que hoy no traen filas y por eso no se listan. */
+  hidden_empty: number;
 }
 
 export function useReportCatalog() {

@@ -62,19 +62,30 @@ def _cutoff(db: Session) -> date | None:
 @router.get("")
 def list_reports(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Catálogo para la pantalla de Reporting: qué hay, cómo se llama y cuánto trae."""
-    salida = []
+    salida, vacios = [], 0
     for name, rep in REPORTS.items():
-        n = db.execute(text(f"SELECT count(*) FROM {rep['view']}")).scalar()  # noqa: S608
+        n = int(db.execute(text(f"SELECT count(*) FROM {rep['view']}")).scalar() or 0)  # noqa: S608
+        # Un reporte sin filas no se publica: no se manda afuera una hoja en
+        # blanco. No se borra del catalogo — vuelve a aparecer solo el dia que
+        # tenga datos, que es justo cuando interesa (p.ej. huecos de numeracion).
+        if n == 0:
+            vacios += 1
+            continue
         salida.append({
             "name": name,
             "title": rep["title"],
             "blurb": rep["blurb"],
             "group": rep["group"],
             "columns": rep["cols"],
-            "rows": int(n or 0),
+            "rows": n,
         })
     salida.sort(key=lambda r: (GROUPS.index(r["group"]), r["title"]))
-    return {"groups": GROUPS, "reports": salida, "cutoff_date": _cutoff(db)}
+    return {
+        "groups": GROUPS,
+        "reports": salida,
+        "cutoff_date": _cutoff(db),
+        "hidden_empty": vacios,
+    }
 
 
 @router.get("/{name}/export.xlsx")

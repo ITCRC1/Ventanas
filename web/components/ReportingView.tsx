@@ -109,10 +109,9 @@ function Tabla({ meta, filas }: { meta: ReportMeta; filas: Record<string, unknow
 export function ReportingView() {
   const catalogo = useReportCatalog();
   const [sel, setSel] = useState<string | null>(null);
-  // Sin elección todavía, abre en el primer reporte CON filas: entrar a una
-  // tabla vacía hace pensar que la pantalla no cargó. Se deriva en vez de
-  // setear estado durante el render.
-  const activo = sel ?? catalogo.data?.reports.find((r) => r.rows > 0)?.name ?? null;
+  // El catálogo solo trae reportes con filas, así que abre en el primero.
+  // Se deriva en vez de setear estado durante el render.
+  const activo = sel ?? catalogo.data?.reports[0]?.name ?? null;
   const meta = catalogo.data?.reports.find((r) => r.name === activo) ?? null;
   const datos = useReport(activo);
 
@@ -164,6 +163,13 @@ export function ReportingView() {
             </div>
           );
         })}
+        {catalogo.data && catalogo.data.hidden_empty > 0 ? (
+          <p className="border-t border-slate-200 pt-2 text-[10px] leading-snug text-slate-400">
+            {catalogo.data.hidden_empty} report
+            {catalogo.data.hidden_empty === 1 ? "" : "s"} not listed — no data at the moment. They
+            appear on their own once there is something to show.
+          </p>
+        ) : null}
       </nav>
 
       {/* Reporte */}
