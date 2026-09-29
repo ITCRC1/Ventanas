@@ -16,6 +16,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.db import set_audit_batch
 from app.core.problems import Problem
 from app.deps import CurrentUser
 from app.models.disbursement import (
@@ -228,6 +229,7 @@ def replace_lines_from_excel(db: Session, disb_id: int, rows: list[dict[str, Any
     """Reemplaza TODAS las líneas del desembolso (borrador) con las del Excel.
     Devuelve cuántas líneas quedaron. El total se recalcula por trigger."""
     _require_draft(db, disb_id)
+    set_audit_batch(db, f"excel-import-{disb_id}")
     db.execute(
         text("DELETE FROM disbursement_line WHERE disbursement_id = :d"), {"d": disb_id}
     )

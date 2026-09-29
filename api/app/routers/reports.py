@@ -36,10 +36,14 @@ _VIEWS: dict[str, str] = {k: v["view"] for k, v in REPORTS.items()}
 _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-def _query_view(db: Session, view: str, limit: int, offset: int) -> list[dict[str, Any]]:
+def _query_view(
+    db: Session, view: str, limit: int, offset: int, order: str | None = None
+) -> list[dict[str, Any]]:
+    # `view` y `order` salen del catalogo del codigo, nunca del request.
+    orden = f" ORDER BY {order}" if order else ""
     rows = (
         db.execute(
-            text(f"SELECT * FROM {view} LIMIT :lim OFFSET :off"),  # noqa: S608 — view viene de whitelist
+            text(f"SELECT * FROM {view}{orden} LIMIT :lim OFFSET :off"),  # noqa: S608
             {"lim": limit, "off": offset},
         )
         .mappings()
@@ -92,7 +96,7 @@ def list_reports(db: Session = Depends(get_db)) -> dict[str, Any]:
 def export_report(name: str, db: Session = Depends(get_db)) -> Response:
     """El reporte completo en Excel, con encabezado y totales. Sin tope de filas."""
     rep = _require(name)
-    filas = _query_view(db, rep["view"], 100_000, 0)
+    filas = _query_view(db, rep["view"], 100_000, 0, rep.get("order"))
     blob = report_xlsx.build(
         title=rep["title"], blurb=rep["blurb"], columns=rep["cols"],
         rows=filas, cutoff=_cutoff(db),
@@ -112,4 +116,4 @@ def get_report(
     db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
     rep = _require(name)
-    return _query_view(db, rep["view"], min(limit, 500), max(offset, 0))
+    return _query_view(db, rep["view"], min(limit, 500), max(offset, 0), rep.get("order"))

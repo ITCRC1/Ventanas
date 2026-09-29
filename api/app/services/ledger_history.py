@@ -21,6 +21,8 @@ from typing import Any, NamedTuple
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.db import set_audit_batch
+
 # Tolerancia: por debajo de medio centavo es ruido de redondeo, no un desfase.
 CENTAVO = Decimal("0.005")
 
@@ -204,6 +206,9 @@ def apply_plan(db: Session, codes: list[str] | None = None) -> dict[str, Any]:
     no se tocan nunca. Conserva el state_id que ya tenía cada semana.
     """
     corte = _cutoff(db)
+    # Reescribe cientos de celdas: van todas bajo una etiqueta para que en la
+    # bitácora se lean como un solo evento y no como ruido.
+    set_audit_batch(db, "ledger-history")
     filas = build_plan(*_fetch(db, corte), corte=corte)
     elegidas = [
         f

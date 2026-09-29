@@ -40,6 +40,16 @@ def set_audit_user(session: Session, user_id: str | None) -> None:
     )
 
 
+def set_audit_batch(session: Session, label: str) -> None:
+    """Etiqueta las escrituras de una operación masiva para la bitácora.
+
+    Traer el historial del LEDGER reescribe cientos de celdas: sin etiqueta la
+    auditoría queda ilegible. `is_local = true` la limita a esta transacción, así
+    que se borra sola al terminar y no contamina lo que venga después.
+    """
+    session.execute(text("SELECT set_config('app.audit_batch', :b, true)"), {"b": label})
+
+
 def session_scope(user_id: str | None = None) -> Iterator[Session]:
     """Contexto transaccional: commit al salir bien, rollback si algo falla."""
     session = SessionLocal()

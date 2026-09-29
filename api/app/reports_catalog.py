@@ -22,6 +22,22 @@ def _c(cols: list[Col]) -> list[dict[str, str]]:
 
 
 REPORTS: dict[str, dict[str, Any]] = {
+    # --- Integrity -----------------------------------------------------------
+    "data-integrity": {
+        "view": "v_data_integrity",
+        "title": "Data Integrity",
+        "blurb": "Automated checks over the whole database. A check with zero failures is proof it ran and passed.",
+        "group": "Integrity",
+        "order": "sort_order",
+        "cols": _c([
+            ("severity", "Severity", "text"),
+            ("area", "Area", "text"),
+            ("check_name", "Check", "text"),
+            ("failures", "Failures", "int"),
+            ("amount", "Amount Involved", "money"),
+            ("hint", "What to do", "text"),
+        ]),
+    },
     # --- Budget & Schedule ---------------------------------------------------
     "budget-vs-actual": {
         "view": "v_budget_vs_actual",
@@ -247,4 +263,4 @@ REPORTS: dict[str, dict[str, Any]] = {
     },
 }
 
-GROUPS = ["Budget & Schedule", "Ledger", "Disbursements & Wires", "Banking"]
+GROUPS = ["Integrity", "Budget & Schedule", "Ledger", "Disbursements & Wires", "Banking"]

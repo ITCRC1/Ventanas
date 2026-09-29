@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.db import set_audit_batch
 from app.core.permissions import require_permission
 from app.core.problems import Problem
 from app.deps import get_current_user, get_db
@@ -137,6 +138,7 @@ def import_disbursement(data: ImportDisbursement, db: Session = Depends(get_db))
             detail=f"No existe un Disbursement #{data.disb_no} en Short Payments.",
         )
 
+    set_audit_batch(db, f"import-disbursement-{data.disb_no}")
     from_excel = db.execute(
         text("SELECT count(*) FROM ledger_sheet_row WHERE src_disb_no = :n AND source = 'excel'"),
         {"n": data.disb_no},
