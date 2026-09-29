@@ -2,18 +2,26 @@
 
 Sólo lectura. Requieren el permiso report.view. Nada se recalcula en la app:
 los totales, saldos y prorrateos ya viven en las vistas de la base.
+
+El catálogo (títulos, etiquetas de columna y tipos) vive en app/reports_catalog.py
+porque estos reportes se mandan afuera y los nombres crudos de las vistas no
+sirven para eso.
 """
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
+from app.core.problems import Problem
 from app.deps import get_db
+from app.export import report_xlsx
+from app.reports_catalog import GROUPS, REPORTS
 
 router = APIRouter(
     prefix="/reports",
@@ -21,24 +29,11 @@ router = APIRouter(
     dependencies=[Depends(require_permission("report.view"))],
 )
 
-# Vistas expuestas como reportes de solo lectura. La whitelist evita inyección
-# por nombre de vista y documenta qué se publica.
-_VIEWS: dict[str, str] = {
-    "ledger": "v_ledger",
-    "budget-vs-actual": "v_budget_vs_actual",
-    "timeline": "v_timeline",
-    "timeline-detail": "v_timeline_detail",
-    "reassignment-queue": "v_reassignment_queue",
-    "disbursement-trace": "v_disbursement_trace",
-    "disbursement-gaps": "v_disbursement_gaps",
-    "credit-ledger": "v_credit_ledger",
-    "credit-balance": "v_credit_balance",
-    "wire-reconciliation": "v_wire_reconciliation",
-    "wire-pending": "v_wire_pending",
-    "bank-fees": "v_bank_fees",
-    "bank-charges-monthly": "v_bank_charges_monthly",
-    "charges-pending-recovery": "v_charges_pending_recovery",
-}
+# Nombre de vista por reporte. La whitelist evita inyección y documenta qué se
+# publica; se deriva del catálogo para no mantener dos listas.
+_VIEWS: dict[str, str] = {k: v["view"] for k, v in REPORTS.items()}
+
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _query_view(db: Session, view: str, limit: int, offset: int) -> list[dict[str, Any]]:
@@ -53,9 +48,49 @@ def _query_view(db: Session, view: str, limit: int, offset: int) -> list[dict[st
     return [dict(r) for r in rows]
 
 
+def _require(name: str) -> dict[str, Any]:
+    rep = REPORTS.get(name)
+    if rep is None:
+        raise Problem(status_code=404, title="Reporte desconocido", detail=f"«{name}» no existe.")
+    return rep
+
+
+def _cutoff(db: Session) -> date | None:
+    return db.execute(text("SELECT cutoff_date FROM settings LIMIT 1")).scalar()
+
+
 @router.get("")
-def list_reports() -> dict[str, list[str]]:
-    return {"reports": sorted(_VIEWS)}
+def list_reports(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Catálogo para la pantalla de Reporting: qué hay, cómo se llama y cuánto trae."""
+    salida = []
+    for name, rep in REPORTS.items():
+        n = db.execute(text(f"SELECT count(*) FROM {rep['view']}")).scalar()  # noqa: S608
+        salida.append({
+            "name": name,
+            "title": rep["title"],
+            "blurb": rep["blurb"],
+            "group": rep["group"],
+            "columns": rep["cols"],
+            "rows": int(n or 0),
+        })
+    salida.sort(key=lambda r: (GROUPS.index(r["group"]), r["title"]))
+    return {"groups": GROUPS, "reports": salida, "cutoff_date": _cutoff(db)}
+
+
+@router.get("/{name}/export.xlsx")
+def export_report(name: str, db: Session = Depends(get_db)) -> Response:
+    """El reporte completo en Excel, con encabezado y totales. Sin tope de filas."""
+    rep = _require(name)
+    filas = _query_view(db, rep["view"], 100_000, 0)
+    blob = report_xlsx.build(
+        title=rep["title"], blurb=rep["blurb"], columns=rep["cols"],
+        rows=filas, cutoff=_cutoff(db),
+    )
+    archivo = f"Ventanas_{name.replace('-', '_')}.xlsx"
+    return Response(
+        blob, media_type=_XLSX,
+        headers={"Content-Disposition": f'attachment; filename="{archivo}"'},
+    )
 
 
 @router.get("/{name}")
@@ -65,9 +100,5 @@ def get_report(
     offset: int = 0,
     db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    from app.core.problems import Problem
-
-    view = _VIEWS.get(name)
-    if view is None:
-        raise Problem(status_code=404, title="Reporte desconocido", detail=f"«{name}» no existe.")
-    return _query_view(db, view, min(limit, 500), max(offset, 0))
+    rep = _require(name)
+    return _query_view(db, rep["view"], min(limit, 500), max(offset, 0))

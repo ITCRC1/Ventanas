@@ -28,6 +28,12 @@ const NAV: NavItem[] = [
   },
   { href: "/dashboard", label: "Dashboard", hint: "Executive summary", perm: "report.view" },
   {
+    href: "/reporting",
+    label: "Reporting",
+    hint: "Reports to print or export",
+    perm: "report.view",
+  },
+  {
     href: "/planning",
     label: "Planning",
     hint: "Prepare and approve what's coming",

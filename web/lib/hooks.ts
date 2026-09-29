@@ -1049,6 +1049,44 @@ export function useCreatePayment() {
   });
 }
 
+// --- Reporting (las vistas de reporte con etiquetas para mandar afuera) ------
+
+export interface ReportColumn {
+  key: string;
+  label: string;
+  kind: "money" | "date" | "int" | "pct" | "text";
+}
+
+export interface ReportMeta {
+  name: string;
+  title: string;
+  blurb: string;
+  group: string;
+  columns: ReportColumn[];
+  rows: number;
+}
+
+export interface ReportCatalog {
+  groups: string[];
+  reports: ReportMeta[];
+  cutoff_date: string | null;
+}
+
+export function useReportCatalog() {
+  return useQuery({
+    queryKey: ["reports", "catalog"],
+    queryFn: () => api.get<ReportCatalog>("/reports"),
+  });
+}
+
+export function useReport(name: string | null) {
+  return useQuery({
+    queryKey: ["reports", "data", name],
+    queryFn: () => api.get<Record<string, unknown>[]>(`/reports/${name}?limit=500`),
+    enabled: !!name,
+  });
+}
+
 export function useEscrowDraws() {
   return useQuery({
     queryKey: ["reports", "disbursement-trace"],
