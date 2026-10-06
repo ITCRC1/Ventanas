@@ -1074,6 +1074,46 @@ export interface ReportCatalog {
   hidden_empty: number;
 }
 
+/** Una entrada de la bitacora, tal como la devuelve `v_finding_log`. */
+export interface BlogEntry {
+  log_no: number;
+  logged_at: string;
+  subject: string;
+  finding: string;
+  action: string | null;
+  source: string | null;
+  /** El consecutivo de la entrada que esta reemplaza, o null. */
+  reemplaza_a: number | null;
+  /** Hay una entrada posterior que la corrige. */
+  fue_reemplazada: boolean;
+  autor: string;
+}
+
+export function useBlog() {
+  return useQuery({
+    queryKey: ["blog"],
+    queryFn: () => api.get<{ entries: BlogEntry[] }>("/blog"),
+  });
+}
+
+/** Agrega una entrada. No hay `useBlogDelete` ni `useBlogEdit`: la base rechaza
+ *  el UPDATE y el DELETE, y el router no expone esas rutas (migracion 0051). */
+export function useBlogPost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      subject: string;
+      finding: string;
+      action: string | null;
+      source: string | null;
+      supersedes: number | null;
+    }) => api.post<{ log_no: number; logged_at: string }>("/blog", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blog"] });
+    },
+  });
+}
+
 export function useReportCatalog() {
   return useQuery({
     queryKey: ["reports", "catalog"],

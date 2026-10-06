@@ -461,6 +461,41 @@ UPDATE bank_tx SET class_code=NULL WHERE description='GASTOS VARIOS__';
 SELECT expect_eq('Bancos','...y reclasifica al poner class_code en NULL',
   $$SELECT class_code FROM bank_tx WHERE description='GASTOS VARIOS__'$$,'other');
 
+-- ============================ BITACORA =====================================
+-- La tabla que solo crece (migracion 0051). Lo que se prueba no es que guarde:
+-- es que NO deje borrar, porque esa es la unica razon por la que existe.
+
+INSERT INTO finding_log (subject, finding, source)
+  VALUES ('Prueba', 'Entrada de prueba de la bitacora', 'test_suite.sql');
+
+SELECT expect_eq('Bitacora','La primera entrada lleva el consecutivo 1',
+  $$SELECT log_no::text FROM finding_log WHERE subject = 'Prueba'$$, '1');
+
+SELECT expect_fail('Bitacora','Una entrada NO se puede editar',
+  $$UPDATE finding_log SET finding = 'otra cosa' WHERE subject = 'Prueba'$$);
+
+SELECT expect_fail('Bitacora','Una entrada NO se puede borrar',
+  $$DELETE FROM finding_log WHERE subject = 'Prueba'$$);
+
+SELECT expect_fail('Bitacora','La bitacora NO se puede vaciar',
+  $$TRUNCATE finding_log$$);
+
+SELECT expect_fail('Bitacora','El asunto no puede venir vacio',
+  $$INSERT INTO finding_log (subject, finding) VALUES ('   ', 'algo')$$);
+
+-- El consecutivo sigue, no se reinicia ni salta.
+INSERT INTO finding_log (subject, finding, supersedes)
+  SELECT 'Prueba 2', 'Corrige la anterior', id FROM finding_log WHERE subject = 'Prueba';
+
+SELECT expect_eq('Bitacora','La segunda entrada sigue el consecutivo',
+  $$SELECT log_no::text FROM finding_log WHERE subject = 'Prueba 2'$$, '2');
+
+SELECT expect_eq('Bitacora','La entrada corregida queda marcada, no borrada',
+  $$SELECT fue_reemplazada::text FROM v_finding_log WHERE log_no = 1$$, 'true');
+
+SELECT expect_eq('Bitacora','La correccion dice a cual reemplaza',
+  $$SELECT reemplaza_a::text FROM v_finding_log WHERE log_no = 2$$, '1');
+
 -- ============================ RESULTADOS ===================================
 \echo ''
 \echo '================= RESULTADOS ================='

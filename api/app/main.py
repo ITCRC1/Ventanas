@@ -14,6 +14,7 @@ from app.routers import (
     admin,
     auth,
     bank,
+    blog,
     catalog,
     disbursements,
     export,
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(public.router, prefix=p)
     app.include_router(reports.router, prefix=p)
     app.include_router(export.router, prefix=p)
+    app.include_router(blog.router, prefix=p)
 
     @app.get("/")
     def root() -> dict[str, str]:

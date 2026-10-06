@@ -77,6 +77,10 @@ const NAV: NavItem[] = [
       { href: "/us-wires", label: "US Wire Transfers", hint: "Owner contributions" },
     ],
   },
+  // La bitacora del proyecto. Va antes de Admin porque se consulta, no se
+  // administra, y sin `perm`: leerla puede cualquiera con sesion. Escribir
+  // pide `blog.post`, y eso lo resuelve la propia pantalla.
+  { href: "/blog", label: "Blog", hint: "Project log — findings, numbered and permanent" },
   { href: "/admin", label: "Admin", hint: "Profiles & users", perm: "admin.users" },
 ];
 
