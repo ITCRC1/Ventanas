@@ -35,6 +35,106 @@ function fecha(iso: string): string {
 /** El consecutivo como se lee: 001, 014, 132. */
 const consecutivo = (n: number) => String(n).padStart(3, "0");
 
+/**
+ * El texto de una entrada, respetando lo que viene alineado.
+ *
+ * Owner, 2026-10-06, viendo la #001: *«debes mejorar las tablas, se ven mal
+ * alineadas»*.
+ *
+ * ⚠️ **El arreglo tiene que estar acá y no en el texto.** Una entrada no se
+ * puede editar —de eso se trata la bitácora—, así que la que ya está escrita
+ * no se va a reformatear nunca. Lo que cambia es cómo se lee.
+ *
+ * El texto se guarda plano, con las columnas armadas a espacios. En
+ * tipografía proporcional una «i» mide menos que una «M» y la alineación se
+ * deshace. Así que las corridas de líneas alineadas salen en monoespaciada, y
+ * la prosa se queda proporcional, que es como se lee mejor.
+ */
+type Trozo =
+  | { tipo: "titulo"; texto: string }
+  | { tipo: "parrafo"; texto: string }
+  | { tipo: "tabla"; lineas: string[] };
+
+/** Una línea con dos o más espacios seguidos viene alineada a mano. */
+const pareceFila = (l: string) => /\S {2,}\S/.test(l);
+
+/** Un rótulo del cuerpo: corto y en mayúsculas («EL CONTRATO»). */
+const pareceTitulo = (l: string) => {
+  const t = l.trim();
+  return t.length > 0 && t.length <= 70 && t === t.toUpperCase() && /[A-ZÁÉÍÓÚÑ]/.test(t);
+};
+
+function trocear(texto: string): Trozo[] {
+  const out: Trozo[] = [];
+  let parrafo: string[] = [];
+  let corrida: string[] = [];
+
+  const cerrarParrafo = () => {
+    if (parrafo.length) out.push({ tipo: "parrafo", texto: parrafo.join("\n") });
+    parrafo = [];
+  };
+  // ⚠️ Una sola línea con doble espacio NO es una tabla: puede ser prosa con
+  // dos espacios después de un punto. Hacen falta dos seguidas para que valga
+  // la pena romper la tipografía.
+  const cerrarCorrida = () => {
+    if (corrida.length >= 2) {
+      cerrarParrafo();
+      out.push({ tipo: "tabla", lineas: corrida });
+    } else {
+      parrafo.push(...corrida);
+    }
+    corrida = [];
+  };
+
+  for (const l of texto.split("\n")) {
+    if (pareceFila(l)) {
+      corrida.push(l);
+      continue;
+    }
+    cerrarCorrida();
+    if (!l.trim()) {
+      cerrarParrafo();
+      continue;
+    }
+    if (pareceTitulo(l)) {
+      cerrarParrafo();
+      out.push({ tipo: "titulo", texto: l.trim() });
+      continue;
+    }
+    parrafo.push(l);
+  }
+  cerrarCorrida();
+  cerrarParrafo();
+  return out;
+}
+
+function Texto({ texto }: { texto: string }) {
+  return (
+    <>
+      {trocear(texto).map((t, i) =>
+        t.tipo === "titulo" ? (
+          <h3 key={i} className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t.texto}
+          </h3>
+        ) : t.tipo === "tabla" ? (
+          // `overflow-x-auto`: una tabla ancha se desplaza, no se parte. Partida
+          // pierde justo la alineación que este bloque existe para conservar.
+          <pre
+            key={i}
+            className="mt-2 overflow-x-auto rounded bg-slate-50 px-3 py-2 font-mono text-xs leading-5 text-slate-800"
+          >
+            {t.lineas.join("\n")}
+          </pre>
+        ) : (
+          <p key={i} className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+            {t.texto}
+          </p>
+        ),
+      )}
+    </>
+  );
+}
+
 export function BlogView() {
   const entradas = useBlog();
   const me = useMe();
@@ -206,13 +306,17 @@ export function BlogView() {
             )}
           </header>
 
-          <p className="mt-3 whitespace-pre-wrap text-sm text-slate-800">{e.finding}</p>
+          <div className="mt-3">
+            <Texto texto={e.finding} />
+          </div>
 
           {e.action && (
-            <p className="mt-3 whitespace-pre-wrap border-l-2 border-brand-200 pl-3 text-sm text-slate-700">
-              <span className="font-medium">Qué hay que hacer: </span>
-              {e.action}
-            </p>
+            <div className="mt-4 border-l-2 border-brand-200 pl-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+                Qué hay que hacer
+              </span>
+              <Texto texto={e.action} />
+            </div>
           )}
 
           {e.source && <p className="mt-3 text-xs text-slate-500">Fuente: {e.source}</p>}
