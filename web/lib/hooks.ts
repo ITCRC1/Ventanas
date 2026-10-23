@@ -1167,6 +1167,10 @@ export interface IssuerReceipt {
   referencia_pago: string | null;
   /** `pdf` o `xml`: de dónde salieron las líneas. */
   detalle_de: string;
+  /** El proyecto PROBABLE, deducido de la oferta cuando las facturas ya
+   *  ligadas de ese mismo contrato apuntan todas al mismo WBS. Es una
+   *  sugerencia, no un dato: `links` sigue siendo la verdad. */
+  wbs_probable: { cost_code: string; wbs_title: string } | null;
   lineas: IssuerLinea[];
   links: IssuerLink[];
 }

@@ -46,7 +46,7 @@ function Estado({ r }: { r: IssuerReceipt }) {
       : "bg-amber-100 text-amber-800";
   return (
     <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs ${tono}`}>
-      {ligada ? "pagada" : r.status === "ignored" ? "anulada" : "sin ligar"}
+      {ligada ? "pagada" : r.status === "ignored" ? "anulada" : "sin ligar al pago"}
     </span>
   );
 }
@@ -141,8 +141,18 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
                             <div className="text-slate-500">{lk.wbs_title}</div>
                           </div>
                         ))
+                      ) : r.wbs_probable ? (
+                        // ⚠️ Rotulado como PROBABLE y en gris: sale de que las
+                        // facturas ya ligadas de esta misma oferta apuntan todas
+                        // al mismo proyecto. Es una pista para amarrarla, no el
+                        // proyecto al que se cargó.
+                        <div className="text-slate-400">
+                          <span className="font-mono">{r.wbs_probable.cost_code}</span>
+                          <div>{r.wbs_probable.wbs_title}</div>
+                          <div className="italic">probable · por la oferta</div>
+                        </div>
                       ) : (
-                        <span className="text-slate-400">sin asignar</span>
+                        <span className="text-slate-400">—</span>
                       ))}
                   </td>
                   <td className={td}>{i === 0 && <Estado r={r} />}</td>
@@ -194,7 +204,11 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
         El <strong>monto de la línea</strong> es el neto, sin impuesto — igual que la columna DEBE
         del PDF. <strong>Oferta</strong> es el número de contrato del proveedor y{" "}
         <strong>Proyecto</strong> es como él lo llama, que no siempre coincide con el WBS.
-        «Sin ligar» significa que el sistema no tiene amarrado el pago, no que esté sin pagar.
+        <strong>«Sin ligar al pago»</strong> no quiere decir que la factura esté sin pagar ni que
+        el gasto no tenga proyecto: el ledger lo trae en todas sus filas. Quiere decir que nadie
+        dijo todavía cuál pago cubre esta factura. El proyecto <em>probable</em> sale de que las
+        facturas ya ligadas de la misma oferta apuntan todas al mismo WBS — es una pista para
+        amarrarla, no el proyecto al que se cargó.
       </p>
     </div>
   );

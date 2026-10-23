@@ -442,6 +442,38 @@ def receipts_by_issuer(
 
         d["links"] = por_recibo.get(f["id"], [])
         out.append(d)
+    # ── El proyecto PROBABLE, cuando la oferta lo deja claro ────────────
+    #
+    # Owner, 2026-10-23: *«según el ledger todas tienen número de proyecto»* —
+    # y tiene razón: el ledger lo trae en sus 277 filas con datos. Lo que falta
+    # no es el proyecto, es la AMARRA entre la factura y su pago.
+    #
+    # La `oferta` del proveedor es su número de contrato, así que las facturas
+    # de una misma oferta suelen cargarse al mismo WBS. Donde las ya ligadas de
+    # esa oferta apuntan todas al MISMO proyecto, se sugiere ese para las que
+    # faltan.
+    #
+    # ⚠️ Se sugiere SÓLO si hay unanimidad. La oferta 24-243-002 de DEHC tiene
+    # facturas ligadas a 3.1 y a 3.5.1 — ahí no hay nada que sugerir, y poner
+    # la más frecuente sería dar por bueno un empate. Va aparte de `links` y la
+    # pantalla lo rotula como probable: una sugerencia que se lee como dato es
+    # peor que una celda vacía.
+    por_oferta: dict[str, set[tuple[str, str]]] = {}
+    for r in out:
+        if r["oferta"] and r["links"]:
+            for lk in r["links"]:
+                if lk.get("cost_code"):
+                    por_oferta.setdefault(r["oferta"], set()).add(
+                        (lk["cost_code"], lk.get("wbs_title") or "")
+                    )
+    for r in out:
+        r["wbs_probable"] = None
+        if not r["links"] and r["oferta"]:
+            candidatos = por_oferta.get(r["oferta"], set())
+            if len(candidatos) == 1:
+                code, titulo = next(iter(candidatos))
+                r["wbs_probable"] = {"cost_code": code, "wbs_title": titulo}
+
     return {
         "issuer": issuer,
         "issuer_name": out[0]["issuer_name"] if out else "",
