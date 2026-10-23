@@ -1114,6 +1114,75 @@ export function useBlogPost() {
   });
 }
 
+/** Una línea del comprobante: qué se cobra y cuánto. */
+export interface IssuerLinea {
+  detalle: string;
+  cantidad: string;
+  unidad: string;
+  monto: string;
+}
+
+/** La línea del LEDGER que paga una factura, con su proyecto. */
+export interface IssuerLink {
+  sheet_row_id: number;
+  entry_date: string | null;
+  /** El número de proyecto (WBS) al que se cargó el pago. */
+  cost_code: string | null;
+  /** El nombre del proyecto, del catálogo WBS. */
+  wbs_title: string | null;
+  amount_paid: string | null;
+  description: string | null;
+}
+
+export interface IssuerReceipt {
+  id: number;
+  invoice_no: string;
+  invoice_date: string | null;
+  received_at: string | null;
+  doc_type: string | null;
+  issuer_name: string;
+  issuer_id: string;
+  currency: string;
+  subtotal: string | null;
+  tax: string | null;
+  total: string | null;
+  status: string;
+  clave: string | null;
+  email_from: string | null;
+  invoice_fx: string | null;
+  has_pdf_file: boolean;
+  has_xml_file: boolean;
+  n_links: number;
+  lineas: IssuerLinea[];
+  links: IssuerLink[];
+}
+
+export interface IssuerInvoices {
+  issuer: string;
+  issuer_name: string;
+  count: number;
+  total: number;
+  receipts: IssuerReceipt[];
+}
+
+/** Las facturas de un proveedor, en orden cronológico de emisión.
+ *
+ *  ⚠️ `staleTime: 0` y refresco al volver a la pantalla: owner, 2026-10-23,
+ *  *«cada vez que llega una factura nueva se ponga acá y se actualice el
+ *  reporte»*. El buzón ingesta por su cuenta, así que la pantalla tiene que
+ *  volver a preguntar en vez de servir lo que cacheó al abrirse. */
+export function useInvoicesByIssuer(issuer: string) {
+  return useQuery({
+    queryKey: ["invoices-by-issuer", issuer],
+    queryFn: () =>
+      api.get<IssuerInvoices>(`/invoice-receipts/by-issuer?issuer=${encodeURIComponent(issuer)}`),
+    enabled: !!issuer,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  });
+}
+
 export function useReportCatalog() {
   return useQuery({
     queryKey: ["reports", "catalog"],

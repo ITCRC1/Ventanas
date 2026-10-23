@@ -188,6 +188,50 @@ def parse_detalle(xml_bytes: bytes) -> list[str]:
     return out
 
 
+def parse_lineas(xml_bytes: bytes) -> list[dict[str, Any]]:
+    """Cada línea del comprobante con su descripción Y su monto.
+
+    `parse_detalle` devuelve sólo los textos, que es lo que necesita el Short
+    Payment. Acá hace falta el monto además: una factura de DEHC trae tres
+    contratos distintos en tres líneas, y sin el monto no se sabe cuánto pesa
+    cada uno.
+
+    ⚠️ El XML de Hacienda va con namespace, así que se compara por el nombre
+    LOCAL de la etiqueta (`_local`). Comparando contra `"LineaDetalle"` pelado
+    no encuentra nada y la factura parece vacía.
+
+    ⚠️ El monto sale de `MontoTotalLinea` y, si no está, de `SubTotal` o
+    `MontoTotal`. Los tres existen en el esquema y no siempre vienen todos; el
+    que manda es el primero, que ya trae descuentos e impuesto de la línea.
+    """
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError:
+        return []
+    out: list[dict[str, Any]] = []
+    for el in root.iter():
+        if _local(el.tag) != "LineaDetalle":
+            continue
+        campos: dict[str, str] = {}
+        for child in el.iter():
+            nombre = _local(child.tag)
+            if nombre in ("Detalle", "Cantidad", "UnidadMedida", "PrecioUnitario",
+                          "MontoTotalLinea", "SubTotal", "MontoTotal"):
+                if nombre not in campos and child.text and child.text.strip():
+                    campos[nombre] = " ".join(child.text.split())
+        if not campos:
+            continue
+        out.append({
+            "detalle": campos.get("Detalle", ""),
+            "cantidad": campos.get("Cantidad", ""),
+            "unidad": campos.get("UnidadMedida", ""),
+            "monto": campos.get("MontoTotalLinea")
+                     or campos.get("SubTotal")
+                     or campos.get("MontoTotal") or "",
+        })
+    return out
+
+
 def _consume(out: dict[str, Any], fname: str, ctype: str, payload: bytes | None) -> None:
     """Procesa un archivo suelto (nombre + bytes): guarda PDF, parsea XML."""
     if not payload:

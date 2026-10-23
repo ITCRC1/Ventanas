@@ -353,6 +353,90 @@ def invoices_by_wbs(ref_fx: float | None = None, db: Session = Depends(get_db)) 
     return {"by_wbs": by_wbs, "total_usd": round(total_usd, 2), "missing_rate": missing}
 
 
+@router.get("/by-issuer", dependencies=[_can_view])
+def receipts_by_issuer(
+    issuer: str,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Todas las facturas de UN proveedor, con el detalle de cada línea.
+
+    Owner, 2026-10-23, sobre DEHC: *«este proveedor es importante… pones todo el
+    detalle con su descripción y además pones el link para que se baje el PDF»*.
+
+    La pantalla de Invoice Receipts es una bandeja: muestra qué llegó. Esto es
+    otra pregunta —qué nos está cobrando este proveedor— y se contesta leyendo
+    las LÍNEAS, no los totales. Una factura de DEHC puede traer el cierre de un
+    contrato y el arranque de otro en el mismo documento.
+
+    `issuer` es la cédula jurídica o parte del nombre. El detalle se lee del XML
+    al vuelo: es el documento legal, y guardar una copia parseada sería un
+    segundo lugar donde el dato puede quedar viejo.
+    """
+    filas = (
+        db.execute(
+            text(
+                """
+                SELECT r.id, r.invoice_no, r.invoice_date, r.received_at, r.doc_type,
+                       r.issuer_name, r.issuer_id, r.currency, r.subtotal, r.tax,
+                       r.total, r.status, r.clave, r.email_from, r.invoice_fx,
+                       (r.pdf_bytes IS NOT NULL) AS has_pdf_file,
+                       (r.xml_bytes IS NOT NULL) AS has_xml_file,
+                       r.xml_bytes,
+                       (SELECT count(*) FROM invoice_receipt_link k
+                         WHERE k.receipt_id = r.id) AS n_links
+                FROM invoice_receipt r
+                WHERE r.issuer_id = :q OR r.issuer_name ILIKE '%' || :q || '%'
+                ORDER BY r.invoice_date, r.invoice_no
+                """
+            ),
+            {"q": issuer},
+        )
+        .mappings()
+        .all()
+    )
+    # Con qué línea del LEDGER quedó amarrada cada una.
+    ligas = (
+        db.execute(
+            text(
+                """
+                SELECT k.receipt_id, s.id AS sheet_row_id, s.entry_date,
+                       s.cost_code, s.amount_paid, s.description,
+                       -- El PROYECTO al que se cargó: el código de la línea del
+                       -- ledger y el nombre que le da el WBS. Owner, 2026-10-23:
+                       -- «que tenga el número de proyecto y nombre del proyecto».
+                       -- La factura no lo trae: lo define el pago, así que una
+                       -- factura sin ligar sale sin proyecto, que es la verdad.
+                       w.title AS wbs_title
+                FROM invoice_receipt_link k
+                JOIN ledger_sheet_row s ON s.id = k.sheet_row_id
+                LEFT JOIN wbs_item w ON w.wbs_code = s.cost_code
+                """
+            )
+        )
+        .mappings()
+        .all()
+    )
+    por_recibo: dict[int, list[dict[str, Any]]] = {}
+    for lk in ligas:
+        por_recibo.setdefault(lk["receipt_id"], []).append(dict(lk))
+
+    out: list[dict[str, Any]] = []
+    for f in filas:
+        d = {k: v for k, v in dict(f).items() if k != "xml_bytes"}
+        d["lineas"] = (
+            invoice_mail.parse_lineas(bytes(f["xml_bytes"])) if f["xml_bytes"] else []
+        )
+        d["links"] = por_recibo.get(f["id"], [])
+        out.append(d)
+    return {
+        "issuer": issuer,
+        "issuer_name": out[0]["issuer_name"] if out else "",
+        "count": len(out),
+        "total": sum(float(x["total"] or 0) for x in out),
+        "receipts": out,
+    }
+
+
 @router.get("", dependencies=[_can_view])
 def list_receipts(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     # OJO: nunca traer xml_bytes/pdf_bytes acá (van por el endpoint /file).

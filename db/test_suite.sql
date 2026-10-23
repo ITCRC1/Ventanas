@@ -47,13 +47,29 @@ EXCEPTION WHEN others THEN
 END $$ LANGUAGE plpgsql;
 
 -- ---------------------------------------------------------------- semilla
+--
+-- ⚠️ La semilla es IDEMPOTENTE porque el suite ya no corre sobre `schema_v2.sql`
+-- a secas: corre sobre una base armada con `alembic upgrade head`, que es el
+-- esquema que de verdad está desplegado. Las migraciones de siembra (0002, 0003)
+-- ya dejan puestos a `bismark` y la fila única de `settings`, así que un INSERT
+-- pelado reventaba antes de la primera prueba — y el suite nunca llegaba a
+-- correr. Probar contra el esquema que nadie despliega no prueba nada.
+--
+-- `settings` se pisa con los valores del suite: el corte y el horizonte los
+-- miran varias pruebas, y los de la migración son otros.
 SET app.user_id = 'bismark';
 INSERT INTO app_user (username,full_name,role_id)
-  SELECT 'bismark','Financial Controller',id FROM role WHERE code='controller';
+  SELECT 'bismark','Financial Controller',id FROM role WHERE code='controller'
+  ON CONFLICT (username) DO NOTHING;
 INSERT INTO app_user (username,full_name,role_id)
-  SELECT 'corporate','Corporativo',id FROM role WHERE code='corporate';
+  SELECT 'corporate','Corporativo',id FROM role WHERE code='corporate'
+  ON CONFLICT (username) DO NOTHING;
 INSERT INTO settings (company,manager,cutoff_date,horizon_start,horizon_end)
-  VALUES ('SEED Development','Blake Delatte','2026-07-01','2026-01-05','2028-01-31');
+  VALUES ('SEED Development','Blake Delatte','2026-07-01','2026-01-05','2028-01-31')
+  ON CONFLICT (id) DO UPDATE SET
+    company = EXCLUDED.company, manager = EXCLUDED.manager,
+    cutoff_date = EXCLUDED.cutoff_date,
+    horizon_start = EXCLUDED.horizon_start, horizon_end = EXCLUDED.horizon_end;
 
 INSERT INTO category (code,name,sort_order) VALUES
   ('Overhead','Overhead',1), ('Setena D1','Setena D1',2), ('Concessions','Concessions',3);
@@ -85,7 +101,8 @@ INSERT INTO bank_account (name,role,currency) VALUES
   ('Ventanas LAFISE Colones','operating','CRC');
 INSERT INTO payee (name,legal_id,bank_name,iban) VALUES
   ('SEED Dev. G','3-102-893339 S.R.L.','BCR','CR57015202001384709188'),
-  ('Alta Batalla','3-102-XXXX','LAFISE','CR15011400007455394299');
+  ('Alta Batalla','3-102-XXXX','LAFISE','CR15011400007455394299')
+  ON CONFLICT DO NOTHING;
 INSERT INTO fx_rate (rate_date,from_currency,to_currency,rate,source)
   VALUES ('2026-06-30','CRC','USD',0.00196,'BCCR');
 

@@ -61,6 +61,10 @@ const NAV: NavItem[] = [
       { href: "/match-review", label: "Match Review", hint: "Confirm the suggested matches" },
       { href: "/ledger-invoices", label: "Ledger + Invoices", hint: "Which lines have no invoice" },
       { href: "/invoices", label: "Invoices (manual)", hint: "Invoices captured by hand" },
+      // Un proveedor con contratos por etapas: lo que importa no es el total
+      // de la factura sino sus LINEAS, porque una sola trae el cierre de un
+      // contrato y el arranque de otro.
+      { href: "/dehc-invoices", label: "DEHC Invoices", hint: "Every line DEHC bills, with its PDF" },
     ],
   },
   { href: "/ledger", label: "Ledger", hint: "Every payment, as in the Excel", perm: "view.ledger" },
