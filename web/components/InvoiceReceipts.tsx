@@ -939,7 +939,9 @@ export function InvoiceReceipts() {
               <th className="px-2 py-2">Issuer</th>
               <th className="px-2 py-2">Invoice #</th>
               <th className="px-2 py-2">Type</th>
-              <th className="px-2 py-2">Date</th>
+              {/* La tabla se ordena por ESTA. «Date» a secas se confundia con
+                  «Received», que es la primera columna y es otra cosa. */}
+              <th className="px-2 py-2">Issued</th>
               <th className="px-2 py-2">Currency</th>
               <th className="px-2 py-2 text-right">Subtotal</th>
               <th className="px-2 py-2 text-right">Subtotal (USD)</th>

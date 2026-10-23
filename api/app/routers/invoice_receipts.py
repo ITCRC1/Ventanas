@@ -505,7 +505,12 @@ def list_receipts(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
                 FROM invoice_receipt r
                 LEFT JOIN disbursement_line l ON l.id = r.sp_line_id
                 LEFT JOIN disbursement d ON d.id = l.disbursement_id
-                ORDER BY r.received_at DESC NULLS LAST, r.id DESC
+                -- Por fecha de EMISION, no de recepcion (owner, 2026-10-23).
+                -- Son cosas distintas y a veces distan meses: DEHC reenvio en
+                -- junio dos facturas de enero. La que manda para leer la
+                -- cuenta es cuando se emitio; cuando llego al buzon es un dato
+                -- del correo, no de la factura.
+                ORDER BY r.invoice_date DESC NULLS LAST, r.invoice_no DESC, r.id DESC
                 """
             )
         )
