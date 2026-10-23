@@ -391,7 +391,10 @@ def receipts_by_issuer(
                          WHERE k.receipt_id = r.id) AS n_links
                 FROM invoice_receipt r
                 WHERE r.issuer_id = :q OR r.issuer_name ILIKE '%' || :q || '%'
-                ORDER BY r.invoice_date, r.invoice_no
+                -- La más RECIENTE primero (owner, 2026-10-23). Lo que se mira
+                -- al abrir esta pantalla es lo que acaba de llegar; con el
+                -- orden al revés había que bajar hasta el fondo para verlo.
+                ORDER BY r.invoice_date DESC, r.invoice_no DESC
                 """
             ),
             {"q": issuer},
