@@ -1189,6 +1189,67 @@ export interface IssuerInvoices {
  *  *«cada vez que llega una factura nueva se ponga acá y se actualice el
  *  reporte»*. El buzón ingesta por su cuenta, así que la pantalla tiene que
  *  volver a preguntar en vez de servir lo que cacheó al abrirse. */
+/** Una línea del WBS que un proveedor tiene a cargo. */
+export interface OwnerLine {
+  wbs_code: string;
+  title: string;
+  owner: string | null;
+  category: string | null;
+  phase: string | null;
+  state: string | null;
+  budget_revised: string | null;
+  spend: string | null;
+  remaining: string | null;
+  forecast: string | null;
+  over_under: string | null;
+  start_date: string | null;
+  due_date: string | null;
+}
+
+/** Un pago del LEDGER cargado a una de esas líneas. */
+export interface OwnerPago {
+  id: number;
+  cost_code: string;
+  entry_date: string | null;
+  payee: string | null;
+  description: string | null;
+  amount: string | null;
+  amount_paid: string | null;
+  amount_due: string | null;
+  invoice_no: string | null;
+}
+
+/** Una semana del cronograma con monto pintado. */
+export interface OwnerSemana {
+  wbs_code: string;
+  week_start: string;
+  planned_amount: string;
+  state: string | null;
+  note: string | null;
+}
+
+export interface OwnerWbs {
+  owner: string;
+  cutoff_date: string | null;
+  lines: OwnerLine[];
+  payments: Record<string, OwnerPago[]>;
+  schedule: Record<string, OwnerSemana[]>;
+}
+
+/** Qué tiene a cargo un proveedor: presupuesto, gasto y cronograma.
+ *
+ *  ⚠️ `owner` es un campo de TEXTO del WBS, escrito a mano. Sirve para saber a
+ *  quién reclamarle, no para cuadrar plata contra el beneficiario del pago. */
+export function useWbsByOwner(owner: string) {
+  return useQuery({
+    queryKey: ["wbs-by-owner", owner],
+    queryFn: () => api.get<OwnerWbs>(`/wbs/by-owner?owner=${encodeURIComponent(owner)}`),
+    enabled: !!owner,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
 export function useInvoicesByIssuer(issuer: string) {
   return useQuery({
     queryKey: ["invoices-by-issuer", issuer],
