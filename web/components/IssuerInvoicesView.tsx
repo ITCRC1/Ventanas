@@ -1,22 +1,30 @@
 "use client";
 
 /**
- * Las facturas de UN proveedor, con todas sus líneas a la vista.
+ * Las facturas de UN proveedor: una fila por concepto facturado.
  *
- * Owner, 2026-10-23, sobre DEHC: *«este proveedor es importante… pones todo el
- * detalle con su descripción y además pones el link para que se baje el PDF»* ·
- * *«todas las líneas de las facturas que estén afuera visible… subtotal,
- * impuesto y total»*.
+ * Owner, 2026-10-23: *«se pone el detalle de la factura, se repite la factura
+ * según el detalle y se pone subtotal»* · *«todas las líneas de las facturas
+ * que estén afuera visible»* · *«que se haga en forma cronológica y que cada
+ * vez que llega una factura nueva se ponga acá»* · *«que tenga el número de
+ * proyecto y nombre del proyecto»*.
  *
- * ⚠️ **Nada se colapsa.** La pregunta que contesta esta pantalla es «qué nos
- * está cobrando», y eso se lee en las LÍNEAS: una factura de DEHC puede traer
- * el cierre de un contrato y el arranque de otro en el mismo documento. Un
- * acordeón obliga a abrir dieciséis veces para ver lo que se vino a ver.
+ * ## La factura se REPITE, no se agrupa
  *
- * Por eso la tabla va por línea y los datos de la factura —fecha, número,
- * subtotal, impuesto, total— se agrupan con `rowSpan` sobre sus líneas: el
- * detalle se lee de corrido y los totales no se repiten en cada renglón, que
- * es lo que haría parecer que la factura se cobró varias veces.
+ * La primera versión juntaba los datos de la factura con `rowSpan` sobre sus
+ * líneas. Se ve más limpio y es peor para lo que esta pantalla sirve: copiar
+ * una fila, filtrarla, mandarla por correo. Con la celda combinada, la fila de
+ * abajo sale sin fecha y sin número de factura — huérfana.
+ *
+ * Así que cada renglón se basta solo. El ojo distingue dónde empieza una
+ * factura nueva por la raya gruesa, no por un hueco en las columnas.
+ *
+ * ## Qué monto lleva cada línea
+ *
+ * El NETO, sin impuesto, igual que la columna DEBE del PDF. El impuesto y el
+ * total van a nivel de factura, que es donde el proveedor los pone. Sumar los
+ * netos de una factura da su subtotal; por eso la fila del encabezado los
+ * repite y no hay que confiar en la suma visual.
  */
 
 import type { IssuerInvoices, IssuerReceipt } from "@/lib/hooks";
@@ -27,10 +35,8 @@ const money = (v: unknown) =>
     ? ""
     : Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** La fecha sola, sin la hora: en una lista de facturas la hora es ruido. */
 const soloFecha = (s: string | null) => (s ? String(s).slice(0, 10) : "");
 
-/** El color del estado. `ignored` es una factura anulada, no un problema. */
 function Estado({ r }: { r: IssuerReceipt }) {
   const ligada = (r.n_links ?? 0) > 0;
   const tono = ligada
@@ -40,7 +46,7 @@ function Estado({ r }: { r: IssuerReceipt }) {
       : "bg-amber-100 text-amber-800";
   return (
     <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs ${tono}`}>
-      {ligada ? "pagada · ligada" : r.status === "ignored" ? "anulada" : "sin ligar"}
+      {ligada ? "pagada" : r.status === "ignored" ? "anulada" : "sin ligar"}
     </span>
   );
 }
@@ -58,19 +64,21 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
 
   const sum = (f: (r: IssuerReceipt) => unknown) =>
     recibos.reduce((a, r) => a + Number(f(r) || 0), 0);
+  const nLineas = recibos.reduce((a, r) => a + Math.max(1, r.lineas.length), 0);
 
-  const th = "border-b border-slate-300 px-3 py-2 text-left font-semibold";
+  const th = "border-b border-slate-300 px-2 py-2 text-left font-semibold";
   const thN = th + " text-right";
-  const td = "border-b border-slate-200 px-3 py-2 align-top";
+  const td = "border-b border-slate-200 px-2 py-1.5 align-top";
   const tdN = td + " text-right tabular-nums whitespace-nowrap";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
         <span className="text-lg font-semibold">{d?.issuer_name}</span>
         <span className="text-slate-500">cédula {issuer}</span>
         <span className="text-slate-700">
-          <strong>{d?.count}</strong> facturas · <strong>${money(d?.total)}</strong>
+          <strong>{d?.count}</strong> facturas · <strong>{nLineas}</strong> líneas ·{" "}
+          <strong>${money(d?.total)}</strong>
         </span>
       </div>
 
@@ -80,107 +88,98 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
             <tr>
               <th className={th}>Emitida</th>
               <th className={th}>Factura</th>
+              <th className={th}>Oferta</th>
+              <th className={th}>Proyecto</th>
               <th className={th}>Detalle de la línea</th>
               <th className={thN}>Monto línea</th>
               <th className={thN}>Subtotal</th>
               <th className={thN}>Impuesto</th>
               <th className={thN}>Total</th>
-              <th className={th}>Proyecto</th>
+              <th className={th}>WBS</th>
               <th className={th}>Estado</th>
               <th className={th}>Archivos</th>
             </tr>
           </thead>
           <tbody>
             {recibos.map((r) => {
-              // Una factura sin líneas en el XML igual tiene que aparecer: que
-              // no se pueda leer el detalle es justamente lo que hay que ver.
               const lineas = r.lineas.length
                 ? r.lineas
-                : [{ detalle: "(el XML no trae detalle de línea)", monto: "", cantidad: "", unidad: "" }];
-              const n = lineas.length;
+                : [{ n: 1, detalle: "(no se pudo leer el detalle)", monto: "" }];
               return lineas.map((ln, i) => (
-                <tr key={`${r.id}-${i}`} className={i === 0 ? "border-t-2 border-slate-300" : ""}>
-                  {i === 0 && (
-                    <>
-                      <td className={td + " whitespace-nowrap"} rowSpan={n}>
-                        {soloFecha(r.invoice_date)}
-                      </td>
-                      <td className={td + " font-mono text-xs"} rowSpan={n}>
-                        {r.invoice_no}
-                        {r.doc_type && r.doc_type !== "FE" && (
-                          <span className="ml-1 rounded bg-rose-100 px-1 text-rose-700">
-                            {r.doc_type}
-                          </span>
-                        )}
-                      </td>
-                    </>
-                  )}
-                  <td className={td}>{ln.detalle}</td>
+                <tr
+                  key={`${r.id}-${i}`}
+                  className={i === 0 ? "border-t-2 border-slate-400" : "bg-slate-50/40"}
+                >
+                  {/* Cada renglón se basta solo: ver la nota de arriba. */}
+                  <td className={td + " whitespace-nowrap"}>{soloFecha(r.invoice_date)}</td>
+                  <td className={td + " whitespace-nowrap font-mono text-xs"}>
+                    {r.invoice_no.slice(-8)}
+                    {r.doc_type && r.doc_type !== "FE" && (
+                      <span className="ml-1 rounded bg-rose-100 px-1 text-rose-700">
+                        {r.doc_type}
+                      </span>
+                    )}
+                  </td>
+                  <td className={td + " whitespace-nowrap font-mono text-xs"}>{r.oferta ?? ""}</td>
+                  <td className={td + " whitespace-nowrap text-xs"}>{r.proyecto ?? ""}</td>
+                  <td className={td}>
+                    {lineas.length > 1 && (
+                      <span className="mr-1 text-slate-400">{ln.n}.</span>
+                    )}
+                    {ln.detalle}
+                  </td>
                   <td className={tdN}>{money(ln.monto)}</td>
-                  {i === 0 && (
-                    <>
-                      <td className={tdN} rowSpan={n}>{money(r.subtotal)}</td>
-                      <td className={tdN} rowSpan={n}>{money(r.tax)}</td>
-                      <td className={tdN + " font-semibold"} rowSpan={n}>{money(r.total)}</td>
-                      <td className={td} rowSpan={n}>
-                        {/* El proyecto lo define el PAGO, no la factura: sin liga
-                            no hay proyecto, y eso es lo que hay que ver. */}
-                        {r.links.length ? (
-                          r.links.map((lk) => (
-                            <div key={lk.sheet_row_id} className="whitespace-nowrap">
-                              <span className="font-mono text-xs font-semibold">
-                                {lk.cost_code}
-                              </span>
-                              <div className="text-xs text-slate-600">{lk.wbs_title}</div>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-400">sin asignar</span>
-                        )}
-                      </td>
-                      <td className={td} rowSpan={n}>
-                        <Estado r={r} />
-                        {r.links.map((lk) => (
-                          <div key={lk.sheet_row_id} className="mt-1 text-xs text-slate-500">
-                            {soloFecha(lk.entry_date)} · WBS {lk.cost_code} · $
-                            {money(lk.amount_paid)}
+                  <td className={tdN}>{i === 0 ? money(r.subtotal) : ""}</td>
+                  <td className={tdN}>{i === 0 ? money(r.tax) : ""}</td>
+                  <td className={tdN + " font-semibold"}>{i === 0 ? money(r.total) : ""}</td>
+                  <td className={td + " whitespace-nowrap text-xs"}>
+                    {i === 0 &&
+                      (r.links.length ? (
+                        r.links.map((lk) => (
+                          <div key={lk.sheet_row_id}>
+                            <span className="font-mono font-semibold">{lk.cost_code}</span>
+                            <div className="text-slate-500">{lk.wbs_title}</div>
                           </div>
-                        ))}
-                      </td>
-                      <td className={td} rowSpan={n}>
-                        <div className="flex gap-2 whitespace-nowrap">
-                          {r.has_pdf_file ? (
-                            <a
-                              className="text-brand-700 underline"
-                              href={`/api/invoice-receipts/${r.id}/file/pdf`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              PDF
-                            </a>
-                          ) : (
-                            <span className="text-slate-400">sin PDF</span>
-                          )}
-                          {r.has_xml_file && (
-                            <a
-                              className="text-slate-500 underline"
-                              href={`/api/invoice-receipts/${r.id}/file/xml`}
-                            >
-                              XML
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </>
-                  )}
+                        ))
+                      ) : (
+                        <span className="text-slate-400">sin asignar</span>
+                      ))}
+                  </td>
+                  <td className={td}>{i === 0 && <Estado r={r} />}</td>
+                  <td className={td}>
+                    {i === 0 && (
+                      <div className="flex gap-2 whitespace-nowrap">
+                        {r.has_pdf_file ? (
+                          <a
+                            className="text-brand-700 underline"
+                            href={`/api/invoice-receipts/${r.id}/file/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            PDF
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                        {r.has_xml_file && (
+                          <a
+                            className="text-slate-500 underline"
+                            href={`/api/invoice-receipts/${r.id}/file/xml`}
+                          >
+                            XML
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ));
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-400 bg-slate-50 font-semibold">
-              <td className={td} colSpan={4}>
-                TOTAL · {recibos.length} facturas
+            <tr className="border-t-2 border-slate-500 bg-slate-100 font-semibold">
+              <td className={td} colSpan={6}>
+                TOTAL · {recibos.length} facturas · {nLineas} líneas
               </td>
               <td className={tdN}>{money(sum((r) => r.subtotal))}</td>
               <td className={tdN}>{money(sum((r) => r.tax))}</td>
@@ -192,9 +191,10 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
       </div>
 
       <p className="text-xs text-slate-500">
-        El detalle sale del XML de Hacienda, que es el documento legal. El PDF es su
-        representación gráfica. «Sin ligar» significa que el sistema no tiene amarrado el pago —
-        no que la factura esté sin pagar.
+        El <strong>monto de la línea</strong> es el neto, sin impuesto — igual que la columna DEBE
+        del PDF. <strong>Oferta</strong> es el número de contrato del proveedor y{" "}
+        <strong>Proyecto</strong> es como él lo llama, que no siempre coincide con el WBS.
+        «Sin ligar» significa que el sistema no tiene amarrado el pago, no que esté sin pagar.
       </p>
     </div>
   );

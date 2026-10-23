@@ -379,6 +379,11 @@ def receipts_by_issuer(
                 SELECT r.id, r.invoice_no, r.invoice_date, r.received_at, r.doc_type,
                        r.issuer_name, r.issuer_id, r.currency, r.subtotal, r.tax,
                        r.total, r.status, r.clave, r.email_from, r.invoice_fx,
+                       -- Lo que sólo está en el PDF (migración 0052). `oferta`
+                       -- es el contrato del proveedor; `proyecto` es como ÉL lo
+                       -- llama, no el WBS.
+                       r.oferta, r.proyecto, r.centro_costo, r.referencia_pago,
+                       r.pdf_lineas,
                        (r.pdf_bytes IS NOT NULL) AS has_pdf_file,
                        (r.xml_bytes IS NOT NULL) AS has_xml_file,
                        r.xml_bytes,
@@ -422,10 +427,19 @@ def receipts_by_issuer(
 
     out: list[dict[str, Any]] = []
     for f in filas:
-        d = {k: v for k, v in dict(f).items() if k != "xml_bytes"}
-        d["lineas"] = (
+        d = {k: v for k, v in dict(f).items() if k not in ("xml_bytes", "pdf_lineas")}
+        # ⚠️ Manda el detalle del PDF: es como el proveedor factura, con el
+        # texto entero y los conceptos agrupados. El del XML queda de respaldo
+        # —recortado a 67 caracteres y partido por código CABYS— para las
+        # facturas cuyo PDF no se pudo leer. Mejor eso que una fila vacía.
+        d["lineas"] = f["pdf_lineas"] or (
             invoice_mail.parse_lineas(bytes(f["xml_bytes"])) if f["xml_bytes"] else []
         )
+        d["detalle_de"] = "pdf" if f["pdf_lineas"] else "xml"
+        # El neto de la línea: el PDF lista sin impuesto, igual que su columna
+        # DEBE. El respaldo del XML trae `MontoTotalLinea`, que SÍ lleva
+        # impuesto — por eso se marca de dónde salió y no se suman entre sí.
+
         d["links"] = por_recibo.get(f["id"], [])
         out.append(d)
     return {

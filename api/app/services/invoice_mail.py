@@ -232,6 +232,115 @@ def parse_lineas(xml_bytes: bytes) -> list[dict[str, Any]]:
     return out
 
 
+#: Un renglón que termina en `$ 6 450.00`. El PDF separa los miles con ESPACIO.
+_RENGLON = re.compile(r"^(.*?)\s*\$\s*([\d  ,]+\.\d{2})\s*$")
+#: El `1.-` del inicio cuando la factura trae varios conceptos. Si trae uno
+#: solo, DEHC no lo numera — por eso el prefijo es opcional y no el ancla.
+_ORDINAL = re.compile(r"^\s*(\d+)\s*\.-\s*")
+#: La referencia del pago que el PDF mete en el bloque de detalle: arranca con
+#: una fecha. Ningún concepto facturado lo hace.
+_REFERENCIA = re.compile(r"^\s*\d{1,2}/\d{1,2}/\d{2,4}")
+#: Renglones del bloque que NO son conceptos.
+_NO_ES_CONCEPTO = re.compile(r"^\s*(Oferta:|Centro de Costo:|Sub-?Total:|Descuento:|IVA:|TOTAL:)", re.I)
+
+
+def _num(s: str) -> str:
+    """`6 450.00` -> `6450.00`. Espacio fino, espacio normal y coma."""
+    return re.sub(r"[  ,]", "", s)
+
+
+def parse_pdf(pdf_bytes: bytes) -> dict[str, Any]:
+    """Oferta, proyecto, centro de costo y las líneas con su texto COMPLETO.
+
+    ⚠️ Esto no reemplaza al XML: el XML es el documento legal y de ahí salen
+    los montos que cuadran con Hacienda. Pero el XML **recorta el detalle a 67
+    caracteres** y parte cada concepto en dos renglones por código CABYS, así
+    que lo que se lee ahí no es lo que el proveedor dice estar cobrando. El PDF
+    lo trae entero y agrupado como lo factura.
+
+    ⚠️ `Oferta`, `Proyecto` y `Centro de Costo` sólo existen en el PDF: el
+    esquema de Hacienda no tiene campo para eso, es la plantilla del proveedor.
+
+    ⚠️ Los conceptos se buscan **entre `Oferta:` y `Sub-Total:`**, no por el
+    prefijo `1.-`: una factura de un solo concepto no lo numera, y anclarse ahí
+    dejaba fuera once de dieciséis.
+    """
+    out: dict[str, Any] = {"oferta": None, "proyecto": None,
+                           "centro_costo": None, "referencia_pago": None,
+                           "lineas": []}
+    import pdfplumber   # import diferido: la libreria es pesada
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            texto = "\n".join((p.extract_text() or "") for p in pdf.pages)
+    except Exception:
+        return out
+
+    m = re.search(r"Oferta:?\s*([A-Za-z0-9][A-Za-z0-9\-/\.]*)", texto)
+    if m:
+        out["oferta"] = m.group(1).strip(" .")
+    # Se corta en `OC No.`: en la plantilla van en el mismo renglón, y sin
+    # cortar el proyecto se lleva el rótulo pegado.
+    m = re.search(r"Proyecto:?\s*(.+)", texto)
+    if m:
+        out["proyecto"] = " ".join(re.split(r"\s*OC\s*No\.?", m.group(1))[0].split()) or None
+    m = re.search(r"Centro de Costo:?\s*([A-Za-z0-9\-/\.]+)", texto)
+    if m:
+        out["centro_costo"] = m.group(1).strip(" .")
+
+    renglones = texto.splitlines()
+    desde = next((i for i, l in enumerate(renglones) if "Oferta:" in l), None)
+    hasta = next((i for i, l in enumerate(renglones) if re.match(r"\s*Sub-?Total:", l, re.I)), None)
+    if desde is None or hasta is None or hasta <= desde:
+        return out
+
+    n = 0
+    for l in renglones[desde + 1:hasta]:
+        if _NO_ES_CONCEPTO.match(l):
+            continue
+        g = _RENGLON.match(l)
+        if not g:
+            continue
+        texto_linea = g.group(1)
+        # ⚠️ El PDF imprime DENTRO del bloque de detalle la referencia del pago
+        # —`14/1/2025 6931813 CR,CD: SERVICIOS FIDUCIARIO, Servicio SINPE`— con
+        # el monto total al lado. Sin sacarla, se cuela como un concepto más y
+        # la factura parece cobrar el doble. Se reconoce porque arranca con una
+        # fecha; ningún concepto lo hace.
+        if _REFERENCIA.match(texto_linea):
+            out["referencia_pago"] = " ".join(texto_linea.split())
+            continue
+        orden = _ORDINAL.match(texto_linea)
+        if orden:
+            n = int(orden.group(1))
+            texto_linea = _ORDINAL.sub("", texto_linea)
+        else:
+            n += 1
+        texto_linea = " ".join(texto_linea.split())
+        if not texto_linea:
+            continue      # el renglón del código suelto, sin descripción
+        out["lineas"].append({"n": n, "detalle": texto_linea, "monto": _num(g.group(2))})
+    return out
+
+def _del_pdf(pdf_bytes: bytes | None) -> dict[str, Any]:
+    """Los campos del PDF, listos para el INSERT. Nunca lanza."""
+    vacio: dict[str, Any] = {"oferta": None, "proyecto": None, "ccosto": None,
+                             "refpago": None, "pdflin": None}
+    if not pdf_bytes:
+        return vacio
+    try:
+        d = parse_pdf(pdf_bytes)
+    except Exception:   # noqa: BLE001 — un PDF ilegible no bota la ingesta
+        return vacio
+    return {
+        "oferta": d.get("oferta"),
+        "proyecto": d.get("proyecto"),
+        "ccosto": d.get("centro_costo"),
+        "refpago": d.get("referencia_pago"),
+        "pdflin": json.dumps(d["lineas"], ensure_ascii=False) if d.get("lineas") else None,
+    }
+
+
 def _consume(out: dict[str, Any], fname: str, ctype: str, payload: bytes | None) -> None:
     """Procesa un archivo suelto (nombre + bytes): guarda PDF, parsea XML."""
     if not payload:
@@ -426,11 +535,13 @@ def fetch_new(db: Session, settings: Settings, *, full: bool = False) -> dict[st
                           (source_uid, received_at, email_from, email_subject, doc_type, clave,
                            invoice_no, issuer_name, issuer_id, invoice_date, currency, invoice_fx,
                            subtotal, tax, total, xml_filename, has_pdf, pdf_filename, xml_bytes,
-                           pdf_bytes, status, created_at)
+                           pdf_bytes, status, created_at,
+                           oferta, proyecto, centro_costo, referencia_pago, pdf_lineas)
                         VALUES
                           (:uid, :recv, :efrom, :subj, :dtype, :clave, :no, :iname, :iid, :idate,
                            :cur, :ifx, :subtotal, :tax, :total, :xml, :pdf, :pdfname, :xmlb, :pdfb,
-                           'new', now())
+                           'new', now(),
+                           :oferta, :proyecto, :ccosto, :refpago, CAST(:pdflin AS jsonb))
                         ON CONFLICT (source_uid) DO NOTHING
                         """
                     ),
@@ -455,6 +566,14 @@ def fetch_new(db: Session, settings: Settings, *, full: bool = False) -> dict[st
                         "pdfname": info["pdf_filename"],
                         "xmlb": info["xml_bytes"],
                         "pdfb": info["pdf_bytes"],
+                        # Lo que sólo está en el PDF. Se extrae acá, al entrar,
+                        # y no al mostrarlo: abrir el PDF en cada carga de
+                        # pantalla son segundos por factura.
+                        #
+                        # ⚠️ Si el PDF no se deja leer, esto queda en nulo y la
+                        # pantalla cae al detalle del XML. Una factura nunca se
+                        # pierde por no poder parsear su representación gráfica.
+                        **_del_pdf(info["pdf_bytes"]),
                     },
                 )
                 inserted += 1

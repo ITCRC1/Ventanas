@@ -1114,12 +1114,18 @@ export function useBlogPost() {
   });
 }
 
-/** Una línea del comprobante: qué se cobra y cuánto. */
+/** Una línea del comprobante: qué se cobra y cuánto.
+ *
+ *  Sale del PDF —texto completo y conceptos como el proveedor los factura— y,
+ *  si ese PDF no se pudo leer, del XML, donde viene recortado a 67 caracteres
+ *  y partido por código CABYS. `detalle_de` en la factura dice cuál de los dos. */
 export interface IssuerLinea {
+  n?: number;
   detalle: string;
-  cantidad: string;
-  unidad: string;
   monto: string;
+  /** Sólo en el respaldo del XML. */
+  cantidad?: string;
+  unidad?: string;
 }
 
 /** La línea del LEDGER que paga una factura, con su proyecto. */
@@ -1153,6 +1159,14 @@ export interface IssuerReceipt {
   has_pdf_file: boolean;
   has_xml_file: boolean;
   n_links: number;
+  /** El contrato del proveedor: agrupa facturas de un mismo trabajo. */
+  oferta: string | null;
+  /** Cómo llama el PROVEEDOR al proyecto. No es el WBS. */
+  proyecto: string | null;
+  centro_costo: string | null;
+  referencia_pago: string | null;
+  /** `pdf` o `xml`: de dónde salieron las líneas. */
+  detalle_de: string;
   lineas: IssuerLinea[];
   links: IssuerLink[];
 }
