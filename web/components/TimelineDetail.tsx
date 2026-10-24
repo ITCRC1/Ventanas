@@ -118,7 +118,18 @@ function add(s: Sums, r: WbsFinancials): void {
 
 const MONEYTH = "px-2 py-2 text-right text-[10px] font-semibold uppercase whitespace-nowrap";
 
-export function TimelineDetail() {
+/** El mismo cuadro, acotado a lo que un proveedor tiene a cargo.
+ *
+ *  Owner, 2026-10-23, sobre el tab Pendiente de DEHC: *«esto debe tener el
+ *  formato como timeline detail, tal cual pero sólo para esto de DEHC»*.
+ *
+ *  ⚠️ Se reusa este componente en vez de dibujar otro parecido. Dos cuadros que
+ *  reparten el mismo cronograma empiezan iguales y se separan en el primer
+ *  arreglo que alguien haga de un lado — y entonces el Timeline dice una cosa y
+ *  la pantalla del proveedor otra sobre las mismas celdas.
+ *
+ *  `owner` es el campo de texto del WBS. Sin él, el cuadro es el de siempre. */
+export function TimelineDetail({ owner }: { owner?: string } = {}) {
   const financials = useFinancials();
   const weeks = useScheduleWeeks();
   const cells = useScheduleCells();
@@ -153,8 +164,12 @@ export function TimelineDetail() {
 
   const groups = useMemo(() => {
     // La VENTA (proceeds) queda FUERA de todos los totales — va como referencia al final.
+    const buscado = (owner ?? "").trim().toUpperCase();
     const lines = (financials.data ?? []).filter(
-      (r) => r.kind !== "section_header" && r.kind !== "proceeds",
+      (r) =>
+        r.kind !== "section_header" &&
+        r.kind !== "proceeds" &&
+        (!buscado || (r.owner ?? "").toUpperCase().includes(buscado)),
     );
     const map = new Map<string, WbsFinancials[]>();
     for (const r of lines) {
@@ -165,18 +180,25 @@ export function TimelineDetail() {
     }
     // Mostrar TODAS las categorías (incluidas las vacías, ej. Construction) en el
     // orden del Excel (sort_order), aunque aún no tengan tareas cargadas.
-    for (const name of tool.catOrder.keys()) {
-      if (!map.has(name)) map.set(name, []);
+    //
+    // ⚠️ Salvo cuando se filtra por proveedor: ahí una categoría vacía no dice
+    // «todavía no hay tareas» sino «este proveedor no tiene ninguna acá», y
+    // llenar el cuadro de bandas vacías esconde las seis que sí importan.
+    if (!buscado) {
+      for (const name of tool.catOrder.keys()) {
+        if (!map.has(name)) map.set(name, []);
+      }
     }
     return [...map.entries()].sort(
       (a, b) => (tool.catOrder.get(a[0]) ?? 99) - (tool.catOrder.get(b[0]) ?? 99),
     );
-  }, [financials.data, tool.catOrder]);
+  }, [financials.data, tool.catOrder, owner]);
 
   const allLines = useMemo(() => groups.flatMap(([, ls]) => ls), [groups]);
   const proceedsLines = useMemo(
-    () => (financials.data ?? []).filter((r) => r.kind === "proceeds"),
-    [financials.data],
+    // La VENTA no es de ningún proveedor: filtrando por owner, fuera.
+    () => (owner ? [] : (financials.data ?? []).filter((r) => r.kind === "proceeds")),
+    [financials.data, owner],
   );
   const grand = useMemo(() => {
     const s = zero();

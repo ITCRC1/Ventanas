@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { IssuerInvoicesView } from "@/components/IssuerInvoicesView";
 import { VendorBudgetView } from "@/components/VendorBudgetView";
-import { VendorPendingView } from "@/components/VendorPendingView";
+import { TimelineDetail } from "@/components/TimelineDetail";
 
 /** La cédula jurídica de DEHC en Hacienda, para las facturas. */
 const DEHC_CEDULA = "3101020869";
@@ -22,7 +22,7 @@ const DEHC_OWNER = "DEHC";
 const TABS = [
   { key: "facturas", label: "Facturas", hint: "Lo que DEHC ha cobrado, línea por línea" },
   { key: "presupuesto", label: "Presupuesto", hint: "Lo que tiene a cargo y en qué se gastó" },
-  { key: "pendiente", label: "Pendiente", hint: "Lo que falta y cuándo lo espera el cronograma" },
+  { key: "pendiente", label: "Pendiente", hint: "El cronograma de sus líneas, semana a semana" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["key"];
@@ -57,7 +57,11 @@ export default function DehcPage() {
 
       {tab === "facturas" && <IssuerInvoicesView issuer={DEHC_CEDULA} />}
       {tab === "presupuesto" && <VendorBudgetView owner={DEHC_OWNER} />}
-      {tab === "pendiente" && <VendorPendingView owner={DEHC_OWNER} />}
+      {/* ⚠️ El MISMO cuadro del Timeline Detail, acotado a DEHC (owner,
+          2026-10-23: «tal cual pero sólo para esto de DEHC»). Dibujar otro
+          parecido daría dos repartos del mismo cronograma, y el día que uno
+          se arregle dirían cosas distintas sobre las mismas celdas. */}
+      {tab === "pendiente" && <TimelineDetail owner={DEHC_OWNER} />}
     </AppShell>
   );
 }
