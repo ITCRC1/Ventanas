@@ -1,176 +1,171 @@
 "use client";
 
 /**
- * El presupuesto que un proveedor tiene a cargo, y en qué se ha gastado.
+ * El presupuesto de un proveedor, en el formato del espejo del ledger.
  *
- * Owner, 2026-10-23, al ver a DEHC en la columna Owner del Timeline Detail:
- * *«necesito sub tabs… 2 para el presupuesto, que acabas de hacer de DEHC, y
- * seguro más abajo se debe poner las tablas de gastos de cada proyecto»*.
+ * Owner, 2026-10-23: *«en tab presupuesto usemos este formato para mostrar el
+ * detalle de las facturas, con este formato bonito. Copia el detalle de ledger,
+ * bien detallado por línea de factura»*.
  *
- * ## Qué pregunta contesta, que las facturas no
+ * Son dos cuadros, uno encima del otro:
  *
- * La pestaña de facturas dice qué nos cobran. Ésta dice **qué le encargamos**:
- * el `owner` de la línea del WBS es quien responde por la tarea. DEHC aparece
- * en doce líneas por $413.944,70, y la mitad no tiene una sola factura todavía
- * — eso no se ve mirando facturas, porque lo que falta justamente no llegó.
+ * 1. **`InvoicesApplied` acotado al proveedor** — el mismo espejo del ledger
+ *    que ya existe, con presupuesto, gasto YTD, facturas aplicadas y el
+ *    diferencial. Se reusa el componente, no su estilo: dos copias del mismo
+ *    cuadro se separan en el primer arreglo que alguien haga de un lado.
  *
- * ⚠️ `owner` es texto escrito a mano, no una llave contra el beneficiario del
- * pago. Sirve para saber a quién reclamarle, no para cuadrar plata.
+ * 2. **El detalle del ledger, asiento por asiento** — agrupado por línea del
+ *    WBS, con su subtotal. El cuadro de arriba dice cuánto; éste dice de qué.
  */
 
-import type { OwnerLine, OwnerWbs } from "@/lib/hooks";
+import { Fragment } from "react";
+import { InvoicesApplied } from "@/components/InvoicesApplied";
+import type { OwnerPago, OwnerWbs } from "@/lib/hooks";
 import { useWbsByOwner } from "@/lib/hooks";
+
+const TH = "px-2 py-1 font-semibold";
+const THR = `${TH} text-right`;
+const TD = "border border-slate-200 px-2 py-1";
+const TDR = `${TD} text-right tabular-nums whitespace-nowrap`;
 
 const money = (v: unknown) =>
   v === null || v === undefined || v === ""
     ? "—"
-    : Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    : Number(v).toLocaleString("en-US", { maximumFractionDigits: 0 });
 
 const num = (v: unknown) => Number(v ?? 0);
 
 export function VendorBudgetView({ owner }: { owner: string }) {
   const q = useWbsByOwner(owner);
-  if (q.isLoading) return <p className="text-sm text-slate-500">Cargando…</p>;
-  if (q.isError)
-    return <p className="text-sm text-red-600">No se pudo cargar: {(q.error as Error).message}</p>;
-
   const d: OwnerWbs | undefined = q.data;
   const lineas = d?.lines ?? [];
-  if (!lineas.length)
-    return (
-      <p className="text-sm text-slate-500">
-        Ninguna línea del WBS tiene a «{owner}» como responsable.
-      </p>
-    );
 
-  const tot = (f: (l: OwnerLine) => unknown) => lineas.reduce((a, l) => a + num(f(l)), 0);
-
-  const th = "border-b border-slate-300 px-2 py-2 text-left font-semibold";
-  const thN = th + " text-right";
-  const td = "border-b border-slate-200 px-2 py-1.5";
-  const tdN = td + " text-right tabular-nums whitespace-nowrap";
+  const todos: OwnerPago[] = lineas.flatMap((l) => d?.payments[l.wbs_code] ?? []);
+  const granCom = todos.reduce((a, p) => a + num(p.amount), 0);
+  const granPag = todos.reduce((a, p) => a + num(p.amount_paid), 0);
 
   return (
     <div className="space-y-6">
+      {/* ── 1. El espejo del ledger, sólo las líneas de este proveedor ──── */}
+      <InvoicesApplied owner={owner} />
+
+      {/* ── 2. El detalle: cada asiento que compone ese gasto ──────────── */}
       <div>
         <h2 className="mb-2 text-base font-semibold">
-          Las {lineas.length} líneas que {owner} tiene a cargo
+          El detalle del ledger, asiento por asiento
         </h2>
-        <div className="overflow-x-auto rounded border border-slate-300 bg-white">
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>
-                <th className={th}>WBS</th>
-                <th className={th}>Título</th>
-                <th className={th}>Categoría · Fase</th>
-                <th className={thN}>Presupuesto</th>
-                <th className={thN}>Gastado</th>
-                <th className={thN}>Pendiente</th>
-                <th className={th}>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineas.map((l) => (
-                <tr key={l.wbs_code}>
-                  <td className={td + " whitespace-nowrap font-mono text-xs font-semibold"}>
-                    {l.wbs_code}
-                  </td>
-                  <td className={td}>{l.title}</td>
-                  <td className={td + " text-xs text-slate-500"}>
-                    {[l.category, l.phase].filter(Boolean).join(" · ")}
-                  </td>
-                  <td className={tdN}>{money(l.budget_revised)}</td>
-                  <td className={tdN}>{money(l.spend)}</td>
-                  <td
-                    className={
-                      tdN + (num(l.remaining) > 0.005 ? " font-semibold text-amber-700" : "")
-                    }
-                  >
-                    {money(l.remaining)}
-                  </td>
-                  <td className={td + " text-xs text-slate-500"}>{l.state}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-slate-400 bg-slate-100 font-semibold">
-                <td className={td} colSpan={3}>
-                  TOTAL
-                </td>
-                <td className={tdN}>{money(tot((l) => l.budget_revised))}</td>
-                <td className={tdN}>{money(tot((l) => l.spend))}</td>
-                <td className={tdN}>{money(tot((l) => l.remaining))}</td>
-                <td className={td} />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+        {q.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+        {q.isError && (
+          <p className="text-sm text-red-600">
+            No se pudo cargar: {(q.error as Error).message}
+          </p>
+        )}
+        {!q.isLoading && !lineas.length && (
+          <p className="text-sm text-slate-500">
+            Ninguna línea del WBS tiene a «{owner}» como responsable.
+          </p>
+        )}
 
-      {/* ── El gasto de cada línea, una tabla por proyecto ────────────────
-          Owner: «más abajo se debe poner las tablas de gastos de cada
-          proyecto». Una sola tabla con las 100+ filas revueltas no deja ver
-          contra qué línea corre cada pago, que es la pregunta. */}
-      <div>
-        <h2 className="mb-2 text-base font-semibold">El gasto, línea por línea</h2>
-        <div className="space-y-4">
-          {lineas.map((l) => {
-            const pagos = d?.payments[l.wbs_code] ?? [];
-            const sumaPagos = pagos.reduce((a, p) => a + num(p.amount_paid), 0);
-            return (
-              <div key={l.wbs_code} className="rounded border border-slate-300 bg-white">
-                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
-                  <span className="text-sm">
-                    <span className="font-mono font-semibold">{l.wbs_code}</span>{" "}
-                    <span className="text-slate-700">{l.title}</span>
-                  </span>
-                  <span className="text-xs text-slate-600">
-                    {pagos.length} pago{pagos.length === 1 ? "" : "s"} · ${money(sumaPagos)} de $
-                    {money(l.budget_revised)}
-                  </span>
-                </div>
-                {pagos.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-slate-500">
-                    Sin pagos registrados. El presupuesto está íntegro.
-                  </p>
-                ) : (
-                  <table className="w-full border-collapse text-sm">
-                    <thead className="text-slate-600">
-                      <tr>
-                        <th className={th + " w-28"}>Fecha</th>
-                        <th className={th}>Concepto</th>
-                        <th className={thN + " w-32"}>Comprometido</th>
-                        <th className={thN + " w-32"}>Pagado</th>
+        {lineas.length > 0 && (
+          <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full min-w-[1000px] border-collapse text-[11px]">
+              <thead className="sticky top-0 z-10 bg-[#434343] text-left text-white">
+                <tr>
+                  <th className={TH}>WBS</th>
+                  <th className={TH}>Date</th>
+                  <th className={TH}>Concept</th>
+                  <th className={TH}>Invoice #</th>
+                  <th className={THR}>Committed</th>
+                  <th className={`${THR} bg-[#8a5a00]`}>Paid</th>
+                  <th className={THR}>Due</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineas.map((l) => {
+                  const pagos = d?.payments[l.wbs_code] ?? [];
+                  const sCom = pagos.reduce((a, p) => a + num(p.amount), 0);
+                  const sPag = pagos.reduce((a, p) => a + num(p.amount_paid), 0);
+                  return (
+                    <Fragment key={l.wbs_code}>
+                      {/* La banda de la línea, como la de categoría del espejo. */}
+                      <tr className="bg-slate-100 font-semibold">
+                        <td className={TD + " font-mono"}>{l.wbs_code}</td>
+                        <td className={TD} colSpan={3}>
+                          {l.title}
+                          <span className="ml-2 font-normal text-slate-500">
+                            presupuesto {money(l.budget_revised)} · pendiente{" "}
+                            {money(l.remaining)}
+                          </span>
+                        </td>
+                        <td className={TDR}>{money(l.budget_revised)}</td>
+                        <td className={TDR}>{money(l.spend)}</td>
+                        <td className={TDR}>{money(l.remaining)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {pagos.map((p) => (
-                        <tr key={p.id}>
-                          <td className={td + " whitespace-nowrap text-xs"}>
-                            {p.entry_date ?? (
-                              <span className="text-amber-700">sin fecha</span>
-                            )}
+
+                      {pagos.length === 0 ? (
+                        <tr>
+                          <td className={TD} />
+                          <td className={TD + " italic text-slate-400"} colSpan={6}>
+                            Sin asientos en el ledger: el presupuesto está íntegro.
                           </td>
-                          <td className={td + " text-xs"}>
-                            {p.description || p.payee || "—"}
-                          </td>
-                          <td className={tdN}>{money(p.amount)}</td>
-                          <td className={tdN}>{money(p.amount_paid)}</td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                      ) : (
+                        pagos.map((p) => (
+                          <tr key={p.id} className="hover:bg-teal-50/40">
+                            <td className={TD} />
+                            <td className={TD + " whitespace-nowrap text-slate-500"}>
+                              {p.entry_date ?? (
+                                <span className="text-amber-700">sin fecha</span>
+                              )}
+                            </td>
+                            <td className={TD}>{p.description || p.payee || "—"}</td>
+                            <td className={TD + " font-mono text-slate-500"}>
+                              {p.invoice_no || ""}
+                            </td>
+                            <td className={TDR}>{money(p.amount)}</td>
+                            <td className={TDR}>{money(p.amount_paid)}</td>
+                            <td className={TDR}>{money(p.amount_due)}</td>
+                          </tr>
+                        ))
+                      )}
+
+                      {pagos.length > 0 && (
+                        <tr className="bg-slate-50 font-semibold">
+                          <td className={TD} />
+                          <td className={TD} colSpan={3}>
+                            Subtotal {l.wbs_code} · {pagos.length} asiento
+                            {pagos.length === 1 ? "" : "s"}
+                          </td>
+                          <td className={TDR}>{money(sCom)}</td>
+                          <td className={TDR}>{money(sPag)}</td>
+                          <td className={TDR} />
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot className="sticky bottom-0 z-10">
+                <tr className="bg-[#434343] font-semibold text-white">
+                  <td className={TD} colSpan={4}>
+                    TOTAL {owner} · {todos.length} asientos
+                  </td>
+                  <td className={TDR}>{money(granCom)}</td>
+                  <td className={TDR}>{money(granPag)}</td>
+                  <td className={TDR} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-slate-500">
-        Estas líneas son las que tienen a <strong>{owner}</strong> como responsable en el WBS. Ese
-        campo es texto escrito a mano: sirve para saber a quién reclamarle, no para cuadrar plata
-        contra el beneficiario del pago.
+        El cuadro de arriba es el espejo del ledger con las facturas aplicadas, acotado a las
+        líneas que tienen a <strong>{owner}</strong> como responsable. El de abajo es el detalle
+        que lo compone: cada asiento del ledger, agrupado por línea. Ese campo de responsable es
+        texto escrito a mano — sirve para saber a quién reclamarle, no para cuadrar plata contra
+        el beneficiario del pago.
       </p>
     </div>
   );

@@ -37,7 +37,15 @@ interface Sums {
 }
 const zero = (): Sums => ({ rev: 0, spend: 0, inv: 0, rem: 0, fc: 0, funding: 0 });
 
-export function InvoicesApplied() {
+/** El mismo cuadro, acotado a lo que un proveedor tiene a cargo.
+ *
+ *  Owner, 2026-10-23: *«en tab presupuesto usemos este formato… con este
+ *  formato bonito»*.
+ *
+ *  ⚠️ Se reusa en vez de replicar el estilo: es el mismo espejo del ledger con
+ *  las facturas aplicadas, y dos copias se separan en el primer arreglo que
+ *  alguien haga de un lado. Sin `owner`, es el cuadro de siempre. */
+export function InvoicesApplied({ owner }: { owner?: string } = {}) {
   const fin = useFinancials();
   // TC de referencia compartido (guardado en la base).
   const ref = useRefFx();
@@ -50,8 +58,12 @@ export function InvoicesApplied() {
   const invOf = (id: number) => byWbs.data?.by_wbs?.[String(id)] ?? 0;
 
   const groups = useMemo(() => {
+    const buscado = (owner ?? "").trim().toUpperCase();
     const lines = (fin.data ?? []).filter(
-      (r) => r.kind !== "section_header" && r.kind !== "proceeds",
+      (r) =>
+        r.kind !== "section_header" &&
+        r.kind !== "proceeds" &&
+        (!buscado || (r.owner ?? "").toUpperCase().includes(buscado)),
     );
     const map = new Map<string, WbsFinancials[]>();
     for (const r of lines) {
@@ -70,7 +82,7 @@ export function InvoicesApplied() {
     return [...map.entries()]
       .map(([cat, ls]) => ({ cat, ls: [...ls].sort(cmp) }))
       .sort((a, b) => cmp(a.ls[0], b.ls[0]));
-  }, [fin.data]);
+  }, [fin.data, owner]);
 
   const sumsOf = (ls: WbsFinancials[]): Sums => {
     const s = zero();
