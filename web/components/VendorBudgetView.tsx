@@ -87,19 +87,33 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                   const sPag = pagos.reduce((a, p) => a + num(p.amount_paid), 0);
                   return (
                     <Fragment key={l.wbs_code}>
-                      {/* La banda de la línea, como la de categoría del espejo. */}
-                      <tr className="bg-slate-100 font-semibold">
-                        <td className={TD + " font-mono"}>{l.wbs_code}</td>
-                        <td className={TD} colSpan={3}>
-                          {l.title}
-                          <span className="ml-2 font-normal text-slate-500">
-                            presupuesto {money(l.budget_revised)} · pendiente{" "}
-                            {money(l.remaining)}
-                          </span>
+                      {/* ⚠️ Las MISMAS clases que la banda de categoría del
+                          cuadro de arriba (owner, 2026-10-23: «separa
+                          visiblemente, tal como arriba»). La raya gruesa es
+                          lo que hace que a simple vista se vea dónde empieza
+                          cada línea; con un gris suave, cuarenta asientos
+                          seguidos se leen como una sola lista. */}
+                      <tr className="border-t-2 border-slate-400 bg-[#EAF0FA]">
+                        <td
+                          className="border border-slate-300 px-2 py-1.5 font-mono text-[12px] font-bold text-slate-800"
+                        >
+                          {l.wbs_code}
                         </td>
-                        <td className={TDR}>{money(l.budget_revised)}</td>
-                        <td className={TDR}>{money(l.spend)}</td>
-                        <td className={TDR}>{money(l.remaining)}</td>
+                        <td
+                          className="border border-slate-300 px-2 py-1.5 text-[12px] font-bold uppercase text-slate-800"
+                          colSpan={3}
+                        >
+                          {l.title}
+                        </td>
+                        <td className={TDR + " border-slate-300 font-bold"}>
+                          {money(l.budget_revised)}
+                        </td>
+                        <td className={TDR + " border-slate-300 font-bold"}>
+                          {money(l.spend)}
+                        </td>
+                        <td className={TDR + " border-slate-300 font-bold"}>
+                          {money(l.remaining)}
+                        </td>
                       </tr>
 
                       {pagos.length === 0 ? (
@@ -111,8 +125,8 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                         </tr>
                       ) : (
                         pagos.map((p) => (
-                          <tr key={p.id} className="hover:bg-teal-50/40">
-                            <td className={TD} />
+                          <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
+                            <td className={TD + " bg-slate-50/60"} />
                             <td className={TD + " whitespace-nowrap text-slate-500"}>
                               {p.entry_date ?? (
                                 <span className="text-amber-700">sin fecha</span>
@@ -130,15 +144,17 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                       )}
 
                       {pagos.length > 0 && (
-                        <tr className="bg-slate-50 font-semibold">
-                          <td className={TD} />
-                          <td className={TD} colSpan={3}>
-                            Subtotal {l.wbs_code} · {pagos.length} asiento
+                        <tr className="border-y-2 border-slate-500 bg-[#DCE6F4] text-[12px] font-bold">
+                          <td
+                            className="border border-slate-300 px-2 py-1.5 text-right"
+                            colSpan={4}
+                          >
+                            TOTAL {l.wbs_code} · {pagos.length} asiento
                             {pagos.length === 1 ? "" : "s"}
                           </td>
-                          <td className={TDR}>{money(sCom)}</td>
-                          <td className={TDR}>{money(sPag)}</td>
-                          <td className={TDR} />
+                          <td className={TDR + " border-slate-300"}>{money(sCom)}</td>
+                          <td className={TDR + " border-slate-300"}>{money(sPag)}</td>
+                          <td className={TDR + " border-slate-300"} />
                         </tr>
                       )}
                     </Fragment>
