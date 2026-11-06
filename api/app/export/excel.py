@@ -1592,14 +1592,16 @@ class ExcelExporter:
         #   aplicado   = -SUM(amount) FILTER (kind = 'application')
         #   acumulado  =  SUM(amount) FILTER (kind <> 'application')
         #   disponible =  SUM(amount)  (= último saldo corrido)
-        if has_rows:
-            amt = f"$D${first}:$D${last}"
-            mov = f"$B${first}:$B${last}"
-            f_aplicado = f'=-SUMIF({mov},"{APP_LABEL}",{amt})'
-            f_acumulado = f'=SUM({amt})-SUMIF({mov},"{APP_LABEL}",{amt})'
-            f_disponible = f"=SUM({amt})"
-        else:
-            f_aplicado = f_acumulado = f_disponible = "0"
+        # CR1 del audit: con la tabla vacia los tres KPI eran el TEXTO "0" —
+        # ni siquiera un cero. Quien escribiera los movimientos a mano en Excel
+        # se quedaba con tres ceros muertos arriba. El rango se abre igual
+        # cuando no hay filas, sobre las 30 lineas siguientes a la nota.
+        ini, fin = (first, last) if has_rows else (first + 1, first + 30)
+        amt = f"$D${ini}:$D${fin}"
+        mov = f"$B${ini}:$B${fin}"
+        f_aplicado = f'=-SUMIF({mov},"{APP_LABEL}",{amt})'
+        f_acumulado = f'=SUM({amt})-SUMIF({mov},"{APP_LABEL}",{amt})'
+        f_disponible = f"=SUM({amt})"
 
         cards = [
             (1, "Accrued", f_acumulado),
@@ -1645,11 +1647,19 @@ class ExcelExporter:
         DATEF = "yyyy-mm-dd"  # formato de fecha local a esta hoja
         headers = [
             "Date", "No.", "Description", "Debit", "Credit", "Account", "Type", "Balance",
+            # ⚠️ B2 del audit: las dos columnas que faltaban. El saldo de la H
+            # se encadena desde los debitos y creditos; el banco reporta el
+            # suyo en cada movimiento. Mientras no se comparen, un faltante en
+            # el detalle no se ve: la cadena sigue cuadrando consigo misma.
+            "Bank reported", "Difference",
         ]
+        COL_BANCO, COL_DIF = 9, 10
 
         accounts = self.db.execute(
             text("SELECT id, name FROM bank_account ORDER BY name")
         ).mappings().all()
+        # nombre de cuenta -> fila del "Closing balance" (la cita US Wire)
+        self.cierre_banco: dict[str, int] = {}
 
         r = 4
         for acc in accounts:
@@ -1732,9 +1742,31 @@ class ExcelExporter:
             fc = ws.cell(r, 8, f"=H{last_data_row}")
             fc.number_format = MONEY
             fc.font = BOLD
+            # El saldo que reporta el BANCO en el ultimo movimiento. Es dato
+            # del estado de cuenta, no un calculo nuestro: por eso va pegado.
+            saldo_banco = rows[-1]["balance"]
+            if saldo_banco is not None:
+                bc = ws.cell(r, COL_BANCO, round(float(saldo_banco), 2))
+                bc.number_format = MONEY
+                bc.font = BOLD
+                dc = ws.cell(r, COL_DIF, f"=ROUND({gc(COL_BANCO)}{r}-H{r},2)")
+                dc.number_format = MONEY
+                dc.font = BOLD
+                # En rojo cuando no cuadra, que es el unico caso que importa.
+                ws.conditional_formatting.add(
+                    f"{gc(COL_DIF)}{r}",
+                    CellIsRule(
+                        operator="notEqual", formula=["0"],
+                        fill=PatternFill("solid", fgColor="FFF4CCCC"),
+                        font=Font(bold=True, color="FF9C0006"),
+                    ),
+                )
+            self.cierre_banco[acc["name"]] = r
             r += 2  # línea en blanco entre cuentas
 
-        for c, w in zip(range(1, 9), [12, 10, 46, 14, 14, 22, 20, 16], strict=False):
+        for c, w in zip(
+            range(1, 11), [12, 10, 46, 14, 14, 22, 20, 16, 16, 16], strict=False
+        ):
             ws.column_dimensions[gc(c)].width = w
         ws.freeze_panes = "A4"
 
@@ -1922,6 +1954,36 @@ class ExcelExporter:
         val.number_format = MONEY
         val.font = BOLD
 
+        # ⚠️ C8 del audit: ese numero es un campo que alguien mantiene a mano en
+        # `settings`. Debajo va el saldo que el estado de cuenta de LAFISE
+        # reporta en la hoja Banks, por formula, y la diferencia entre los dos.
+        # Hoy coinciden al centavo; el dia que dejen de coincidir se ve aqui en
+        # vez de descubrirse meses despues.
+        fila_cierre = getattr(self, "cierre_banco", {}).get("Ventanas LAFISE (operativa)")
+        if fila_cierre:
+            r += 1
+            e = ws.cell(r, 8, "Per Banks sheet")
+            e.font = Font(size=9, color="FF808080")
+            e.alignment = RIGHT
+            b = ws.cell(r, 9, f"=Banks!I{fila_cierre}")
+            b.number_format = MONEY
+            b.font = Font(size=9, color="FF808080")
+            r += 1
+            e = ws.cell(r, 8, "Difference")
+            e.font = Font(size=9, color="FF808080")
+            e.alignment = RIGHT
+            d = ws.cell(r, 9, f"=ROUND(I{r - 2}-I{r - 1},2)")
+            d.number_format = MONEY
+            d.font = Font(size=9, color="FF808080")
+            ws.conditional_formatting.add(
+                f"I{r}",
+                CellIsRule(
+                    operator="notEqual", formula=["0"],
+                    fill=PatternFill("solid", fgColor="FFF4CCCC"),
+                    font=Font(bold=True, color="FF9C0006"),
+                ),
+            )
+
         # --- anchos de columna ---
         widths = [20, 12, 16, 26, 26, 18, 16, 16, 16, 30]
         for i, w in enumerate(widths, 1):
@@ -2048,10 +2110,9 @@ class ExcelExporter:
             ws.cell(r, i).fill = HDR
             ws.cell(r, i).font = WHITE
         ws.cell(r, 6, "TOTAL ACTIVE INVOICES")
-        if active_totals:
-            ws.cell(
-                r, 8, _suma(f"H{t}" for t in active_totals)
-            ).number_format = MONEY
+        # IN1 del audit: sin facturas activas esta celda quedaba EN BLANCO, que
+        # se lee como "no se calculo" y no como "cero". _suma ya devuelve "=0".
+        ws.cell(r, 8, _suma(f"H{t}" for t in active_totals)).number_format = MONEY
 
         for c, w in zip(range(1, 9), [16, 26, 12, 12, 12, 46, 18, 14], strict=False):
             ws.column_dimensions[gc(c)].width = w
