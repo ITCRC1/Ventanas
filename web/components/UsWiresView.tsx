@@ -253,7 +253,12 @@ function BlockRows({
           <span className="ml-2 font-normal normal-case text-slate-500">· {block.note}</span>
         </td>
       </tr>
-      {rows.map((r) => (
+      {/* ⚠️ Del MAS RECIENTE al mas viejo (owner, 2026-11-06), como un estado
+          de cuenta bancario. Se invierte SOLO la presentacion: `running_balance`
+          lo calcula el backend en orden cronologico y cada fila conserva el
+          suyo — «el saldo despues de este movimiento»—. Recalcularlo al reves
+          daria un saldo que no es el de ninguna fecha. */}
+      {[...rows].reverse().map((r) => (
         <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
           <td className="px-2 py-1">
             <TextCell
