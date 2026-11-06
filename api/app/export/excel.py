@@ -231,6 +231,15 @@ class ExcelExporter:
             for (yy, mm), wks in months.items():
                 w_first = col
                 for w in wks:
+                    # J5 del audit: la FECHA REAL del lunes, en la fila 2. La
+                    # fila 5 sólo trae el día ("1", "8", "15"), que no sirve
+                    # para sumar por fecha. Las columnas de MES y TRIMESTRE se
+                    # quedan vacías acá a propósito: así un SUMIF sobre la fila
+                    # 2 toca sólo semanas y nunca cuenta un subtotal.
+                    wd = ws.cell(2, col, w)
+                    wd.number_format = "yyyy-mm-dd"
+                    wd.font = Font(size=7, color="FF808080")
+                    wd.alignment = Alignment(horizontal="center")
                     ws.cell(3, col, qname)
                     ws.cell(4, col, dt.date(yy, mm, 1).strftime("%b %Y").upper())
                     cc = ws.cell(hr, col, w.day)
@@ -269,9 +278,58 @@ class ExcelExporter:
         tc.font = WHITE
         ws.column_dimensions[gc(col)].width = 15
 
+        # ── C1 y J6 del audit: dos columnas al FINAL ────────────────────────
+        #
+        # Van al final y no entre las fijas a proposito: el layout A..M es un
+        # ancla —hay formulas y notas que lo citan por letra— y correrlo
+        # romperia mas de lo que arregla.
+        #
+        # ⚠️ C1: el Forecast decia `=J+TOTAL`, o sea gastado + TODO el plan.
+        # Pero el plan ANTERIOR al corte es historia: reproduce lo que el
+        # LEDGER ya pago. Sumarlo al gastado lo cuenta dos veces — en la
+        # 0.0002 daba 24,375,000 donde el presupuesto son 15,000,000.
+        #
+        # Comprobado contra la base en las 14 lineas mas grandes: la app define
+        # Forecast = gastado + lo pintado DESPUES del corte. Esta columna aisla
+        # ese "despues" con un SUMIF sobre la fila 2 de fechas, que es la unica
+        # manera de hacerlo con formula viva y no con un numero pegado.
+        self.future_col = col + 1
+        fcell = ws.cell(hr, self.future_col, "PLAN POST-CORTE")
+        fcell.fill = HDR
+        fcell.font = WHITE
+        fcell.alignment = Alignment(horizontal="center", wrap_text=True)
+        ws.cell(4, self.future_col, "FORECAST")
+        ws.column_dimensions[gc(self.future_col)].width = 15
+
+        # J6: el plan fasado no siempre suma al presupuesto revisado —hay 17
+        # lineas que difieren por centavos—. La columna lo deja a la vista en
+        # vez de que haya que buscarlo.
+        self.check_col = col + 2
+        kcell = ws.cell(hr, self.check_col, "PLAN vs PRESUP.")
+        kcell.fill = HDR
+        kcell.font = WHITE
+        kcell.alignment = Alignment(horizontal="center", wrap_text=True)
+        ws.cell(4, self.check_col, "CONTROL")
+        ws.column_dimensions[gc(self.check_col)].width = 15
+
+        # El corte que separa historia de futuro. Es el mismo de `settings` que
+        # usa la app: con otro, el Excel y la pantalla dirian forecasts
+        # distintos sobre las mismas celdas.
+        self.cutoff = self.db.execute(
+            text("SELECT cutoff_date FROM settings LIMIT 1")
+        ).scalar()
+        _a = gc(min(self.week_col.values()))
+        _b = gc(self.total_col - 1)
+        self._futuro_f = (
+            '=SUMIF($%s$2:$%s$2,">="&DATE(%d,%d,%d),%s{r}:%s{r})'
+            % (_a, _b, self.cutoff.year, self.cutoff.month, self.cutoff.day, _a, _b)
+            if self.cutoff
+            else "=0"
+        )
+
         # Columnas de dinero de una fila (para subtotales/total): las 7 fijas
         # G..M + TODAS las de tiempo (semana/mes/trim) + la TOTAL final.
-        money_cols = list(range(7, 14)) + list(range(14, self.total_col + 1))
+        money_cols = list(range(7, 14)) + list(range(14, self.check_col + 1))
         wcols = set(self.week_col.values())
 
         def numfmt(c: int) -> str:
@@ -388,7 +446,10 @@ class ExcelExporter:
                 if e["forecast_ovr"] is not None:  # override manual del app = dato base
                     ws.cell(r, 12, float(e["forecast_ovr"])).number_format = MONEY
                 else:  # Forecast = Spend + Timeline Total (vivo)
-                    ws.cell(r, 12, f"=J{r}+{gc(self.total_col)}{r}").number_format = MONEY
+                    # C1: gastado + plan POSTERIOR al corte, no el total.
+                    ws.cell(r, 12, f"=J{r}+{gc(self.future_col)}{r}").number_format = MONEY
+                    ws.cell(r, self.future_col, self._futuro_f.format(r=r)).number_format = MONEY
+                    ws.cell(r, self.check_col, f"=ROUND({gc(self.total_col)}{r}-I{r},2)").number_format = MONEY
                 ws.cell(r, 13, f"=I{r}-L{r}").number_format = MONEY                     # Variance
                 write_timeline_line(r, code, cat)
                 r += 1
@@ -429,7 +490,10 @@ class ExcelExporter:
                 ws.cell(r, 10, f"={spend_f}").number_format = MONEY
                 ws.cell(r, 11, f"=I{r}-J{r}").number_format = MONEY
                 write_timeline_venta(r, sale_codes)
-                ws.cell(r, 12, f"=J{r}+{gc(self.total_col)}{r}").number_format = MONEY
+                # C1: gastado + plan POSTERIOR al corte, no el total.
+                ws.cell(r, 12, f"=J{r}+{gc(self.future_col)}{r}").number_format = MONEY
+                ws.cell(r, self.future_col, self._futuro_f.format(r=r)).number_format = MONEY
+                ws.cell(r, self.check_col, f"=ROUND({gc(self.total_col)}{r}-I{r},2)").number_format = MONEY
                 ws.cell(r, 13, f"=I{r}-L{r}").number_format = MONEY
                 for c in money_cols:
                     ws.cell(r, c).font = BOLD
