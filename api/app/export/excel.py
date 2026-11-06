@@ -25,6 +25,7 @@ from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter as gc
 from openpyxl.worksheet.properties import Outline
+from openpyxl.worksheet.table import Table, TableStyleInfo
 from sqlalchemy import text
 from sqlalchemy.engine.row import RowMapping
 from sqlalchemy.orm import Session
@@ -187,7 +188,16 @@ class ExcelExporter:
         for c, w in zip(range(1, 10), [12, 12, 14, 26, 46, 14, 14, 14, 18], strict=False):
             ws.column_dimensions[gc(c)].width = w
         ws.freeze_panes = "B4"
-        ws.auto_filter.ref = f"A3:I{self.ledger_last}"
+        # ⚠️ L15 del audit: tabla de Excel de verdad, no un autofiltro suelto.
+        # Una fila escrita debajo entra sola al rango —y por lo tanto a los
+        # SUMIF del Job Cost— en vez de quedarse fuera sin que nadie lo note.
+        # El autofiltro no se pone: Excel no admite los dos sobre el mismo
+        # rango, y la tabla ya trae el suyo.
+        t = Table(displayName="Ledger", ref=f"A3:I{self.ledger_last}")
+        t.tableStyleInfo = TableStyleInfo(
+            name="TableStyleLight1", showRowStripes=True, showColumnStripes=False
+        )
+        ws.add_table(t)
 
     # ------------------------------------------------------------------ 2
 
@@ -2130,18 +2140,44 @@ class ExcelExporter:
             r += 1
         ws["B11"] = "How to collapse"
         ws["B11"].font = Font(bold=True, size=12)
-        for i, t in enumerate(
-            [
-                "The 1 · 2 · 3 buttons at the top left of Job Cost Report:",
-                "   1 → quarters only",
-                "   2 → quarters + months",
-                "   3 → full weekly detail",
-                "The +/− above each column group also work.",
-                "",
-                "LIVE model: Spend, Remaining, Forecast, subtotals and totals are",
-                "formulas. If you edit the LEDGER, everything recalculates on its own.",
-            ]
-        ):
+        texto = [
+            "The 1 · 2 · 3 buttons at the top left of Job Cost Report:",
+            "   1 → quarters only",
+            "   2 → quarters + months",
+            "   3 → full weekly detail",
+            "The +/− above each column group also work.",
+            "",
+            "LIVE model: Spend, Remaining, Forecast, subtotals and totals are",
+            "formulas. If you edit the LEDGER, everything recalculates on its own.",
+            "",
+            "WHAT IS A FORMULA AND WHAT IS DATA",
+            "   Formula — anything derived: every total, every balance, every",
+            "   week of Timeline and Timeline Detail, Spend, Remaining, Forecast.",
+            "   Data — what the system was told: the LEDGER rows, the weekly",
+            "   amounts in Job Cost Report, the bank movements, the original",
+            "   budget (columns G and H). Change these and the rest follows.",
+            "",
+            "COLUMNS WORTH KNOWING",
+            "   Job Cost Report · PLAN POST-CORTE — the schedule AFTER the cutoff",
+            "      date. Forecast = Spend + this. The plan before the cutoff is",
+            "      history: the LEDGER already paid it, so adding it would count",
+            "      the same money twice.",
+            "   Job Cost Report · PLAN vs PRESUP. — the whole schedule minus the",
+            "      revised budget. Zero means the plan spends exactly the budget.",
+            "   Banks · Bank reported / Difference — the balance the bank states",
+            "      against the one this chain builds from debits and credits.",
+            "      Red means they disagree, and the detail is what is missing.",
+            "",
+            "EXPENSES AND SALES DO NOT MIX",
+            "   Job Cost Report and Dashboard total them on separate rows. The",
+            "   sales line carries a negative sign; adding it to the expenses",
+            "   understated the project budget by its own amount.",
+            "",
+            "THE LEDGER IS AN EXCEL TABLE",
+            "   Named 'Ledger'. A row typed under the last one joins the table,",
+            "   and therefore every SUMIF in Job Cost Report, on its own.",
+        ]
+        for i, t in enumerate(texto):
             ws.cell(13 + i, 2, t)
         ws.column_dimensions["B"].width = 6
         ws.column_dimensions["C"].width = 22
