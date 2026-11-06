@@ -708,7 +708,13 @@ class ExcelExporter:
                 v = sum(sched.get((i, w), 0.0) for i in ids)
                 cell = ws.cell(row, wc)
                 if v:
-                    cell.value = round(v, 2)
+                    # TL2 del audit: esto era el numero pegado. Ahora la semana
+                    # sale por SUMIF al Job Cost igual que Budget, Spend y
+                    # Forecast de esta misma fila (_sumif, arriba): una sola
+                    # fuente para toda la fila en vez de una mezcla de formula y
+                    # valor que se desincroniza en cuanto alguien repinta.
+                    jcr = self.week_col.get(w)
+                    cell.value = _sumif(codes, gc(jcr)) if jcr else round(v, 2)
                     cell.number_format = "#,##0"
                 if paint:
                     cell.fill = self._cat_fill(category, bool(v))
