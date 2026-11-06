@@ -18,6 +18,7 @@ import datetime as dt
 from collections import defaultdict
 from io import BytesIO
 from typing import Any
+from collections.abc import Iterable
 
 from openpyxl import Workbook
 from openpyxl.formatting.rule import CellIsRule
@@ -65,6 +66,24 @@ def _mondays(start: dt.date, end: dt.date) -> list[dt.date]:
         out.append(d)
         d += dt.timedelta(days=7)
     return out
+
+
+def _suma(refs: Iterable[str]) -> str:
+    """`=SUM(a,b,c)` en vez de `=a+b+c`.
+
+    Las dos dan el mismo numero mientras todo sea numero. La cadena de `+`
+    revienta con `#VALUE!` si una sola de las celdas trae texto —un rotulo
+    pegado de mas, una celda que alguien escribio a mano— y se lleva por
+    delante el total; `SUM` se salta lo que no es numero. Ademas es mas corta,
+    que importa cuando la lista pasa del centenar de filas.
+
+    Excel admite 255 argumentos por `SUM`; con mas, se parte en varias.
+    """
+    partes = [x for x in refs]
+    if not partes:
+        return "=0"
+    trozos = [partes[i:i + 200] for i in range(0, len(partes), 200)]
+    return "=" + "+".join("SUM(" + ",".join(t) + ")" for t in trozos)
 
 
 def _quarter(d: dt.date) -> str:
@@ -387,10 +406,10 @@ class ExcelExporter:
             for (_yy, _mm), (mc2, a, b) in self.month_col.items():
                 ws.cell(rr, mc2, f"=SUM({gc(a)}{rr}:{gc(b)}{rr})").number_format = MONEY
             for _qn, (qc2, mcs) in self.qtr_col.items():
-                ws.cell(rr, qc2, "=" + "+".join(f"{gc(m)}{rr}" for m in mcs)).number_format = MONEY
+                ws.cell(rr, qc2, _suma(f"{gc(m)}{rr}" for m in mcs)).number_format = MONEY
             ws.cell(
                 rr, self.total_col,
-                "=" + "+".join(f"{gc(q)}{rr}" for q, _ in self.qtr_col.values()),
+                _suma(f"{gc(q)}{rr}" for q, _ in self.qtr_col.values()),
             ).number_format = MONEY
 
         def write_timeline_venta(rr: int, codes: list[str]) -> None:
@@ -406,14 +425,19 @@ class ExcelExporter:
             for (_yy, _mm), (mc2, a, b) in self.month_col.items():
                 ws.cell(rr, mc2, f"=SUM({gc(a)}{rr}:{gc(b)}{rr})").number_format = MONEY
             for _qn, (qc2, mcs) in self.qtr_col.items():
-                ws.cell(rr, qc2, "=" + "+".join(f"{gc(m)}{rr}" for m in mcs)).number_format = MONEY
+                ws.cell(rr, qc2, _suma(f"{gc(m)}{rr}" for m in mcs)).number_format = MONEY
             ws.cell(
                 rr, self.total_col,
-                "=" + "+".join(f"{gc(q)}{rr}" for q, _ in self.qtr_col.values()),
+                _suma(f"{gc(q)}{rr}" for q, _ in self.qtr_col.values()),
             ).number_format = MONEY
 
         r = hr + 1
-        subtotal_rows: list[int] = []  # filas TOTAL GASTOS/VENTA (para PROJECT TOTAL)
+        # J3 del audit: dos listas, no una. El PROJECT TOTAL sumaba gastos y
+        # ventas en la misma celda, y la venta de Ventanas entra con signo
+        # negativo (-480,000): el presupuesto del proyecto salia 480,000 por
+        # debajo de lo que es, sin que nada avisara.
+        cost_totals: list[int] = []   # filas TOTAL EXPENSES
+        sale_totals: list[int] = []   # filas TOTAL SALES
 
         for cat, lines in cats.items():
             costs = [e for e in lines if (e["kind"] or "cost") != "proceeds"]
@@ -466,7 +490,7 @@ class ExcelExporter:
                     ws.cell(r, c, 0)
                 ws.cell(r, c).number_format = numfmt(c)
                 ws.cell(r, c).font = BOLD
-            subtotal_rows.append(r)
+            cost_totals.append(r)
             r += 1
 
             # --- TOTAL VENTA (sólo si la categoría tiene proceeds) ---
@@ -484,10 +508,21 @@ class ExcelExporter:
                     r, 8, sum(float(e["budget_change"] or 0) for e in sales)
                 ).number_format = MONEY
                 ws.cell(r, 9, f"=G{r}+H{r}").number_format = MONEY
-                spend_f = "+".join(
-                    f'SUMIF(LEDGER!$A:$A,"{c}",LEDGER!$G:$G)' for c in sale_codes
-                ) or "0"
-                ws.cell(r, 10, f"={spend_f}").number_format = MONEY
+                # J2 del audit: con un solo codigo de venta, el gasto se busca
+                # por la celda B de esta misma fila y no por el texto "6"
+                # escrito dentro de la formula. Asi, cambiar el codigo en B
+                # mueve tambien el numero; antes la formula seguia buscando el
+                # codigo viejo y nadie se enteraba.
+                if len(sale_codes) == 1:
+                    ws.cell(
+                        r, 10, f"=SUMIF(LEDGER!$A:$A,$B{r},LEDGER!$G:$G)"
+                    ).number_format = MONEY
+                else:
+                    # Con varios, B lleva "a, b" y SUMIF no lo entiende: hay
+                    # que nombrarlos uno a uno.
+                    ws.cell(r, 10, _suma(
+                        f'SUMIF(LEDGER!$A:$A,"{c}",LEDGER!$G:$G)' for c in sale_codes
+                    )).number_format = MONEY
                 ws.cell(r, 11, f"=I{r}-J{r}").number_format = MONEY
                 write_timeline_venta(r, sale_codes)
                 # C1: gastado + plan POSTERIOR al corte, no el total.
@@ -497,19 +532,26 @@ class ExcelExporter:
                 ws.cell(r, 13, f"=I{r}-L{r}").number_format = MONEY
                 for c in money_cols:
                     ws.cell(r, c).font = BOLD
-                subtotal_rows.append(r)
+                sale_totals.append(r)
                 r += 1
 
-        # --- PROJECT TOTAL (suma de las filas de subtotal; sin doble conteo) ---
-        for i in range(1, self.total_col + 1):
-            ws.cell(r, i).fill = TOTAL
-        ws.cell(r, 3, "PROJECT TOTAL").font = BOLD
-        if subtotal_rows:
+        # --- Totales del proyecto: gasto y venta en filas SEPARADAS ---
+        def _total_row(rr: int, label: str, srcs: list[int], fill: PatternFill) -> None:
+            for i in range(1, self.total_col + 1):
+                ws.cell(rr, i).fill = fill
+            ws.cell(rr, 3, label).font = BOLD
             for c in money_cols:
                 ws.cell(
-                    r, c, "=" + "+".join(f"{gc(c)}{x}" for x in subtotal_rows)
+                    rr, c, _suma(f"{gc(c)}{x}" for x in srcs)
                 ).number_format = numfmt(c)
-                ws.cell(r, c).font = BOLD
+                ws.cell(rr, c).font = BOLD
+
+        _total_row(r, "PROJECT TOTAL — EXPENSES", cost_totals, TOTAL)
+        r += 1
+        if sale_totals:
+            _total_row(r, "PROJECT TOTAL — SALES", sale_totals, GREEN)
+            r += 1
+            _total_row(r, "NET (EXPENSES + SALES)", cost_totals + sale_totals, TOTAL)
 
         for c, width in zip(
             range(1, 14), [11, 10, 42, 14, 20, 20, 15, 14, 15, 15, 15, 15, 14], strict=False
@@ -682,7 +724,7 @@ class ExcelExporter:
             # Presupuesto/gasto/forecast de un conjunto de WBS: SUMIF al Job Cost.
             if not codes:
                 return 0
-            return "=" + "+".join(
+            return _suma(
                 f'SUMIF({JC}!$B:$B,"{c}",{JC}!${src}:${src})' for _i, c in codes
             )
 
@@ -721,10 +763,10 @@ class ExcelExporter:
             for (_yy, _mm), (mc2, a, b) in month_col.items():
                 ws.cell(row, mc2, f"=SUM({gc(a)}{row}:{gc(b)}{row})").number_format = MONEY
             for _qn, (qc2, mcs) in qtr_col.items():
-                ws.cell(row, qc2, "=" + "+".join(f"{gc(m)}{row}" for m in mcs)).number_format = MONEY
+                ws.cell(row, qc2, _suma(f"{gc(m)}{row}" for m in mcs)).number_format = MONEY
             ws.cell(
                 row, total_col,
-                "=" + "+".join(f"{gc(q)}{row}" for q, _ in qtr_col.values()),
+                _suma(f"{gc(q)}{row}" for q, _ in qtr_col.values()),
             ).number_format = MONEY
             if bold:
                 for cc2 in range(3, 8):
@@ -738,7 +780,7 @@ class ExcelExporter:
             ws.cell(row, 1, label).font = BOLD
 
             def _s(c: int) -> object:
-                return ("=" + "+".join(f"{gc(c)}{rr}" for rr in srcs)) if srcs else 0
+                return _suma(f"{gc(c)}{rr}" for rr in srcs)
 
             ws.cell(row, 3, _s(3)).number_format = MONEY
             ws.cell(row, 4, _s(4)).number_format = MONEY
@@ -905,11 +947,11 @@ class ExcelExporter:
                 ws.cell(row, mc2, f"=SUM({gc(a)}{row}:{gc(b)}{row})").number_format = MONEY
             for _qn, (qc2, mcs) in qtr_col.items():
                 ws.cell(
-                    row, qc2, "=" + "+".join(f"{gc(m)}{row}" for m in mcs)
+                    row, qc2, _suma(f"{gc(m)}{row}" for m in mcs)
                 ).number_format = MONEY
             ws.cell(
                 row, total_col,
-                "=" + "+".join(f"{gc(q)}{row}" for q, _ in qtr_col.values()),
+                _suma(f"{gc(q)}{row}" for q, _ in qtr_col.values()),
             ).number_format = MONEY
 
         # ---- datos: líneas de v_wbs_financials + montos por semana (dato base) ----
@@ -996,7 +1038,7 @@ class ExcelExporter:
             for i, src in zip(range(7, 11), "IJKL", strict=False):
                 ws.cell(
                     row, i,
-                    "=" + "+".join(
+                    _suma(
                         f"SUMIF('Job Cost Report'!$B:$B,\"{cd}\","
                         f"'Job Cost Report'!${src}:${src})"
                         for cd in codes
@@ -1010,7 +1052,7 @@ class ExcelExporter:
                     # los códigos que la venta agrupa.
                     jcr = self.week_col.get(w)
                     if jcr:
-                        ws.cell(row, wc, "=" + "+".join(
+                        ws.cell(row, wc, _suma(
                             "SUMIF('Job Cost Report'!$B:$B,\"%s\","
                             "'Job Cost Report'!%s:%s)" % (cd, gc(jcr), gc(jcr))
                             for cd in codes
@@ -1027,13 +1069,13 @@ class ExcelExporter:
             for i in range(7, 11):
                 ws.cell(
                     row, i,
-                    ("=" + "+".join(f"{gc(i)}{x}" for x in idxs)) if idxs else 0,
+                    _suma(f"{gc(i)}{x}" for x in idxs),
                 ).number_format = MONEY
             ws.cell(row, 11, f"=J{row}-H{row}").number_format = MONEY
             for wc in week_col.values():
                 if idxs:
                     ws.cell(
-                        row, wc, "=" + "+".join(f"{gc(wc)}{x}" for x in idxs)
+                        row, wc, _suma(f"{gc(wc)}{x}" for x in idxs)
                     ).number_format = WK
             _rollup(row)
             lab = ws.cell(row, 1, label)
@@ -1148,20 +1190,26 @@ class ExcelExporter:
 
         # --- cabecera de la tabla ------------------------------------------
         hr = 7
-        heads = ["Category / line", "Status", "Budget", "Spend", "Remaining"]
+        # D1 del audit: el WBS, que faltaba. Sin el, cada SUMIF llevaba el
+        # codigo escrito dentro y la fila no se podia copiar ni auditar: habia
+        # que abrir la formula para saber a que linea miraba.
+        heads = ["Category / line", "WBS", "Status", "Budget", "Spend", "Remaining"]
+        NCOL = len(heads)
+        C_WBS, C_EST, C_PRE, C_GAS, C_REM = 2, 3, 4, 5, 6
         for i, h in enumerate(heads, 1):
             c = ws.cell(hr, i, h)
             c.fill = HDR
             c.font = WHITE
             c.alignment = Alignment(
-                horizontal="left" if i == 1 else ("center" if i == 2 else "right")
+                horizontal="left" if i == 1 else ("center" if i <= 3 else "right")
             )
 
-        total_rows: list[int] = []   # filas de subtotal → suman al GRAN TOTAL
+        cost_totals: list[int] = []   # filas TOTAL / TOTAL EXPENSES
+        sale_totals: list[int] = []   # filas TOTAL SALES
         r = hr + 1
         for cat, lines in ordered:
             # fila de categoría
-            for i in range(1, 6):
+            for i in range(1, NCOL + 1):
                 ws.cell(r, i).fill = CATF
             cc = ws.cell(r, 1, cat.upper())
             cc.font = BOLD
@@ -1174,72 +1222,97 @@ class ExcelExporter:
             for ln in costs:
                 code = (ln["wbs_code"] or "").strip()
                 ws.cell(r, 1, ln["title"]).alignment = Alignment(indent=1)
-                st = ws.cell(r, 2, ln["state"])
-                st.fill = STATE_FILL.get(ln["state"], STATE_FILL["not_started"])
-                st.alignment = Alignment(horizontal="center")
-                ws.cell(r, 3, f"={sumif(code, 'I')}").number_format = MONEY
-                ws.cell(r, 4, f"={sumif(code, 'J')}").number_format = MONEY
-                ws.cell(r, 5, f"={sumif(code, 'K')}").number_format = MONEY
+                wc = ws.cell(r, C_WBS, code)
+                wc.alignment = Alignment(horizontal="center")
+                # D2: el estado tambien se busca, no se pega. Si alguien lo
+                # cambia en el Job Cost, el Dashboard lo sigue; antes se
+                # quedaba con el estado del dia que se bajo el archivo.
+                ws.cell(
+                    r, C_EST,
+                    f'=IFERROR(XLOOKUP(${gc(C_WBS)}{r},{JC}!$B:$B,{JC}!$A:$A),"")',
+                ).alignment = Alignment(horizontal="center")
+                ws.cell(r, C_EST).fill = STATE_FILL.get(
+                    ln["state"], STATE_FILL["not_started"]
+                )
+                # D1: SUMIF por la celda B de la fila -> la fila se copia.
+                for col, src in ((C_PRE, "I"), (C_GAS, "J"), (C_REM, "K")):
+                    ws.cell(
+                        r, col,
+                        f"=SUMIF({JC}!$B:$B,${gc(C_WBS)}{r},{JC}!${src}:${src})",
+                    ).number_format = MONEY
                 cost_line_rows.append(r)
                 r += 1
 
-            def sum_local(col: int, rr: list[int]) -> str:
-                return "=" + "+".join(f"{gc(col)}{x}" for x in rr) if rr else "=0"
+            def _total(rr: int, etq: str, filas: list[int],
+                       fill: PatternFill, font: Font) -> None:
+                for i in range(1, NCOL + 1):
+                    ws.cell(rr, i).fill = fill
+                e = ws.cell(rr, C_EST, etq)
+                e.font = font
+                e.alignment = Alignment(horizontal="right")
+                for col in (C_PRE, C_GAS, C_REM):
+                    ws.cell(rr, col, _suma(f"{gc(col)}{x}" for x in filas))
+                    ws.cell(rr, col).number_format = MONEY
+                    ws.cell(rr, col).font = font
 
             if not sales:
-                # una sola fila TOTAL (= suma de las líneas listadas)
-                for i in range(1, 6):
-                    ws.cell(r, i).fill = TOTAL
-                ws.cell(r, 2, "TOTAL").font = BOLD
-                ws.cell(r, 2).alignment = Alignment(horizontal="right")
-                for col in (3, 4, 5):
-                    ws.cell(r, col, sum_local(col, cost_line_rows)).number_format = MONEY
-                    ws.cell(r, col).font = BOLD
-                total_rows.append(r)
+                _total(r, "TOTAL", cost_line_rows, TOTAL, BOLD)
+                cost_totals.append(r)
                 r += 1
             else:
-                # TOTAL GASTOS (suma de las líneas de gasto listadas)
-                for i in range(1, 6):
-                    ws.cell(r, i).fill = TOTAL
-                ws.cell(r, 2, "TOTAL EXPENSES").font = BOLD
-                ws.cell(r, 2).alignment = Alignment(horizontal="right")
-                for col in (3, 4, 5):
-                    ws.cell(r, col, sum_local(col, cost_line_rows)).number_format = MONEY
-                    ws.cell(r, col).font = BOLD
-                total_rows.append(r)
+                _total(r, "TOTAL EXPENSES", cost_line_rows, TOTAL, BOLD)
+                cost_totals.append(r)
                 r += 1
                 # TOTAL VENTA (kind='proceeds') — no se lista, sólo el subtotal
-                codes = ", ".join((ln["wbs_code"] or "").strip() for ln in sales)
-                for i in range(1, 6):
+                codes = [(ln["wbs_code"] or "").strip() for ln in sales]
+                for i in range(1, NCOL + 1):
                     ws.cell(r, i).fill = VENTA_FILL
-                ws.cell(r, 2, f"TOTAL SALES · {codes}").font = VENTA_FONT
-                ws.cell(r, 2).alignment = Alignment(horizontal="right")
-                for col, src in ((3, "I"), (4, "J"), (5, "K")):
-                    f = "=" + "+".join(
-                        sumif((ln["wbs_code"] or "").strip(), src) for ln in sales
-                    )
-                    ws.cell(r, col, f).number_format = MONEY
+                ws.cell(r, C_WBS, ", ".join(codes)).alignment = Alignment(
+                    horizontal="center"
+                )
+                e = ws.cell(r, C_EST, "TOTAL SALES")
+                e.font = VENTA_FONT
+                e.alignment = Alignment(horizontal="right")
+                for col, src in ((C_PRE, "I"), (C_GAS, "J"), (C_REM, "K")):
+                    ws.cell(r, col, _suma(sumif(c, src) for c in codes))
+                    ws.cell(r, col).number_format = MONEY
                     ws.cell(r, col).font = VENTA_FONT
-                total_rows.append(r)
+                sale_totals.append(r)
                 r += 1
 
-        # --- GRAN TOTAL (suma de todas las filas de subtotal) --------------
-        for i in range(1, 6):
-            ws.cell(r, i).fill = TOTAL
-        gt = ws.cell(r, 1, "GRAND TOTAL")
-        gt.font = Font(bold=True, size=11)
-        for col in (3, 4, 5):
-            f = "=" + "+".join(f"{gc(col)}{x}" for x in total_rows) if total_rows else "=0"
-            ws.cell(r, col, f).number_format = MONEY
-            ws.cell(r, col).font = Font(bold=True, size=11)
-        gt_row = r
+        # --- Totales: gasto y venta POR SEPARADO ---------------------------
+        #
+        # ⚠️ D4 del audit: el GRAN TOTAL sumaba las dos cosas. La venta de
+        # Ventanas entra con signo negativo (−480,000), asi que el presupuesto
+        # del proyecto se mostraba en 20,338,191.73 cuando el gasto
+        # presupuestado es 20,818,191.73, y el % ejecutado salia 59.5% en vez
+        # de 58.1%. Nada fallaba: solo daba el numero equivocado.
+        def _gran(rr: int, etq: str, filas: list[int], fill: PatternFill) -> int:
+            for i in range(1, NCOL + 1):
+                ws.cell(rr, i).fill = fill
+            g = ws.cell(rr, 1, etq)
+            g.font = Font(bold=True, size=11)
+            for col in (C_PRE, C_GAS, C_REM):
+                ws.cell(rr, col, _suma(f"{gc(col)}{x}" for x in filas))
+                ws.cell(rr, col).number_format = MONEY
+                ws.cell(rr, col).font = Font(bold=True, size=11)
+            return rr
 
-        # --- KPIs (referencian el GRAN TOTAL, fórmulas vivas) --------------
+        gt_row = _gran(r, "TOTAL EXPENSES — PROJECT", cost_totals, TOTAL)
+        r += 1
+        if sale_totals:
+            _gran(r, "TOTAL SALES — PROJECT", sale_totals, VENTA_FILL)
+            r += 1
+            _gran(r, "NET (EXPENSES + SALES)", cost_totals + sale_totals, TOTAL)
+            r += 1
+
+        # --- KPIs (referencian el total de GASTO, fórmulas vivas) ----------
+        P, G, M = gc(C_PRE), gc(C_GAS), gc(C_REM)
         kpis = [
-            (1, "Revised Budget", f"=C{gt_row}", MONEY),
-            (2, "Spend to Date", f"=D{gt_row}", MONEY),
-            (3, "Remaining", f"=E{gt_row}", MONEY),
-            (4, "% Executed", f"=IFERROR(D{gt_row}/C{gt_row},0)", PCT),
+            (1, "Revised Budget", f"={P}{gt_row}", MONEY),
+            (2, "Spend to Date", f"={G}{gt_row}", MONEY),
+            (3, "Remaining", f"={M}{gt_row}", MONEY),
+            (4, "% Executed", f"=IFERROR({G}{gt_row}/{P}{gt_row},0)", PCT),
         ]
         for col, lbl, formula, fmt in kpis:
             lc = ws.cell(4, col, lbl)
@@ -1248,7 +1321,7 @@ class ExcelExporter:
             vc.number_format = fmt
             vc.font = KPI_VAL
 
-        for c, w in zip(range(1, 6), [40, 16, 16, 16, 16], strict=False):
+        for c, w in zip(range(1, NCOL + 1), [40, 12, 16, 16, 16, 16], strict=False):
             ws.column_dimensions[gc(c)].width = w
         ws.freeze_panes = ws.cell(hr + 1, 1)
 
@@ -1799,7 +1872,7 @@ class ExcelExporter:
             ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
             sub = ws.cell(
                 r, 8,
-                ("=" + "+".join(f"H{x}" for x in block_rows)) if block_rows else 0,
+                _suma(f"H{x}" for x in block_rows),
             )
             sub.number_format = MONEY
             sub.font = BOLD
@@ -1814,13 +1887,13 @@ class ExcelExporter:
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
         g = ws.cell(
             r, 7,
-            ("=" + "+".join(f"G{x}" for x in all_data_rows)) if all_data_rows else 0,
+            _suma(f"G{x}" for x in all_data_rows),
         )
         g.number_format = MONEY
         g.font = BOLD
         h = ws.cell(
             r, 8,
-            ("=" + "+".join(f"H{x}" for x in all_data_rows)) if all_data_rows else 0,
+            _suma(f"H{x}" for x in all_data_rows),
         )
         h.number_format = MONEY
         h.font = BOLD
@@ -1977,7 +2050,7 @@ class ExcelExporter:
         ws.cell(r, 6, "TOTAL ACTIVE INVOICES")
         if active_totals:
             ws.cell(
-                r, 8, "=" + "+".join(f"H{t}" for t in active_totals)
+                r, 8, _suma(f"H{t}" for t in active_totals)
             ).number_format = MONEY
 
         for c, w in zip(range(1, 9), [16, 26, 12, 12, 12, 46, 18, 14], strict=False):
