@@ -969,7 +969,19 @@ class ExcelExporter:
                 v = row_sched[w]
                 cell = ws.cell(row, wc)
                 if v:
-                    cell.value = round(v, 2)
+                    # ⚠️ T3 del audit: esto era el NÚMERO copiado del Job Cost.
+                    # Daba igual hoy y se desincronizaba con cualquier cambio —
+                    # que es la definición de una copia pegada. Ahora lo trae
+                    # por fórmula de la columna de ESA MISMA SEMANA del Job
+                    # Cost, que es la única fuente del cronograma.
+                    jcr = self.week_col.get(w)
+                    if jcr:
+                        cell.value = (
+                            "=SUMIF('Job Cost Report'!$B:$B,$D%d,"
+                            "'Job Cost Report'!%s:%s)" % (row, gc(jcr), gc(jcr))
+                        )
+                    else:
+                        cell.value = round(v, 2)
                     cell.number_format = WK
                 cell.fill = self._cat_fill(e["category"], bool(v))  # color de categoría, igual que el app
             _rollup(row)
@@ -988,7 +1000,17 @@ class ExcelExporter:
             for w, wc in week_col.items():
                 v = sum(sched.get(cd, {}).get(w, 0.0) for cd in codes)
                 if v:
-                    ws.cell(row, wc, round(v, 2)).number_format = WK
+                    # Mismo criterio que la línea de detalle (T3), pero sumando
+                    # los códigos que la venta agrupa.
+                    jcr = self.week_col.get(w)
+                    if jcr:
+                        ws.cell(row, wc, "=" + "+".join(
+                            "SUMIF('Job Cost Report'!$B:$B,\"%s\","
+                            "'Job Cost Report'!%s:%s)" % (cd, gc(jcr), gc(jcr))
+                            for cd in codes
+                        )).number_format = WK
+                    else:
+                        ws.cell(row, wc, round(v, 2)).number_format = WK
             _rollup(row)
             lab = ws.cell(row, 1, label)
             lab.font = BOLD
