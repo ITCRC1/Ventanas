@@ -22,13 +22,24 @@ Detalle completo con versiones y librerías: `DECISIONES.md` §1 a §4.
 
 ## Estado
 
+> Verificado contra producción el 2026-11-06. Si algo acá no cuadra con lo que
+> ves, el que miente es este cuadro: contá de nuevo y corregilo.
+
 | | |
 |---|---|
-| Modelo de datos | terminado — `db/schema_v2.sql`, 38 tablas, 22 vistas |
-| Pruebas | 78, todas verdes en base limpia — `db/test_suite.sql` |
+| Modelo de datos | 52 tablas, 26 vistas — `db/schema_v2.sql` + 49 migraciones |
+| Migración desplegada | `0052_factura_pdf` |
+| Pruebas | `db/test_suite.sql`, se corre con **psql** y pide base limpia (ver abajo) |
 | ETL | funcionando de punta a punta contra datos reales |
-| API | **no empezada — acá arranca el trabajo** |
-| Front | no empezado |
+| API | desplegada — 18 routers en `api/app/routers/` |
+| Front | desplegado — 28 componentes en `web/components/` |
+| Export a Excel | `api/app/export/excel.py`, 12 hojas, modelo vivo |
+
+**El test suite se corre con `psql`, no con psycopg.** `trg_credit_balance` es un
+CONSTRAINT TRIGGER diferido: dispara al cerrar la transacción, no en el INSERT.
+psycopg manda el archivo entero como una sola transacción, así que los
+`expect_fail` no fallan donde deben y el suite revienta al final. psql, que
+confirma cada sentencia, sí los ve.
 
 ## Reglas de este proyecto
 
