@@ -134,6 +134,7 @@ class ExcelExporter:
         self._sheet_bancos()
         self._sheet_wires()
         self._sheet_facturas()
+        self._sheet_recibos()
         self._sheet_legend()
         # Mismo orden que las pestañas del app.
         order = ["Timeline", "Timeline Detail", "Job Cost Report", "Dashboard",
@@ -2128,6 +2129,146 @@ class ExcelExporter:
             ws.column_dimensions[gc(c)].width = w
         ws.freeze_panes = "A4"
 
+    def _sheet_recibos(self) -> None:
+        """Facturas recibidas (invoice_receipt) — las que llegan por correo.
+
+        La hoja `Invoices` replica el modulo `invoice` del app, que hoy esta
+        vacio. Las facturas que el sistema SI tiene son estas: los XML de
+        Hacienda que entran al buzon. Estaban en la base y no en el libro.
+
+        Dos cosas que esta hoja NO hace, a proposito:
+          * No suma monedas distintas. Hay facturas en USD y en CRC, y las de
+            CRC no traen tipo de cambio (`invoice_fx` = 1). Un total unico
+            seria un numero inventado; van dos totales, uno por moneda.
+          * No recalcula el Total. El total es el que declara el XML y manda
+            el; lo que hace la hoja es restarle subtotal + impuesto y mostrar
+            la diferencia cuando no cierra.
+        """
+        ws = self.wb.create_sheet("Invoice Receipts")
+        DATEF = "yyyy-mm-dd"
+        ROJO = PatternFill("solid", fgColor="FFF4CCCC")
+        ROJO_F = Font(bold=True, color="FF9C0006")
+
+        ws["A1"] = "DASHBOARD VENTANAS — Invoice Receipts (Hacienda XML)"
+        ws["A1"].font = Font(bold=True, size=14)
+        ws["A2"] = (
+            "What arrived in the mailbox. Total is what the XML declares; "
+            "Check = Subtotal + Tax − Total."
+        )
+        ws["A2"].font = Font(italic=True, color="FF808080")
+
+        rows = self.db.execute(
+            text(
+                """
+                SELECT r.received_at, r.invoice_date, r.invoice_no,
+                       r.issuer_name, r.issuer_id, r.oferta, r.proyecto,
+                       r.currency, r.subtotal, r.tax, r.total, r.status,
+                       r.xml_bytes IS NOT NULL AS tiene_xml, r.has_pdf,
+                       (SELECT string_agg(DISTINCT w.wbs_code, ', ' ORDER BY w.wbs_code)
+                          FROM invoice_receipt_link l
+                          JOIN ledger_entry le ON le.id = l.ledger_entry_id
+                          JOIN wbs_item     w  ON w.id  = le.wbs_id
+                         WHERE l.receipt_id = r.id) AS wbs
+                FROM invoice_receipt r
+                ORDER BY r.invoice_date DESC NULLS LAST, r.invoice_no DESC, r.id DESC
+                """
+            )
+        ).mappings().all()
+
+        cols = [
+            ("Received", 12), ("Invoice date", 13), ("Invoice #", 22),
+            ("Issuer", 40), ("Issuer ID", 14), ("Oferta", 14), ("Project", 26),
+            ("Cur.", 7), ("Subtotal", 14), ("Tax", 12), ("Total", 14),
+            ("Check", 12), ("Status", 10), ("WBS", 16), ("Files", 12),
+        ]
+        hr = 7
+        for i, (h, _w) in enumerate(cols, 1):
+            c = ws.cell(hr, i, h)
+            c.fill = HDR
+            c.font = WHITE
+            c.alignment = Alignment(horizontal="center", wrap_text=True)
+        ws.row_dimensions[hr].height = 24
+
+        first = hr + 1
+        r = first
+        for e in rows:
+            if e["received_at"]:
+                ws.cell(r, 1, e["received_at"].date()).number_format = DATEF
+            ws.cell(r, 2, e["invoice_date"]).number_format = DATEF
+            ws.cell(r, 3, e["invoice_no"]).font = Font(name="Consolas", size=9)
+            ws.cell(r, 4, e["issuer_name"])
+            ws.cell(r, 5, e["issuer_id"]).font = Font(name="Consolas", size=9)
+            ws.cell(r, 6, e["oferta"])
+            ws.cell(r, 7, e["proyecto"])
+            cu = ws.cell(r, 8, e["currency"])
+            cu.alignment = Alignment(horizontal="center")
+            ws.cell(r, 9, float(e["subtotal"] or 0)).number_format = MONEY
+            ws.cell(r, 10, float(e["tax"] or 0)).number_format = MONEY
+            # El total es DATO: lo declara el XML. No se recalcula.
+            ws.cell(r, 11, float(e["total"] or 0)).number_format = MONEY
+            ws.cell(r, 12, f"=ROUND(I{r}+J{r}-K{r},2)").number_format = MONEY
+            ws.cell(r, 13, e["status"]).alignment = Alignment(horizontal="center")
+            ws.cell(r, 14, e["wbs"])
+            ws.cell(r, 15, ("XML" if e["tiene_xml"] else "")
+                    + (" + PDF" if e["has_pdf"] else "")).alignment = Alignment(
+                horizontal="center"
+            )
+            r += 1
+        last = r - 1
+        hay = last >= first
+
+        if not hay:
+            ws.cell(first, 1, "No invoice receipts yet.").font = Font(
+                italic=True, color="FF808080"
+            )
+            last = first
+
+        # Check en rojo cuando subtotal + impuesto no da el total declarado.
+        ws.conditional_formatting.add(
+            f"L{first}:L{last}",
+            CellIsRule(operator="notEqual", formula=["0"], fill=ROJO, font=ROJO_F),
+        )
+
+        # --- Totales: UNA FILA POR MONEDA, nunca sumadas entre si ----------
+        r += 1
+        monedas = sorted({(e["currency"] or "?") for e in rows})
+        for m in monedas:
+            for i in range(1, len(cols) + 1):
+                ws.cell(r, i).fill = TOTAL
+            t = ws.cell(r, 4, f"TOTAL {m}")
+            t.font = BOLD
+            t.alignment = Alignment(horizontal="right")
+            for col, L in ((9, "I"), (10, "J"), (11, "K")):
+                ws.cell(
+                    r, col,
+                    f'=SUMIF($H${first}:$H${last},"{m}",${L}${first}:${L}${last})',
+                ).number_format = MONEY
+                ws.cell(r, col).font = BOLD
+            ws.cell(
+                r, 15,
+                f'=COUNTIF($H${first}:$H${last},"{m}")&" inv."',
+            ).alignment = Alignment(horizontal="center")
+            r += 1
+
+        # --- Resumen arriba: cuanto hay y en que estado --------------------
+        kpi = [
+            (1, "Receipts", f"=COUNTA($C${first}:$C${last})&\"\""),
+            (3, "Linked to ledger", f'=COUNTIF($M${first}:$M${last},"linked")&""'),
+            (5, "Not reviewed", f'=COUNTIF($M${first}:$M${last},"new")&""'),
+            (7, "Totals not matching", f'=COUNTIF($L${first}:$L${last},"<>0")&""'),
+        ]
+        for col, lbl, f in kpi:
+            lc = ws.cell(4, col, lbl)
+            lc.font = Font(size=9, color="FF808080")
+            vc = ws.cell(5, col, f)
+            vc.font = Font(bold=True, size=14)
+
+        for i, (_h, w) in enumerate(cols, 1):
+            ws.column_dimensions[gc(i)].width = w
+        ws.freeze_panes = f"D{first}"
+        if hay:
+            ws.auto_filter.ref = f"A{hr}:O{last}"
+
     def _sheet_legend(self) -> None:
         ws = self.wb.create_sheet("Legend")
         ws["B2"] = "Status legend"
@@ -2172,6 +2313,13 @@ class ExcelExporter:
             "   Job Cost Report and Dashboard total them on separate rows. The",
             "   sales line carries a negative sign; adding it to the expenses",
             "   understated the project budget by its own amount.",
+            "",
+            "INVOICE RECEIPTS",
+            "   The XML invoices that arrive in the mailbox. Two totals, one per",
+            "   currency: USD and CRC are never added together, and the CRC ones",
+            "   carry no exchange rate, so there is no single figure to give.",
+            "   Check = Subtotal + Tax − Total. Red means the XML does not add",
+            "   up to what it declares; the declared Total is what counts.",
             "",
             "THE LEDGER IS AN EXCEL TABLE",
             "   Named 'Ledger'. A row typed under the last one joins the table,",
