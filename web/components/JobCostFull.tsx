@@ -1039,6 +1039,10 @@ export function JobCostFull() {
     // Se limpia DESPUES de que el servidor confirma. Si falla, lo escrito
     // sigue en pantalla y el boton sigue ahi para reintentar: perder el
     // trabajo de alguien por un error de red no es una opcion.
+    // mutateAsync ya espera a que los datos frescos esten en la cache (el
+    // onSuccess del hook devuelve las invalidaciones). Recien ahi se saca del
+    // buffer: si se sacara antes, el monto desapareceria de la pantalla entre
+    // el guardado y el refetch, y parece que no se guardo.
     await upsertCells.mutateAsync(lote);
     setPend((prev) => {
       const m = new Map(prev);

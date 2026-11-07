@@ -372,10 +372,16 @@ export function useUpsertCells() {
         state_id?: number;
       }[],
     ) => api.put<{ ok: boolean; count: number }>("/schedule/cells", { cells }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["schedule", "cells"] });
-      qc.invalidateQueries({ queryKey: ["wbs"] });
-    },
+    // ⚠️ Se DEVUELVEN las promesas. Sin el return, mutateAsync resuelve antes
+    // de que lleguen los datos frescos, y quien guarda cree que ya terminó
+    // cuando la pantalla todavía muestra lo viejo. En Job Cost eso hacía que
+    // el monto recién escrito desapareciera un instante: se borraba del buffer
+    // de pendientes y el refetch aún no lo traía. Parecía que no se guardaba.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ["schedule", "cells"] }),
+        qc.invalidateQueries({ queryKey: ["wbs"] }),
+      ]),
   });
 }
 
