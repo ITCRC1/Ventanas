@@ -337,8 +337,8 @@ def lines_xlsx(disb_id: int, db: Session = Depends(get_db)) -> Response:
     rows = (
         db.execute(
             text(
-                "SELECT dl.description, dl.invoice_no, dl.reason, dl.transfer, dl.amount, "
-                "       p.name AS payee_name "
+                "SELECT dl.line_no, dl.description, dl.vendor, dl.invoice_no, dl.reason, "
+                "       dl.transfer, dl.amount, p.name AS payee_name "
                 "FROM disbursement_line dl LEFT JOIN payee p ON p.id = dl.payee_id "
                 "WHERE dl.disbursement_id = :id ORDER BY dl.line_no"
             ),

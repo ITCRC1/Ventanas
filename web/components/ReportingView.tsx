@@ -1,5 +1,7 @@
 "use client";
 
+import { api } from "@/lib/api";
+
 import { PrintBar } from "@/components/PrintBar";
 import { num } from "@/lib/format";
 import { type ReportColumn, type ReportMeta, useReport, useReportCatalog } from "@/lib/hooks";
@@ -189,13 +191,14 @@ export function ReportingView() {
                   {corte ? ` · cut-off ${corte}` : ""}
                 </p>
               </div>
-              <a
-                href={`/api/reports/${meta.name}/export.xlsx`}
+              <button
+                type="button"
+                onClick={() => void api.abrir(`/reports/${meta.name}/export.xlsx`, true)}
                 className="shrink-0 rounded border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
                 title="Full report in Excel, with header and totals — no row limit"
               >
                 ⬇ Excel
-              </a>
+              </button>
             </div>
 
             {truncado ? (

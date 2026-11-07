@@ -1,5 +1,6 @@
 "use client";
 
+import { IndicadorGuardado } from "@/components/IndicadorGuardado";
 import { useLogout, useMe } from "@/lib/hooks";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -326,6 +327,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {/* Usuario */}
           <div className="flex shrink-0 items-center gap-3">
+            {/* Estado de guardado del tab que esté abierto. Sale del cliente
+                HTTP, no de la vista: cualquier pantalla queda cubierta. */}
+            <IndicadorGuardado />
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-[11px] font-semibold">
                 {initials}

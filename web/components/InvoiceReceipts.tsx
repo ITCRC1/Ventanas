@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import {
   type InvoiceReceipt,
   type LedgerCandidate,
@@ -1043,15 +1043,14 @@ export function InvoiceReceipts() {
                 </td>
                 <td className="px-2 py-1 text-center">
                   {r.has_pdf_file ? (
-                    <a
-                      href={`/api/invoice-receipts/${r.id}/file/pdf`}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => void api.abrir(`/invoice-receipts/${r.id}/file/pdf`)}
                       className="mr-1 rounded bg-red-100 px-1 text-[10px] font-medium text-red-700 hover:bg-red-200"
                       title={r.pdf_filename ?? "Open PDF"}
                     >
                       PDF
-                    </a>
+                    </button>
                   ) : r.has_pdf ? (
                     <span
                       className="mr-1 rounded bg-red-50 px-1 text-[10px] text-red-400"
@@ -1061,13 +1060,14 @@ export function InvoiceReceipts() {
                     </span>
                   ) : null}
                   {r.has_xml_file ? (
-                    <a
-                      href={`/api/invoice-receipts/${r.id}/file/xml`}
+                    <button
+                      type="button"
+                      onClick={() => void api.abrir(`/invoice-receipts/${r.id}/file/xml`, true)}
                       className="rounded bg-slate-200 px-1 text-[10px] font-medium text-slate-700 hover:bg-slate-300"
                       title={r.xml_filename ?? "Download XML"}
                     >
                       XML
-                    </a>
+                    </button>
                   ) : r.xml_filename ? (
                     <span
                       className="rounded bg-slate-100 px-1 text-[10px] text-slate-400"

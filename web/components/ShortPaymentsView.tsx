@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import {
   useAddShortLine,
   useCategories,
@@ -862,13 +862,14 @@ export function ShortPaymentsView() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={`/api/disbursements/${b.id}/lines.xlsx`}
+                <button
+                  type="button"
+                  onClick={() => void api.abrir(`/disbursements/${b.id}/lines.xlsx`, true)}
                   className="rounded border border-white/50 px-2 py-1 text-xs text-white hover:bg-white/10"
                   title="Download the lines to Excel to edit them"
                 >
                   ⬇ Excel
-                </a>
+                </button>
                 {canReopen ? (
                   <button
                     type="button"

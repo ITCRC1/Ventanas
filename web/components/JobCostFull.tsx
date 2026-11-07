@@ -1,7 +1,7 @@
 "use client";
 
 import { PrintBar } from "@/components/PrintBar";
-import type { ApiError } from "@/lib/api";
+import { api, type ApiError } from "@/lib/api";
 import { evalMath } from "@/lib/calc";
 import { COL_HELP, ColHead } from "@/lib/colhelp";
 import { num } from "@/lib/format";
@@ -1157,13 +1157,14 @@ export function JobCostFull() {
             </button>
           ) : null}
           {me.data?.permissions.includes("report.view") ? (
-            <a
-              href="/api/export/excel"
+            <button
+              type="button"
+              onClick={() => void api.abrir("/export/excel", true)}
               className="rounded border border-emerald-600 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
               title="Ventanas Master File — live Excel, a replica of the app with everything formulated"
             >
               ⬇ Ventanas Master File
-            </a>
+            </button>
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] uppercase text-slate-400">Statuses:</span>

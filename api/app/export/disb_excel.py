@@ -13,7 +13,28 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 # Encabezados de columna (orden fijo). Deben coincidir export ⇄ import.
-COLS = ["Description", "Invoice #", "Note", "Name (Beneficiary)", "Transfer", "Amount"]
+#
+# "#" y "Vendor" se sumaron el 2026-11-07, a pedido: el Excel mostraba menos
+# que la pantalla. El "#" es de solo lectura -al subir se renumera por el
+# orden de las filas- y por eso va aparte de COLS, que es el contrato
+# export ⇄ import. "Vendor" si viaja en los dos sentidos.
+COLS = [
+    "Description",
+    "Vendor",
+    "Invoice #",
+    "Note",
+    "Name (Beneficiary)",
+    "Transfer",
+    "Amount",
+]
+COL_NUM = "#"  # columna de solo lectura, delante de COLS
+
+
+def _lineas(texto: str, ancho: int) -> int:
+    """Cuantas lineas ocupa `texto` en una columna de `ancho` caracteres."""
+    if not texto:
+        return 1
+    return max(1, -(-len(str(texto)) // ancho))
 
 
 def lines_to_xlsx(disb: Any, rows: list[dict[str, Any]]) -> bytes:
@@ -35,27 +56,57 @@ def lines_to_xlsx(disb: Any, rows: list[dict[str, Any]]) -> bytes:
     header_row = 4
     navy = PatternFill("solid", fgColor="1A237E")
     hfont = Font(bold=True, color="FFFFFF", size=10)
-    for c, name in enumerate(COLS, start=1):
+    encabezados = [COL_NUM, *COLS]
+    for c, name in enumerate(encabezados, start=1):
         cell = ws.cell(row=header_row, column=c, value=name)
         cell.fill = navy
         cell.font = hfont
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # ⚠️ La descripcion y el proveedor se cortaban: el ancho era 42 y el texto
+    # real pasa de 60 caracteres. Van con ajuste de linea y la fila crece sola
+    # segun lo que haya que mostrar, para que en el Excel se lea TODO -que es el
+    # punto de bajarlo-.
+    ajuste = Alignment(wrap_text=True, vertical="top")
+    izq = Alignment(vertical="top")
 
     r = header_row + 1
-    for row in rows:
-        ws.cell(row=r, column=1, value=row.get("description") or "")
-        ws.cell(row=r, column=2, value=row.get("invoice_no") or "")
-        ws.cell(row=r, column=3, value=row.get("reason") or "")
-        ws.cell(row=r, column=4, value=row.get("payee_name") or "")
-        ws.cell(row=r, column=5, value=(row.get("transfer") or "SEND"))
-        amt = ws.cell(row=r, column=6, value=float(row.get("amount") or 0))
+    for i, row in enumerate(rows, start=1):
+        desc = row.get("description") or ""
+        vend = row.get("vendor") or ""
+        num = ws.cell(row=r, column=1, value=row.get("line_no") or i)
+        num.alignment = Alignment(horizontal="center", vertical="top")
+        ws.cell(row=r, column=2, value=desc).alignment = ajuste
+        ws.cell(row=r, column=3, value=vend).alignment = ajuste
+        ws.cell(row=r, column=4, value=row.get("invoice_no") or "").alignment = izq
+        ws.cell(row=r, column=5, value=row.get("reason") or "").alignment = ajuste
+        ws.cell(row=r, column=6, value=row.get("payee_name") or "").alignment = ajuste
+        ws.cell(row=r, column=7, value=(row.get("transfer") or "SEND")).alignment = izq
+        amt = ws.cell(row=r, column=8, value=float(row.get("amount") or 0))
         amt.number_format = "#,##0.00"
+        amt.alignment = izq
+        # Alto estimado: openpyxl no mide texto, asi que se calcula por el campo
+        # mas largo contra el ancho de su columna. Mejor sobrar una linea que
+        # cortar el texto.
+        lineas = max(
+            _lineas(desc, 52), _lineas(vend, 30), _lineas(row.get("payee_name") or "", 30), 1
+        )
+        if lineas > 1:
+            ws.row_dimensions[r].height = 14 * lineas
         r += 1
+    ultima = r - 1
 
-    widths = [42, 14, 16, 34, 10, 14]
+    widths = [5, 52, 30, 16, 20, 30, 10, 14]
     for c, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(c)].width = w
     ws.freeze_panes = f"A{header_row + 1}"
+    if ultima >= header_row + 1:
+        ws.auto_filter.ref = f"A{header_row}:H{ultima}"
+        total = ws.cell(row=ultima + 1, column=7, value="TOTAL")
+        total.font = Font(bold=True)
+        tc = ws.cell(row=ultima + 1, column=8, value=f"=SUM(H{header_row + 1}:H{ultima})")
+        tc.number_format = "#,##0.00"
+        tc.font = Font(bold=True)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -91,6 +142,8 @@ def parse_lines_xlsx(data: bytes) -> list[dict[str, Any]]:
 
     ci = {
         "description": col("descrip"),
+        # El "#" del archivo no se lee: al subir, el orden de las filas manda.
+        "vendor": col("vendor", "proveedor"),
         "invoice_no": col("factura", "invoice"),
         "reason": col("nota", "note", "razón", "razon", "reason"),
         "payee_name": col("nombre", "name", "benefic"),
@@ -116,6 +169,7 @@ def parse_lines_xlsx(data: bytes) -> list[dict[str, Any]]:
         out.append(
             {
                 "description": str(desc).strip() if desc else "",
+                "vendor": (str(get(r, "vendor")).strip() or None) if get(r, "vendor") else None,
                 "invoice_no": (str(get(r, "invoice_no")).strip() or None)
                 if get(r, "invoice_no")
                 else None,

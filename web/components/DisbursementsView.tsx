@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { money } from "@/lib/format";
 import {
   useAddLine,
@@ -463,28 +463,27 @@ export function DisbursementsView() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={`/api/disbursements/${d.id}/breakdown.pdf`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void api.abrir(`/disbursements/${d.id}/breakdown.pdf`)}
                   className={`${BTN} border-emerald-600 text-emerald-700 hover:bg-emerald-50`}
                 >
                   Breakdown PDF
-                </a>
-                <a
-                  href={`/api/disbursements/${d.id}/instruction.pdf`}
-                  target="_blank"
-                  rel="noreferrer"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void api.abrir(`/disbursements/${d.id}/instruction.pdf`)}
                   className={`${BTN} border-emerald-600 text-emerald-700 hover:bg-emerald-50`}
                 >
                   Instruction PDF
-                </a>
-                <a
-                  href={`/api/disbursements/${d.id}/lines.xlsx`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void api.abrir(`/disbursements/${d.id}/lines.xlsx`, true)}
                   className={`${BTN} border-indigo-600 text-indigo-700 hover:bg-indigo-50`}
                 >
                   ⬇ Excel
-                </a>
+                </button>
                 {editable ? (
                   <label
                     className={`${BTN} cursor-pointer border-indigo-600 text-indigo-700 hover:bg-indigo-50 ${uploading ? "opacity-50" : ""}`}

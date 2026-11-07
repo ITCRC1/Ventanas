@@ -29,6 +29,10 @@ export default function LoginPage() {
   const err = devLogin.error ?? sharedLogin.error ?? passwordLogin.error;
   const isDev = config.data?.dev_login ?? false;
 
+  const vencida =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("vencida") === "1";
+
   function dest() {
     const next =
       typeof window !== "undefined"
@@ -51,6 +55,17 @@ export default function LoginPage() {
         <h1 className="text-2xl font-semibold">Dashboard Ventanas</h1>
         <p className="text-sm text-slate-500">Project financial control</p>
       </div>
+
+      {/* La sesión dura 8 horas. Antes se vencía en silencio y se seguía
+          escribiendo contra una API que ya no guardaba nada; ahora el cliente
+          HTTP manda acá con ?vencida=1 y se dice por qué. */}
+      {vencida ? (
+        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Tu sesión se venció por inactividad. Volvé a entrar: te devolvemos a la
+          pantalla donde estabas. <strong>Lo último que escribiste puede no
+          haberse guardado</strong> — revisalo al volver.
+        </p>
+      ) : null}
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         {isDev ? (

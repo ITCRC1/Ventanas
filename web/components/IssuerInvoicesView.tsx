@@ -1,5 +1,7 @@
 "use client";
 
+import { api } from "@/lib/api";
+
 /**
  * Las facturas de UN proveedor: una fila por concepto facturado.
  *
@@ -160,24 +162,24 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
                     {i === 0 && (
                       <div className="flex gap-2 whitespace-nowrap">
                         {r.has_pdf_file ? (
-                          <a
+                          <button
+                            type="button"
                             className="text-brand-700 underline"
-                            href={`/api/invoice-receipts/${r.id}/file/pdf`}
-                            target="_blank"
-                            rel="noreferrer"
+                            onClick={() => void api.abrir(`/invoice-receipts/${r.id}/file/pdf`)}
                           >
                             PDF
-                          </a>
+                          </button>
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
                         {r.has_xml_file && (
-                          <a
+                          <button
+                            type="button"
                             className="text-slate-500 underline"
-                            href={`/api/invoice-receipts/${r.id}/file/xml`}
+                            onClick={() => void api.abrir(`/invoice-receipts/${r.id}/file/xml`, true)}
                           >
                             XML
-                          </a>
+                          </button>
                         )}
                       </div>
                     )}

@@ -241,6 +241,7 @@ def replace_lines_from_excel(db: Session, disb_id: int, rows: list[dict[str, Any
             disbursement_id=disb_id,
             line_no=i,
             description=r["description"],
+            vendor=r.get("vendor"),
             invoice_no=r.get("invoice_no"),
             amount=r.get("amount") or Decimal(0),
             reason=r.get("reason"),
