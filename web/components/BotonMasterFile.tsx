@@ -2,10 +2,13 @@
 
 // "Bajar todo": el Ventanas Master File, el libro completo con las 12 hojas.
 //
-// Vive en la barra de arriba y no dentro de un tab a proposito. Antes estaba en
-// Job Cost, al final de la fila de la leyenda de estados, y no se encontraba:
-// el archivo que resume TODO el proyecto no puede estar escondido en una
-// pantalla.
+// Va en la barra de arriba Y en Job Cost. Primero lo puse solo en la barra,
+// pensando que tenerlo en dos lados era ruido; a la media hora el owner lo
+// estaba buscando en Job Cost, que es donde siempre estuvo. La costumbre de
+// quien lo usa gana: el boton se pone donde la mano lo va a buscar.
+//
+// Por eso tambien se llama "Master File" en los dos lados y no "Excel - todo":
+// el nombre con el que se lo conoce es el que se reconoce.
 //
 // El libro se arma consultando la base entera, asi que tarda unos segundos. El
 // boton lo dice mientras tanto — sin eso uno hace clic, no pasa nada visible, y
@@ -16,7 +19,7 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useMe } from "@/lib/hooks";
 
-export function BotonMasterFile() {
+export function BotonMasterFile({ tono = "barra" }: { tono?: "barra" | "pagina" }) {
   const me = useMe();
   const [bajando, setBajando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,13 +49,23 @@ export function BotonMasterFile() {
         error ??
         "Ventanas Master File — el libro completo: Job Cost, Timeline, LEDGER, Bancos, Facturas y más, con todo por fórmula"
       }
-      className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+      className={`rounded-md border font-medium transition ${
+        tono === "barra" ? "px-2.5 py-1 text-xs" : "px-3 py-1 text-sm font-semibold"
+      } ${
         error
           ? "border-red-300 bg-red-50 text-red-700"
-          : "border-white/25 text-white hover:border-white/50 hover:bg-white/10"
+          : tono === "barra"
+            ? "border-white/25 text-white hover:border-white/50 hover:bg-white/10"
+            : "border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
       } ${bajando ? "opacity-60" : ""}`}
     >
-      {bajando ? "Armando el libro…" : error ? `⚠ ${error}` : "⬇ Excel — todo"}
+      {bajando
+        ? "Armando el libro…"
+        : error
+          ? `⚠ ${error}`
+          : tono === "barra"
+            ? "⬇ Master File"
+            : "⬇ Ventanas Master File"}
     </button>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { PrintBar } from "@/components/PrintBar";
+import { BotonMasterFile } from "@/components/BotonMasterFile";
 import type { ApiError } from "@/lib/api";
 import { evalMath } from "@/lib/calc";
 import { COL_HELP, ColHead } from "@/lib/colhelp";
@@ -1156,6 +1157,8 @@ export function JobCostFull() {
               ⬅ Traer historial del LEDGER
             </button>
           ) : null}
+          {/* Tambien en la barra de arriba. Esta es la mano que lo busca. */}
+          <BotonMasterFile tono="pagina" />
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] uppercase text-slate-400">Statuses:</span>
             {(states.data ?? []).map((s) => (
