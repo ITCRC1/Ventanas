@@ -2009,3 +2009,47 @@ export function useLedgerOptions(q: string, enabled = true) {
     enabled,
   });
 }
+
+// --- Propuesta de presupuesto anual -----------------------------------------
+
+export interface BudgetProposalRow {
+  wbs_code: string;
+  title: string;
+  category: string;
+  phase: string | null;
+  owner: string | null;
+  origen: "ledger" | "cronograma";
+  budget_revised: number;
+  spend: number;
+  remaining: number;
+  plan: Record<string, number>;
+  propuesta: Record<string, number>;
+  plan_total: number;
+  propuesta_total: number;
+}
+export interface BudgetProposalHabito {
+  mensual: number;
+  semana_del_mes: number;
+  meses_con_pago: number;
+  historial: { mes: string; monto: number }[];
+}
+export interface BudgetProposal {
+  anio: number;
+  semanas: string[];
+  filas: BudgetProposalRow[];
+  habito: Record<string, BudgetProposalHabito>;
+  totales: {
+    remanente: number;
+    plan: number;
+    propuesta: number;
+    lineas: number;
+    lineas_habito: number;
+  };
+}
+
+export function useBudgetProposal(anio: number) {
+  return useQuery({
+    queryKey: ["budget-proposal", anio],
+    queryFn: () => api.get<BudgetProposal>(`/budget-proposal?anio=${anio}`),
+  });
+}

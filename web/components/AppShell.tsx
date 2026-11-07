@@ -42,6 +42,12 @@ const NAV: NavItem[] = [
     perm: "view.planning",
   },
   {
+    href: "/budget-proposal",
+    label: "Propuesta Budget",
+    hint: "Presupuesto del año por semana, del cronograma y del LEDGER",
+    perm: "report.view",
+  },
+  {
     label: "Payments",
     perm: "view.payments",
     items: [
@@ -100,6 +106,7 @@ const ROUTE_PERM = (
     ["/timeline", "view.timeline"],
     ["/dashboard", "report.view"],
     ["/planning", "view.planning"],
+    ["/budget-proposal", "report.view"],
     ["/payments", "view.payments"],
     ["/disbursements", "view.payments"],
     ["/credit", "view.payments"],

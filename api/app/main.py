@@ -23,6 +23,7 @@ from app.routers import (
     invoices,
     ledger,
     planning,
+    presupuesto,
     public,
     reports,
     schedule,
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(invoice_receipts.router, prefix=p)
     app.include_router(us_wires.router, prefix=p)
     app.include_router(planning.router, prefix=p)
+    app.include_router(presupuesto.router, prefix=p)
     app.include_router(public.router, prefix=p)
     app.include_router(reports.router, prefix=p)
     app.include_router(export.router, prefix=p)
