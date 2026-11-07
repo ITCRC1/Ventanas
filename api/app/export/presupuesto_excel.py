@@ -34,23 +34,30 @@ def propuesta_a_xlsx(d: dict[str, Any]) -> bytes:
     anio = d["anio"]
     semanas: list[str] = d["semanas"]
     filas: list[dict[str, Any]] = d["filas"]
-    habito: dict[str, Any] = d["habito"]
+    # ⚠️ `totales` y no `tot`: mas abajo `tot` es la FILA del gran total.
+    # Con el mismo nombre, la fila pisaba el diccionario y la hoja Control
+    # reventaba con "int object is not subscriptable".
+    totales = d["totales"]
 
     wb = Workbook()
     ws = wb.active
     ws.title = f"Propuesta {anio}"
     ws.sheet_view.showGridLines = False
 
-    FIJ = ["NO. PROYECTO", "TAREA", "CATEGORÍA", "ORIGEN", "REMANENTE",
-           f"PLAN ACTUAL {anio}", f"PROPUESTA {anio}", "DIFERENCIA"]
+    # El Job Cost es el estandar: presupuesto, gastado y remanente primero,
+    # y despues los cuatro tramos en que se reparte el remanente.
+    FIJ = ["NO. PROYECTO", "TAREA", "CATEGORÍA", "PRESUPUESTO", "GASTADO",
+           "REMANENTE", "VENCIDO", "ARRASTRE", f"PLAN {anio}",
+           f"POSTERIOR A {anio}", f"PROPUESTA {anio}"]
     C0 = len(FIJ) + 1
     C_TOT = C0 + len(semanas)
 
     ws["A1"] = f"PRESUPUESTO {anio} — VENTANAS · propuesta semanal"
     ws["A1"].font = Font(bold=True, size=16, color=TEAL)
     ws["A2"] = (
-        "Hitos: del cronograma ya cargado.  ·  Hábito: del historial del LEDGER "
-        "(monto típico y semana del mes en que se paga)."
+        "El remanente de cada línea se reparte en VENCIDO (la semana ya pasó y "
+        "sigue sin gastarse), ARRASTRE (de hoy a fin de año), PLAN (dentro del "
+        f"año) y POSTERIOR.  Propuesta {anio} = vencido + arrastre + plan."
     )
     ws["A2"].font = Font(size=10, color=GRIS)
     ws["A3"] = (
@@ -91,25 +98,28 @@ def propuesta_a_xlsx(d: dict[str, Any]) -> bytes:
         r += 1
         ini = r
         for f in ls:
-            esLedger = f["origen"] == "ledger"
             ws.cell(r, 1, f["wbs_code"]).font = Font(name="Consolas", size=9)
             ws.cell(r, 2, f["title"]).alignment = Alignment(wrap_text=True, vertical="top")
             ws.cell(r, 3, f["category"])
-            o = ws.cell(r, 4, "LEDGER (hábito)" if esLedger else "Cronograma (hito)")
-            if esLedger:
-                o.fill = PatternFill("solid", fgColor=LEDGER)
-                o.font = Font(bold=True, color=AMBAR, size=9)
-            ws.cell(r, 5, f["remaining"]).number_format = MONEDA
-            ws.cell(r, 6, f["plan_total"]).number_format = MONEDA
-            ws.cell(r, 7, f"=SUM({gc(C0)}{r}:{gc(C_TOT - 1)}{r})").number_format = MONEDA
-            ws.cell(r, 8, f"={gc(7)}{r}-{gc(6)}{r}").number_format = MONEDA
+            for col, k in ((4, "budget_revised"), (5, "spend"), (6, "remaining"),
+                           (7, "vencido"), (8, "arrastre"), (9, "plan_total"),
+                           (10, "posterior")):
+                cel = ws.cell(r, col, f[k])
+                cel.number_format = MONEDA
+                if col == 7 and f["vencido"]:
+                    cel.fill = PatternFill("solid", fgColor="FFF4CCCC")
+                    cel.font = Font(bold=True, color="FF9C0006")
+                elif col == 8 and f["arrastre"]:
+                    cel.fill = PatternFill("solid", fgColor=LEDGER)
+            # La propuesta es la suma de sus propias semanas: si se ajusta una
+            # celda, el total se mueve con ella.
+            p = ws.cell(r, 11, f"=SUM({gc(C0)}{r}:{gc(C_TOT - 1)}{r})")
+            p.number_format = MONEDA
+            p.font = Font(bold=True)
             for j, w in enumerate(semanas):
                 v = f["propuesta"].get(w)
-                cel = ws.cell(r, C0 + j, v if v else None)
-                cel.number_format = MONEDA
-                if v and esLedger:
-                    cel.fill = PatternFill("solid", fgColor=LEDGER)
-            ws.cell(r, C_TOT, f"={gc(7)}{r}").number_format = MONEDA
+                ws.cell(r, C0 + j, v if v else None).number_format = MONEDA
+            ws.cell(r, C_TOT, f"={gc(11)}{r}").number_format = MONEDA
             ws.cell(r, C_TOT).font = Font(bold=True)
             r += 1
         fin = r - 1
@@ -118,7 +128,7 @@ def propuesta_a_xlsx(d: dict[str, Any]) -> bytes:
             cc.fill = PatternFill("solid", fgColor=SUBTOT)
             cc.border = Border(top=MEDIO, bottom=MEDIO)
         ws.cell(r, 2, f"Subtotal {cat}").font = Font(bold=True)
-        for col in [5, 6, 7, 8, *range(C0, C_TOT + 1)]:
+        for col in [*range(4, 12), *range(C0, C_TOT + 1)]:
             cc = ws.cell(r, col, f"=SUM({gc(col)}{ini}:{gc(col)}{fin})")
             cc.number_format = MONEDA
             cc.font = Font(bold=True)
@@ -129,13 +139,14 @@ def propuesta_a_xlsx(d: dict[str, Any]) -> bytes:
     for i in range(1, C_TOT + 1):
         ws.cell(tot, i).fill = PatternFill("solid", fgColor=TEAL)
     ws.cell(tot, 2, f"TOTAL {anio}").font = Font(bold=True, size=11, color="FFFFFFFF")
-    for col in [5, 6, 7, 8, *range(C0, C_TOT + 1)]:
+    for col in [*range(4, 12), *range(C0, C_TOT + 1)]:
         ref = ",".join(f"{gc(col)}{x}" for x in subs)
         cc = ws.cell(tot, col, f"=SUM({ref})" if subs else 0)
         cc.number_format = MONEDA
         cc.font = Font(bold=True, size=11, color="FFFFFFFF")
 
-    for col, w in ((1, 12), (2, 42), (3, 18), (4, 18), (5, 15), (6, 16), (7, 16), (8, 15)):
+    for col, w in ((1, 12), (2, 42), (3, 18), (4, 15), (5, 15), (6, 15),
+                   (7, 14), (8, 14), (9, 14), (10, 15), (11, 16)):
         ws.column_dimensions[gc(col)].width = w
     for j in range(len(semanas)):
         ws.column_dimensions[gc(C0 + j)].width = 10
@@ -148,49 +159,47 @@ def propuesta_a_xlsx(d: dict[str, Any]) -> bytes:
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
 
-    # ── Hoja 2: de dónde sale cada número de hábito ────────────────────────
-    h2 = wb.create_sheet("Base del cálculo")
+    # ── Hoja 2: el control de que los tramos cierren ───────────────────────
+    h2 = wb.create_sheet("Control")
     h2.sheet_view.showGridLines = False
-    h2["A1"] = "DE DÓNDE SALE CADA NÚMERO DE HÁBITO"
+    h2["A1"] = "EL REMANENTE, REPARTIDO"
     h2["A1"].font = Font(bold=True, size=14, color=TEAL)
     h2["A2"] = (
-        "Cada pago real del LEDGER, mes a mes. El monto propuesto es la MEDIANA "
-        "— no el promedio: un pago doble o un mes salteado corren el promedio y "
-        "dejan de describir lo típico."
+        "Los cuatro tramos tienen que sumar el remanente del Job Cost. Si "
+        "«Sin ubicar» no es cero, hay plata pendiente que el cronograma no pone "
+        "en ningún año — y entonces el presupuesto está incompleto."
     )
     h2["A2"].font = Font(size=10, color=GRIS)
     h2["A2"].alignment = Alignment(wrap_text=True)
     h2.row_dimensions[2].height = 30
-
-    titulos = {f["wbs_code"]: f["title"] for f in filas}
-    rem = {f["wbs_code"]: f["remaining"] for f in filas}
     f2 = 4
-    for code, hb in habito.items():
-        h2.cell(f2, 1, f"{code} — {titulos.get(code, '')}").font = Font(bold=True, size=11)
-        f2 += 1
-        meses = (rem.get(code, 0) / hb["mensual"]) if hb["mensual"] else 0
-        for et, va, fm in (
-            ("Propuesto por mes", hb["mensual"], MONEDA),
-            ("Semana del mes", f"semana {hb['semana_del_mes']}", None),
-            (f"Propuesto {anio} (12 meses)", hb["mensual"] * 12, MONEDA),
-            ("Remanente del presupuesto", rem.get(code, 0), MONEDA),
-            ("Meses que cubre el remanente", round(meses, 1), "0.0"),
-            ("Meses con pago en el historial", hb["meses_con_pago"], "0"),
-        ):
-            h2.cell(f2, 1, et).font = Font(size=9, color=GRIS)
-            c = h2.cell(f2, 2, va)
-            if fm:
-                c.number_format = fm
-            c.font = Font(bold=True)
+    for et, k in (
+        ("Presupuesto revisado", "budget_revised"),
+        ("Gastado", "spend"),
+        ("REMANENTE", "remanente"),
+        ("", None),
+        ("Vencido — la semana ya pasó", "vencido"),
+        ("Arrastre — de hoy a fin de año", "arrastre"),
+        (f"Plan {anio}", "plan"),
+        (f"Posterior a {anio}", "posterior"),
+        ("", None),
+        ("Sin ubicar (tiene que ser 0)", "sin_ubicar"),
+        ("", None),
+        (f"PROPUESTA {anio} = vencido + arrastre + plan", "propuesta"),
+        ("Líneas del Job Cost", "lineas"),
+    ):
+        if k is None:
             f2 += 1
-        h2.cell(f2, 1, "Historial del LEDGER").font = Font(size=9, bold=True, color=AMBAR)
+            continue
+        h2.cell(f2, 1, et).font = Font(size=10, color=GRIS)
+        c = h2.cell(f2, 2, totales[k])
+        c.number_format = "#,##0" if k == "lineas" else MONEDA
+        c.font = Font(bold=True, size=11)
+        if k == "sin_ubicar" and abs(totales[k]) > 5:
+            c.fill = PatternFill("solid", fgColor="FFF4CCCC")
+            c.font = Font(bold=True, size=11, color="FF9C0006")
         f2 += 1
-        for p in hb["historial"]:
-            h2.cell(f2, 1, p["mes"]).alignment = Alignment(horizontal="right")
-            h2.cell(f2, 2, p["monto"]).number_format = MONEDA
-            f2 += 1
-        f2 += 2
-    for col, w in ((1, 32), (2, 18), (3, 14)):
+    for col, w in ((1, 42), (2, 20)):
         h2.column_dimensions[gc(col)].width = w
 
     buf = io.BytesIO()

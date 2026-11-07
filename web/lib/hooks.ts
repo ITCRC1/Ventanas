@@ -2018,32 +2018,40 @@ export interface BudgetProposalRow {
   category: string;
   phase: string | null;
   owner: string | null;
-  origen: "ledger" | "cronograma";
+  state: string | null;
   budget_revised: number;
   spend: number;
   remaining: number;
+  /** Planeado para una semana QUE YA PASÓ y todavía en el remanente. */
+  vencido: number;
+  /** Planeado de hoy a fin del año en curso. */
+  arrastre: number;
+  plan_total: number;
+  /** Planeado en años posteriores al presupuestado. */
+  posterior: number;
   plan: Record<string, number>;
   propuesta: Record<string, number>;
-  plan_total: number;
   propuesta_total: number;
-}
-export interface BudgetProposalHabito {
-  mensual: number;
-  semana_del_mes: number;
-  meses_con_pago: number;
-  historial: { mes: string; monto: number }[];
+  /** Lo que el LEDGER paga por mes en esta línea. Informativo: no mueve nada. */
+  ritmo_ledger: number | null;
 }
 export interface BudgetProposal {
   anio: number;
   semanas: string[];
   filas: BudgetProposalRow[];
-  habito: Record<string, BudgetProposalHabito>;
   totales: {
-    remanente: number;
-    plan: number;
-    propuesta: number;
     lineas: number;
-    lineas_habito: number;
+    budget_revised: number;
+    spend: number;
+    remanente: number;
+    vencido: number;
+    arrastre: number;
+    plan: number;
+    posterior: number;
+    propuesta: number;
+    /** remanente − (vencido + arrastre + plan + posterior). Si no es ~0, hay
+     *  remanente que el cronograma no ubica en ningún año. */
+    sin_ubicar: number;
   };
 }
 

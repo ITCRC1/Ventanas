@@ -1,16 +1,18 @@
 "use client";
 
-// Propuesta de presupuesto anual, semana por semana — en vivo.
+// Presupuesto anual por semana, con el JOB COST como estándar.
 //
-// El año es un selector: se cambia a 2028 y la pantalla y el Excel salen de
-// 2028. Antes esto era un script que yo corría a mano para un año fijo.
+// Regla de la pantalla: **ninguna línea del Job Cost queda afuera.** Las 78
+// salen, tengan remanente o no. Una línea que no aparece es una línea que nadie
+// revisa, y en un presupuesto eso es justo lo que no se puede permitir.
 //
-// Lo que hay que entender de la tabla, y por eso está escrito en pantalla y no
-// solo acá: cada línea dice de dónde sale su número.
-//   · Cronograma (hito) — permisos, obras, la cuota de la propiedad. El LEDGER
-//     no puede opinar: todavía no empezaron, no tienen un solo pago.
-//   · LEDGER (hábito)   — lo que se paga todos los meses. El LEDGER sabe el
-//     monto típico y la semana en que cae; el cronograma no.
+// El remanente de cada línea se parte en cuatro tramos que tienen que sumarlo:
+//   VENCIDO    la semana ya pasó y sigue sin gastarse
+//   ARRASTRE   de hoy a fin del año en curso
+//   PLAN       dentro del año que se presupuesta
+//   POSTERIOR  más adelante
+// y la propuesta es VENCIDO + ARRASTRE + PLAN. El control "sin ubicar" avisa si
+// queda remanente que el cronograma no pone en ningún año.
 
 import { useMemo, useState } from "react";
 
@@ -19,7 +21,7 @@ import { type BudgetProposalRow, useBudgetProposal } from "@/lib/hooks";
 
 const MES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SET", "OCT", "NOV", "DIC"];
 
-function usd(n: number): string {
+function usd(n: number | null | undefined): string {
   if (!n) return "—";
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
@@ -27,10 +29,10 @@ function usd(n: number): string {
 export function BudgetProposalView() {
   const ahora = new Date().getFullYear();
   const [anio, setAnio] = useState(ahora + 1);
+  const [soloConMonto, setSoloConMonto] = useState(false);
   const q = useBudgetProposal(anio);
   const d = q.data;
 
-  // Las semanas agrupadas por mes, para la banda de arriba.
   const bandas = useMemo(() => {
     const out: { mes: number; desde: number; hasta: number }[] = [];
     (d?.semanas ?? []).forEach((w, i) => {
@@ -45,23 +47,23 @@ export function BudgetProposalView() {
   const porCat = useMemo(() => {
     const m = new Map<string, BudgetProposalRow[]>();
     for (const f of d?.filas ?? []) {
+      if (soloConMonto && f.propuesta_total < 0.5 && f.remaining < 0.5) continue;
       const a = m.get(f.category);
       if (a) a.push(f);
       else m.set(f.category, [f]);
     }
     return [...m.entries()];
-  }, [d?.filas]);
+  }, [d?.filas, soloConMonto]);
 
-  if (q.isLoading) return <p className="text-sm text-slate-500">Calculando la propuesta…</p>;
+  if (q.isLoading) return <p className="text-sm text-slate-500">Calculando el presupuesto…</p>;
   if (q.isError || !d)
-    return <p className="text-sm text-red-700">No se pudo calcular la propuesta.</p>;
+    return <p className="text-sm text-red-700">No se pudo calcular el presupuesto.</p>;
 
   const t = d.totales;
-  const anios = [ahora, ahora + 1, ahora + 2, ahora + 3];
+  const mostradas = porCat.reduce((s, [, ls]) => s + ls.length, 0);
 
   return (
     <div className="space-y-3">
-      {/* Controles y resumen */}
       <div className="rounded-lg border border-teal-200 bg-teal-50/60">
         <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
           <div className="flex flex-wrap items-center gap-3">
@@ -72,7 +74,7 @@ export function BudgetProposalView() {
                 onChange={(e) => setAnio(Number(e.target.value))}
                 className="rounded border border-teal-300 bg-white px-2 py-1 text-sm font-bold text-teal-900"
               >
-                {anios.map((y) => (
+                {[ahora, ahora + 1, ahora + 2, ahora + 3].map((y) => (
                   <option key={y} value={y}>
                     {y}
                   </option>
@@ -81,39 +83,66 @@ export function BudgetProposalView() {
             </label>
             <span className="text-xl font-bold text-teal-900 tabular">{usd(t.propuesta)}</span>
             <span className="text-[11px] text-teal-700">
-              propuesta · {t.lineas} líneas, {t.lineas_habito} de hábito ·{" "}
-              {usd(t.plan)} es lo que hoy tiene el cronograma
+              propuesta {anio} · {mostradas} de {t.lineas} líneas del Job Cost
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => void api.abrir(`/budget-proposal/export.xlsx?anio=${anio}`, true)}
-            className="rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-            title="La misma propuesta, en Excel, con los totales por fórmula y la hoja que justifica cada número de hábito"
-          >
-            ⬇ Excel
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-[11px] text-teal-800">
+              <input
+                type="checkbox"
+                checked={soloConMonto}
+                onChange={(e) => setSoloConMonto(e.target.checked)}
+              />
+              Esconder las líneas cerradas
+            </label>
+            <button
+              type="button"
+              onClick={() => void api.abrir(`/budget-proposal/export.xlsx?anio=${anio}`, true)}
+              className="rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+            >
+              ⬇ Excel
+            </button>
+          </div>
         </div>
-        <p className="border-t border-teal-200 bg-white/60 px-3 py-1.5 text-[11px] text-slate-600">
-          <b>Cronograma (hito)</b>: permisos, obras y la cuota de la propiedad — el LEDGER no puede
-          opinar porque todavía no empezaron.{" "}
-          <b className="text-amber-800">LEDGER (hábito)</b>: lo que se paga todos los meses — el
-          monto típico y la semana salen del historial real. Esta pantalla no cambia nada en el
-          sistema.
+
+        {/* Los cuatro tramos del remanente, y el control de que cierren. */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-teal-200 bg-white/60 px-3 py-2 text-[11px] sm:grid-cols-6">
+          {[
+            ["Remanente del Job Cost", t.remanente, "text-slate-900"],
+            ["Vencido (semana ya pasó)", t.vencido, "text-red-700"],
+            ["Arrastre de este año", t.arrastre, "text-amber-700"],
+            [`Plan ${anio}`, t.plan, "text-slate-900"],
+            [`Posterior a ${anio}`, t.posterior, "text-slate-500"],
+            ["Sin ubicar", t.sin_ubicar, Math.abs(t.sin_ubicar) > 5 ? "text-red-700" : "text-emerald-700"],
+          ].map(([et, v, cls]) => (
+            <div key={String(et)}>
+              <div className="uppercase tracking-wide text-slate-400">{et}</div>
+              <div className={`tabular font-bold ${cls}`}>{usd(Number(v))}</div>
+            </div>
+          ))}
+        </div>
+        <p className="border-t border-teal-200 px-3 py-1.5 text-[11px] text-slate-600">
+          El <b>Job Cost es el estándar</b>: el remanente de cada línea se reparte entre los cuatro
+          tramos y tienen que sumarlo — por eso está el control <b>Sin ubicar</b>. La propuesta es{" "}
+          <b>vencido + arrastre + plan</b>, y lo que no pasó se coloca en la primera semana del año
+          para que se vea y alguien lo mueva a sabiendas. Esta pantalla no cambia nada.
         </p>
       </div>
 
-      <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">
+      <div className="max-h-[68vh] overflow-auto rounded-lg border border-slate-200 bg-white">
         <table className="border-collapse text-[11px]">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#0F5F59] text-white">
-              <th className="sticky left-0 z-20 bg-[#0F5F59] px-2 py-1 text-left">No. Proyecto</th>
+              <th className="sticky left-0 z-20 bg-[#0F5F59] px-2 py-1 text-left">WBS</th>
               <th className="px-2 py-1 text-left">Tarea</th>
-              <th className="px-2 py-1 text-center">Origen</th>
+              <th className="px-2 py-1 text-right">Presup.</th>
+              <th className="px-2 py-1 text-right">Gastado</th>
               <th className="px-2 py-1 text-right">Remanente</th>
+              <th className="bg-[#8C2F2F] px-2 py-1 text-right">Vencido</th>
+              <th className="bg-[#8A5A00] px-2 py-1 text-right">Arrastre</th>
               <th className="px-2 py-1 text-right">Plan {d.anio}</th>
-              <th className="bg-[#8A5A00] px-2 py-1 text-right">Propuesta</th>
-              <th className="bg-[#8A5A00] px-2 py-1 text-right">Dif.</th>
+              <th className="px-2 py-1 text-right">Posterior</th>
+              <th className="bg-[#1A7F4B] px-2 py-1 text-right">PROPUESTA</th>
               {bandas.map((b) => (
                 <th
                   key={`${b.mes}-${b.desde}`}
@@ -127,59 +156,68 @@ export function BudgetProposalView() {
           </thead>
           <tbody>
             {porCat.map(([cat, ls]) => {
-              const sum = (k: "remaining" | "plan_total" | "propuesta_total") =>
-                ls.reduce((s, f) => s + f[k], 0);
+              const sum = (k: keyof BudgetProposalRow) =>
+                ls.reduce((s, f) => s + (Number(f[k]) || 0), 0);
               return (
                 <>
                   <tr key={cat} className="bg-[#EAF0FA]">
-                    <td
-                      colSpan={7 + d.semanas.length}
-                      className="px-2 py-1 font-semibold text-teal-900"
-                    >
+                    <td colSpan={10 + d.semanas.length} className="px-2 py-1 font-semibold text-teal-900">
                       {cat.toUpperCase()}
                     </td>
                   </tr>
                   {ls.map((f) => {
-                    const led = f.origen === "ledger";
+                    const cerrada = f.remaining < 0.5 && f.propuesta_total < 0.5;
                     return (
-                      <tr key={f.wbs_code} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="sticky left-0 z-10 bg-white px-2 font-mono text-[10px]">
+                      <tr
+                        key={f.wbs_code}
+                        className={`border-b border-slate-100 hover:bg-slate-50 ${
+                          cerrada ? "text-slate-400" : ""
+                        }`}
+                      >
+                        <td
+                          className={`sticky left-0 z-10 px-2 font-mono text-[10px] ${
+                            cerrada ? "bg-slate-50" : "bg-white"
+                          }`}
+                        >
                           {f.wbs_code}
                         </td>
-                        <td className="px-2">{f.title}</td>
-                        <td
-                          className={`px-2 text-center text-[10px] ${
-                            led ? "bg-amber-100 font-semibold text-amber-800" : "text-slate-500"
-                          }`}
-                        >
-                          {led ? "LEDGER" : "Cronograma"}
+                        <td className="px-2">
+                          {f.title}
+                          {f.ritmo_ledger ? (
+                            <span
+                              className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800"
+                              title={`El LEDGER paga ${usd(f.ritmo_ledger)} por mes en esta línea. Informativo: no mueve el presupuesto.`}
+                            >
+                              ledger {usd(f.ritmo_ledger)}/mes
+                            </span>
+                          ) : null}
                         </td>
-                        <td className="tabular px-2 text-right">{usd(f.remaining)}</td>
                         <td className="tabular px-2 text-right text-slate-500">
-                          {usd(f.plan_total)}
+                          {usd(f.budget_revised)}
                         </td>
-                        <td className="tabular bg-amber-50 px-2 text-right font-semibold">
+                        <td className="tabular px-2 text-right text-slate-500">{usd(f.spend)}</td>
+                        <td className="tabular px-2 text-right font-semibold">
+                          {usd(f.remaining)}
+                        </td>
+                        <td className="tabular bg-red-50 px-2 text-right font-semibold text-red-700">
+                          {usd(f.vencido)}
+                        </td>
+                        <td className="tabular bg-amber-50 px-2 text-right text-amber-800">
+                          {usd(f.arrastre)}
+                        </td>
+                        <td className="tabular px-2 text-right">{usd(f.plan_total)}</td>
+                        <td className="tabular px-2 text-right text-slate-500">
+                          {usd(f.posterior)}
+                        </td>
+                        <td className="tabular bg-emerald-50 px-2 text-right font-bold text-emerald-900">
                           {usd(f.propuesta_total)}
-                        </td>
-                        <td
-                          className={`tabular px-2 text-right ${
-                            f.propuesta_total - f.plan_total > 0.5
-                              ? "font-semibold text-emerald-700"
-                              : f.propuesta_total - f.plan_total < -0.5
-                                ? "font-semibold text-red-700"
-                                : "text-slate-400"
-                          }`}
-                        >
-                          {usd(f.propuesta_total - f.plan_total)}
                         </td>
                         {d.semanas.map((w) => {
                           const v = f.propuesta[w];
                           return (
                             <td
                               key={w}
-                              className={`tabular px-1 text-center text-[10px] ${
-                                v && led ? "bg-amber-100" : ""
-                              }`}
+                              className="tabular px-1 text-center text-[10px]"
                               title={v ? `${w} · ${usd(v)}` : undefined}
                             >
                               {v ? Math.round(v / 1000) + "K" : ""}
@@ -192,12 +230,17 @@ export function BudgetProposalView() {
                   <tr key={`${cat}-sub`} className="bg-[#DCE6F4] font-semibold">
                     <td className="sticky left-0 z-10 bg-[#DCE6F4] px-2" />
                     <td className="px-2">Subtotal {cat}</td>
-                    <td />
+                    <td className="tabular px-2 text-right">{usd(sum("budget_revised"))}</td>
+                    <td className="tabular px-2 text-right">{usd(sum("spend"))}</td>
                     <td className="tabular px-2 text-right">{usd(sum("remaining"))}</td>
+                    <td className="tabular px-2 text-right text-red-700">{usd(sum("vencido"))}</td>
+                    <td className="tabular px-2 text-right text-amber-800">
+                      {usd(sum("arrastre"))}
+                    </td>
                     <td className="tabular px-2 text-right">{usd(sum("plan_total"))}</td>
-                    <td className="tabular px-2 text-right">{usd(sum("propuesta_total"))}</td>
-                    <td className="tabular px-2 text-right">
-                      {usd(sum("propuesta_total") - sum("plan_total"))}
+                    <td className="tabular px-2 text-right">{usd(sum("posterior"))}</td>
+                    <td className="tabular px-2 text-right text-emerald-900">
+                      {usd(sum("propuesta_total"))}
                     </td>
                     <td colSpan={d.semanas.length} />
                   </tr>
@@ -207,11 +250,14 @@ export function BudgetProposalView() {
             <tr className="bg-[#0F5F59] font-bold text-white">
               <td className="sticky left-0 z-10 bg-[#0F5F59] px-2" />
               <td className="px-2">TOTAL {d.anio}</td>
-              <td />
+              <td className="tabular px-2 text-right">{usd(t.budget_revised)}</td>
+              <td className="tabular px-2 text-right">{usd(t.spend)}</td>
               <td className="tabular px-2 text-right">{usd(t.remanente)}</td>
+              <td className="tabular px-2 text-right">{usd(t.vencido)}</td>
+              <td className="tabular px-2 text-right">{usd(t.arrastre)}</td>
               <td className="tabular px-2 text-right">{usd(t.plan)}</td>
+              <td className="tabular px-2 text-right">{usd(t.posterior)}</td>
               <td className="tabular px-2 text-right">{usd(t.propuesta)}</td>
-              <td className="tabular px-2 text-right">{usd(t.propuesta - t.plan)}</td>
               <td colSpan={d.semanas.length} />
             </tr>
           </tbody>

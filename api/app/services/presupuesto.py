@@ -1,42 +1,51 @@
-"""Propuesta de presupuesto anual, semana por semana.
+"""Presupuesto anual por semana, con el JOB COST como estándar.
 
-De dónde sale cada número — es lo único que importa entender de este módulo:
+Regla de oro de este módulo: **ninguna línea del Job Cost queda afuera.** Las 78
+salen, tengan remanente o no, tengan plan o no. Una línea que no aparece es una
+línea que nadie revisa, y en un presupuesto eso es exactamente lo que no se
+puede permitir.
 
-* **Líneas de HITO** (permisos, obras, la cuota de la propiedad): del cronograma
-  que ya está cargado. El LEDGER no puede opinar sobre ellas porque **todavía no
-  empezaron**: no tienen un solo pago. Inventarles un ritmo sería inventar.
+De dónde sale cada número
+-------------------------
+Todo del Job Cost. `remaining` manda: es lo que le queda a la línea. El
+cronograma dice CUÁNDO, y se parte en tres tramos que tienen que sumar el
+remanente:
 
-* **Líneas de HÁBITO** (las que se pagan todos los meses): del LEDGER. Él sabe
-  el monto que se repite y la semana del mes en que cae; el cronograma no.
+    vencido   — planeado para una semana QUE YA PASÓ y que sigue en el
+                remanente: se presupuestó, no se ejecutó, y nadie lo movió.
+    arrastre  — lo planeado de hoy a fin del año en curso.
+    plan      — lo planeado dentro del año que se presupuesta.
+    posterior — lo planeado en años más adelante.
 
-El hábito **no está escrito a mano** en ninguna lista: se deduce del historial.
-Una línea es de hábito si todavía le queda presupuesto y se pagó en al menos
-`MESES_MINIMOS` meses distintos del último año y medio. El día que un contrato
-nuevo empiece a pagarse todos los meses, entra solo.
+    propuesta = vencido + arrastre + plan
 
-Se usa la **mediana** y no el promedio: un pago doble o un mes salteado corren
-el promedio y dejan de describir lo típico.
+Lo anterior al corte del forecast no cuenta: eso es historia del ledger, ya
+gastada. El `vencido` empieza en el corte.
 
-Este módulo NO escribe nada. Calcula y devuelve.
+El arrastre se coloca en la primera semana del año, marcado. No es una opinión
+sobre cuándo se va a gastar: es ponerlo donde se vea, para que alguien lo mueva
+a sabiendas en vez de que desaparezca del año.
+
+El LEDGER no participa del cálculo. Aparece solo como dato al costado —cuánto
+paga por mes esa línea en la realidad— para poder contrastar, pero no mueve un
+solo número.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-from collections import Counter, defaultdict
+from collections import defaultdict
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-# Cuántos meses distintos con pago hacen falta para llamarle hábito a una línea.
-MESES_MINIMOS = 6
-# Ventana de historial que se mira para deducirlo.
 MESES_DE_HISTORIAL = 18
+MESES_MINIMOS = 6
 
 
-def _lunes_del_anio(anio: int) -> list[dt.date]:
+def _lunes(anio: int) -> list[dt.date]:
     d = dt.date(anio, 1, 1)
     d += dt.timedelta(days=(7 - d.weekday()) % 7)
     out: list[dt.date] = []
@@ -55,26 +64,21 @@ def _mediana(xs: list[float]) -> float:
 
 
 def _f(x: Any) -> float:
-    if x is None:
-        return 0.0
-    if isinstance(x, Decimal):
-        return float(x)
-    return float(x)
+    return float(x) if isinstance(x, (int, float, Decimal)) and x is not None else 0.0
 
 
 def construir(db: Session, anio: int) -> dict[str, Any]:
-    semanas = _lunes_del_anio(anio)
-    # El primer lunes de cada mes: ahí es donde cae lo recurrente.
-    primer_lunes: dict[int, dt.date] = {}
-    for w in semanas:
-        primer_lunes.setdefault(w.month, w)
+    semanas = _lunes(anio)
+    primera = semanas[0] if semanas else dt.date(anio, 1, 1)
+    hoy = dt.date.today()
 
-    # ── Las líneas, con presupuesto y remanente ────────────────────────────
+    # ── TODAS las líneas de gasto del Job Cost. Sin filtro. ────────────────
     lineas = db.execute(
         text(
             """
-            SELECT f.wbs_code, f.title, f.category, f.phase, f.owner,
-                   f.budget_revised, f.spend, f.remaining
+            SELECT f.wbs_code, f.title, f.category, f.phase, f.owner, f.state,
+                   f.budget_original, f.budget_change, f.budget_revised,
+                   f.spend, f.remaining
             FROM v_wbs_financials f
             LEFT JOIN wbs_item w ON w.wbs_code = f.wbs_code
             WHERE f.kind = 'cost'
@@ -83,26 +87,38 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
         )
     ).mappings().all()
 
-    # ── Lo que ya está pintado en el cronograma para ese año ───────────────
+    # ── El cronograma, partido en los tres tramos ──────────────────────────
+    corte = db.execute(text("SELECT cutoff_date FROM settings LIMIT 1")).scalar()
+    corte = corte or dt.date(anio - 1, 1, 1)
     plan: dict[str, dict[str, float]] = defaultdict(dict)
+    vencido: dict[str, float] = defaultdict(float)
+    arrastre: dict[str, float] = defaultdict(float)
+    posterior: dict[str, float] = defaultdict(float)
     for r in db.execute(
         text(
             """
             SELECT w.wbs_code, s.week_start, SUM(s.planned_amount) AS monto
             FROM schedule_cell s JOIN wbs_item w ON w.id = s.wbs_id
-            WHERE EXTRACT(year FROM s.week_start) = :anio
-              AND COALESCE(s.planned_amount, 0) <> 0
+            WHERE COALESCE(s.planned_amount, 0) <> 0
             GROUP BY 1, 2
             """
-        ),
-        {"anio": anio},
+        )
     ).mappings():
-        plan[r["wbs_code"]][str(r["week_start"])] = _f(r["monto"])
+        code, w, monto = r["wbs_code"], r["week_start"], _f(r["monto"])
+        if isinstance(w, dt.datetime):
+            w = w.date()
+        if w.year == anio:
+            plan[code][str(w)] = plan[code].get(str(w), 0.0) + monto
+        elif w.year > anio:
+            posterior[code] += monto
+        elif w >= hoy:
+            arrastre[code] += monto          # pendiente de aquí a fin de año
+        elif w >= corte:
+            vencido[code] += monto           # ⚠️ la semana ya pasó y sigue pendiente
 
-    # ── El historial del LEDGER, para deducir el hábito ────────────────────
-    desde = dt.date.today() - dt.timedelta(days=30 * MESES_DE_HISTORIAL)
-    hist: dict[str, dict[str, float]] = defaultdict(dict)
-    semana_del_mes: dict[str, Counter[int]] = defaultdict(Counter)
+    # ── El LEDGER, SOLO como dato al costado ───────────────────────────────
+    desde = hoy - dt.timedelta(days=30 * MESES_DE_HISTORIAL)
+    por_mes: dict[str, dict[str, float]] = defaultdict(dict)
     for r in db.execute(
         text(
             """
@@ -115,59 +131,29 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
         ),
         {"desde": desde},
     ).mappings():
-        c = r["wbs_code"]
         d: dt.date = r["entry_date"]
         ym = f"{d.year:04d}-{d.month:02d}"
-        hist[c][ym] = hist[c].get(ym, 0.0) + _f(r["monto"])
-        semana_del_mes[c][min((d.day - 1) // 7 + 1, 4)] += 1
+        c = r["wbs_code"]
+        por_mes[c][ym] = por_mes[c].get(ym, 0.0) + _f(r["monto"])
 
-    rem_por_code = {r["wbs_code"]: _f(r["remaining"]) for r in lineas}
+    ritmo: dict[str, float] = {}
+    for c, meses in por_mes.items():
+        if len(meses) >= MESES_MINIMOS:
+            ritmo[c] = round(_mediana(list(meses.values())), 2)
 
-    # ── Quién es de hábito ─────────────────────────────────────────────────
-    habito: dict[str, dict[str, Any]] = {}
-    for code, meses in hist.items():
-        if len(meses) < MESES_MINIMOS:
-            continue
-        if rem_por_code.get(code, 0.0) <= 1:
-            continue  # ya terminó: su ritmo es historia, no pronóstico
-        mensual = _mediana(list(meses.values()))
-        if mensual <= 0:
-            continue
-        sem = semana_del_mes[code].most_common(1)[0][0] if semana_del_mes[code] else 1
-        habito[code] = {
-            "mensual": round(mensual, 2),
-            "semana_del_mes": sem,
-            "meses_con_pago": len(meses),
-            "historial": sorted(
-                ({"mes": k, "monto": round(v, 2)} for k, v in meses.items()),
-                key=lambda x: x["mes"],
-            ),
-        }
-
-    # ── La propuesta: 12 pagos en la semana que dice el ledger ─────────────
-    def lunes_de(mes: int, sem: int) -> dt.date | None:
-        base = primer_lunes.get(mes)
-        if base is None:
-            return None
-        cand = base + dt.timedelta(days=7 * (sem - 1))
-        return cand if cand.month == mes else base
-
+    # ── Las filas: TODAS ───────────────────────────────────────────────────
     filas: list[dict[str, Any]] = []
     for ln in lineas:
         code = ln["wbs_code"]
-        rem = _f(ln["remaining"])
         del_plan = plan.get(code, {})
-        hb = habito.get(code)
-        if rem <= 1 and not del_plan and not hb:
-            continue
-        if hb:
-            propuesta = {}
-            for mes in range(1, 13):
-                w = lunes_de(mes, hb["semana_del_mes"])
-                if w:
-                    propuesta[str(w)] = hb["mensual"]
-        else:
-            propuesta = dict(del_plan)
+        arr = round(arrastre.get(code, 0.0), 2)
+        ven = round(vencido.get(code, 0.0), 2)
+        propuesta = dict(del_plan)
+        if arr or ven:
+            # Lo que no pasó entra en la primera semana del año, a la vista,
+            # para que alguien lo mueva a sabiendas en vez de que desaparezca.
+            k = str(primera)
+            propuesta[k] = round(propuesta.get(k, 0.0) + arr + ven, 2)
         filas.append(
             {
                 "wbs_code": code,
@@ -175,27 +161,42 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
                 "category": ln["category"] or "Sin categoría",
                 "phase": ln["phase"],
                 "owner": ln["owner"],
-                "origen": "ledger" if hb else "cronograma",
+                "state": ln["state"],
                 "budget_revised": round(_f(ln["budget_revised"]), 2),
                 "spend": round(_f(ln["spend"]), 2),
-                "remaining": round(rem, 2),
+                "remaining": round(_f(ln["remaining"]), 2),
+                "vencido": ven,
+                "arrastre": arr,
+                "plan_total": round(sum(del_plan.values()), 2),
+                "posterior": round(posterior.get(code, 0.0), 2),
                 "plan": del_plan,
                 "propuesta": propuesta,
-                "plan_total": round(sum(del_plan.values()), 2),
                 "propuesta_total": round(sum(propuesta.values()), 2),
+                "ritmo_ledger": ritmo.get(code),
             }
         )
 
+    suma = lambda k: round(sum(f[k] for f in filas), 2)  # noqa: E731
+    tot_rem = suma("remaining")
+    tot_cubierto = round(
+        suma("vencido") + suma("arrastre") + suma("plan_total") + suma("posterior"), 2
+    )
     return {
         "anio": anio,
         "semanas": [str(w) for w in semanas],
         "filas": filas,
-        "habito": habito,
         "totales": {
-            "remanente": round(sum(f["remaining"] for f in filas), 2),
-            "plan": round(sum(f["plan_total"] for f in filas), 2),
-            "propuesta": round(sum(f["propuesta_total"] for f in filas), 2),
             "lineas": len(filas),
-            "lineas_habito": len(habito),
+            "budget_revised": suma("budget_revised"),
+            "spend": suma("spend"),
+            "remanente": tot_rem,
+            "vencido": suma("vencido"),
+            "arrastre": suma("arrastre"),
+            "plan": suma("plan_total"),
+            "posterior": suma("posterior"),
+            "propuesta": suma("propuesta_total"),
+            # Si esto no es ~0, hay remanente que el cronograma no ubica en
+            # ningún año — y entonces el presupuesto está incompleto.
+            "sin_ubicar": round(tot_rem - tot_cubierto, 2),
         },
     }
