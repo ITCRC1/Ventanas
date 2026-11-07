@@ -909,6 +909,87 @@ export function JobCostFull() {
   const navCols = columns.map((c) => c.key);
   const firstState = () => states.data?.[0]?.id ?? 1;
 
+  // ── Moverse por las columnas sin salir de donde uno esta ────────────────
+  //
+  // ⚠️ El problema que resuelve: la grilla mide 72vh y arranca despues de una
+  // cabecera alta, asi que su barra de desplazamiento horizontal queda FUERA
+  // de la pantalla; y las flechas ◀ ▶ viven en la barra de controles, que se
+  // va para arriba apenas uno baja. Resultado: para correr el cronograma una
+  // semana habia que irse al fondo, y al volver uno ya no sabia donde estaba.
+  //
+  // Tres caminos, los tres desde donde sea:
+  //   · Shift + rueda del mouse sobre la grilla
+  //   · Alt + ← / →  (una columna)   ·   Alt + Shift + ← / →  (un mes)
+  //   · las flechas flotantes, pegadas al borde de la pantalla
+  //
+  // ⚠️ No se usa un ancho fijo. Las columnas declaran `minWidth: 58` pero el
+  // ancho real lo decide el navegador segun el contenido, asi que un numero
+  // escrito a mano deja el salto corrido y despues de diez clics uno ya no
+  // cae en el borde de ninguna columna. Se MIDE el encabezado y se salta de
+  // borde a borde, como hace `jumpToMonth`.
+  const correr = useCallback((columnas: number) => {
+    const sc = scroller.current;
+    if (!sc || columnas === 0) return;
+    const ths = [...sc.querySelectorAll<HTMLElement>("th[data-wk]")];
+    if (ths.length === 0) return;
+    const borde = sc.getBoundingClientRect().left + FROZEN_W + 4;
+    // La primera columna que hoy asoma a la derecha de las congeladas.
+    let i = ths.findIndex((t) => t.getBoundingClientRect().left >= borde - 1);
+    if (i < 0) i = ths.length - 1;
+    const destino = ths[Math.min(Math.max(i + columnas, 0), ths.length - 1)];
+    if (!destino || destino === ths[i]) {
+      // Ya esta en la punta: se empuja igual, para que el clic no quede mudo.
+      sc.scrollBy({ left: columnas * (ths[0]?.offsetWidth || 58), behavior: "smooth" });
+      return;
+    }
+    sc.scrollBy({
+      left: destino.getBoundingClientRect().left - borde,
+      behavior: "smooth",
+    });
+  }, []);
+
+  // Shift + rueda: el navegador no lo hace solo cuando el contenedor tambien
+  // desplaza en vertical, asi que se traduce a mano.
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const rueda = (e: WheelEvent) => {
+      if (!e.shiftKey) return;
+      const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (!d) return;
+      e.preventDefault();
+      sc.scrollLeft += d;
+    };
+    sc.addEventListener("wheel", rueda, { passive: false });
+    return () => sc.removeEventListener("wheel", rueda);
+  }, []);
+
+  // Alt + flechas. Con Alt y no a secas porque las flechas solas ya mueven la
+  // celda seleccionada al editar, y pisarlas romperia el tecleo.
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+      e.preventDefault();
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      correr(dir * (e.shiftKey ? 4 : 1));
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [correr]);
+
+  // Las flechas flotantes solo aparecen cuando la grilla esta a la vista: si
+  // uno esta leyendo otra cosa, no tienen nada que mover.
+  const [grillaALaVista, setGrillaALaVista] = useState(false);
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const obs = new IntersectionObserver(([x]) => setGrillaALaVista(x.isIntersecting), {
+      threshold: 0,
+    });
+    obs.observe(sc);
+    return () => obs.disconnect();
+  }, []);
+
   // ── Guardar lo pendiente ────────────────────────────────────────────────
   const guardar = async () => {
     if (pend.size === 0) return;
@@ -1039,14 +1120,13 @@ export function JobCostFull() {
     if (cells.length) anotar(cells);
   };
 
+  // Los botones de la barra de arriba siguen moviendo ~un mes por clic.
+  const scrollBy = (dir: number) => correr(dir * 4);
+
   if (financials.isLoading || weeks.isLoading)
     return <p className="text-sm text-slate-500">Loading Job Cost…</p>;
 
   const nTimeline = columns.length;
-  // Desplazamiento horizontal LENTO: ~4 columnas (≈ un mes) por clic — antes saltaba
-  // 80% de la pantalla y se salteaba semanas.
-  const scrollBy = (dir: number) =>
-    scroller.current?.scrollBy({ left: dir * 60 * 4, behavior: "smooth" });
 
   // Saltar EXACTO a un mes: deja la primera semana de ese YYYY-MM justo después de
   // las columnas congeladas. Usa delta por getBoundingClientRect (robusto con sticky).
@@ -1392,7 +1472,7 @@ export function JobCostFull() {
         <span className="ml-2 text-xs text-slate-400">
           {allLines.length} lines · {weekList.length} weeks
           {canSched
-            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period · lo que escribís queda en ámbar hasta que apretás 💾 Guardar"
+            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period · lo que escribís queda en ámbar hasta que apretás 💾 Guardar · para correr las columnas desde donde estés: Shift+rueda, Alt+←/→ (Alt+Shift para un mes) o las flechas flotantes del borde derecho"
             : ""}
         </span>
         {/* Fecha de corte del Forecast: el timeline desde acá cuenta como futuro */}
@@ -1483,6 +1563,52 @@ export function JobCostFull() {
           </div>
         );
       })()}
+
+      {/* Flechas flotantes: pegadas al borde de la pantalla, no a la pagina,
+          asi que estan donde sea que uno este mirando. Aparecen solo mientras
+          la grilla esta a la vista. */}
+      {grillaALaVista ? (
+        <div className="pointer-events-none fixed inset-y-0 right-0 z-30 flex items-center pr-2 print:hidden">
+          <div className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-lg backdrop-blur">
+            <button
+              type="button"
+              aria-label="Un mes a la izquierda"
+              title="Un mes atrás  ·  Alt+Shift+←"
+              onClick={() => correr(-4)}
+              className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+            >
+              ⏮
+            </button>
+            <button
+              type="button"
+              aria-label="Una columna a la izquierda"
+              title="Una columna atrás  ·  Alt+←  ·  Shift+rueda"
+              onClick={() => correr(-1)}
+              className="rounded px-2 py-1 text-base text-slate-700 hover:bg-slate-100"
+            >
+              ◀
+            </button>
+            <button
+              type="button"
+              aria-label="Una columna a la derecha"
+              title="Una columna adelante  ·  Alt+→  ·  Shift+rueda"
+              onClick={() => correr(1)}
+              className="rounded px-2 py-1 text-base text-slate-700 hover:bg-slate-100"
+            >
+              ▶
+            </button>
+            <button
+              type="button"
+              aria-label="Un mes a la derecha"
+              title="Un mes adelante  ·  Alt+Shift+→"
+              onClick={() => correr(4)}
+              className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+            >
+              ⏭
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div
         ref={scroller}
