@@ -646,6 +646,18 @@ export function JobCostFull() {
   // mover semanas de un año a otro). null = por defecto (año actual).
   const [selYears, setSelYears] = useState<number[] | null>(null);
   const [sel, setSel] = useState<{ wbsId: number; week: string } | null>(null);
+  // ── Bloque: un rectangulo de celdas, para moverlo entero ────────────────
+  //
+  // ⚠️ Antes solo se podia arrastrar UNA celda a otra semana. Correr un mes de
+  // cinco lineas eran veinte arrastres, y el owner lo dijo con todas las
+  // letras: "se hace muy tedioso".
+  //
+  // Se guarda por INDICES de fila y columna (no por wbs_id y fecha) porque el
+  // movimiento es "correr N columnas": con indices es una resta, y con fechas
+  // habria que recalcular que semana cae N lugares mas alla cada vez.
+  const [bloque, setBloque] = useState<
+    { f0: number; f1: number; c0: number; c1: number } | null
+  >(null);
   const [onlyIssues, setOnlyIssues] = useState(false);
   const [adding, setAdding] = useState(false);
   // Arrastrar un monto de un mes/semana a otro (misma línea). null = sin arrastre.
@@ -943,6 +955,80 @@ export function JobCostFull() {
   const navCols = columns.map((c) => c.key);
   const firstState = () => states.data?.[0]?.id ?? 1;
 
+  // Extiende el bloque desde la celda anclada (`sel`) hasta la que se marque.
+  const extenderBloque = (wbsId: number, colKey: string) => {
+    const f1 = navRowIds.indexOf(wbsId);
+    const c1 = navCols.indexOf(colKey);
+    const f0 = sel ? navRowIds.indexOf(sel.wbsId) : f1;
+    const c0 = sel ? navCols.indexOf(sel.week) : c1;
+    if (f0 < 0 || c0 < 0 || f1 < 0 || c1 < 0) return;
+    setBloque({
+      f0: Math.min(f0, f1),
+      f1: Math.max(f0, f1),
+      c0: Math.min(c0, c1),
+      c1: Math.max(c0, c1),
+    });
+    setEditBuf(null);
+  };
+
+  // Las celdas del bloque, con su monto de HOY. Solo vista semanal: en
+  // Mensual/Trimestral una columna son varias semanas y "correr una columna"
+  // no tiene un significado unico.
+  const celdasDelBloque = () => {
+    if (!bloque) return [];
+    const out: { wbsId: number; ci: number; week: string; monto: number }[] = [];
+    for (let f = bloque.f0; f <= bloque.f1; f++) {
+      const wbsId = navRowIds[f];
+      if (wbsId == null) continue;
+      for (let ci = bloque.c0; ci <= bloque.c1; ci++) {
+        const col = colOf(navCols[ci]);
+        if (!col || col.weeks.length !== 1) continue;
+        const w = col.weeks[0];
+        const monto = index.get(wbsId)?.get(w)?.amount ?? 0;
+        if (monto) out.push({ wbsId, ci, week: w, monto });
+      }
+    }
+    return out;
+  };
+
+  // Corre el bloque `delta` columnas. El destino se calcula contra los montos
+  // ORIGINALES: si origen y destino se pisan, no se arrastra lo ya movido.
+  const moverBloque = (delta: number) => {
+    if (!bloque || !delta) return;
+    const celdas = celdasDelBloque();
+    if (!celdas.length) return;
+    // Que no se salga de la grilla ni entre al historial bloqueado.
+    const destinos = celdas.map((x) => x.ci + delta);
+    if (destinos.some((d) => d < minEditColIdx || d >= navCols.length)) return;
+
+    const cambios = new Map<string, PendCell>();
+    const poner = (wbsId: number, week: string, monto: number | null, st?: number) => {
+      cambios.set(`${wbsId}|${week}`, {
+        wbs_id: wbsId,
+        week_start: week,
+        planned_amount: monto,
+        state_id: st,
+      });
+    };
+    // Primero se vacia el origen...
+    for (const x of celdas) poner(x.wbsId, x.week, null);
+    // ...y despues se escribe el destino, sumando lo que ya hubiera ahi.
+    for (const x of celdas) {
+      const col = colOf(navCols[x.ci + delta]);
+      if (!col || col.weeks.length !== 1) return;
+      const w = col.weeks[0];
+      const yaHabia = celdas.some((y) => y.wbsId === x.wbsId && y.week === w)
+        ? 0 // esa celda es origen: su monto se va, no se suma
+        : (index.get(x.wbsId)?.get(w)?.amount ?? 0);
+      const st = index.get(x.wbsId)?.get(x.week)?.state_id ?? firstState();
+      const prev = cambios.get(`${x.wbsId}|${w}`);
+      const base = prev && prev.planned_amount !== null ? prev.planned_amount : yaHabia;
+      poner(x.wbsId, w, Math.round((base + x.monto) * 100) / 100, st);
+    }
+    anotar([...cambios.values()]);
+    setBloque({ ...bloque, c0: bloque.c0 + delta, c1: bloque.c1 + delta });
+  };
+
   // ── Moverse por las columnas sin salir de donde uno esta ────────────────
   //
   // ⚠️ El problema que resuelve: la grilla mide 72vh y arranca despues de una
@@ -998,8 +1084,9 @@ export function JobCostFull() {
     return () => sc.removeEventListener("wheel", rueda);
   }, [nodoGrilla]);
 
-  // Alt + flechas. Con Alt y no a secas porque las flechas solas ya mueven la
-  // celda seleccionada al editar, y pisarlas romperia el tecleo.
+  // Alt + flechas corre las COLUMNAS a la vista. Con Alt y no a secas porque
+  // las flechas solas ya mueven la celda seleccionada al editar, y pisarlas
+  // romperia el tecleo.
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
@@ -1010,6 +1097,16 @@ export function JobCostFull() {
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [correr]);
+
+  // Escape suelta el bloque. Sin esto queda resaltado y estorba.
+  useEffect(() => {
+    if (!bloque) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBloque(null);
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [bloque]);
 
   // Las flechas flotantes solo aparecen cuando la grilla esta a la vista: si
   // uno esta leyendo otra cosa, no tienen nada que mover.
@@ -1529,7 +1626,7 @@ export function JobCostFull() {
         <span className="ml-2 text-xs text-slate-400">
           {allLines.length} lines · {weekList.length} weeks
           {canSched
-            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period · lo que escribís queda en ámbar hasta que apretás 💾 Guardar · para correr las columnas desde donde estés: Shift+rueda, Alt+←/→ (Alt+Shift para un mes) o las flechas flotantes del borde derecho"
+            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period · lo que escribís queda en ámbar hasta que apretás 💾 Guardar · para correr las columnas desde donde estés: Shift+rueda, Alt+←/→ (Alt+Shift para un mes) o las flechas flotantes del borde derecho · para mover un BLOQUE: clic en una celda, Shift+clic en la otra punta y usá la barra de abajo (Esc lo suelta)"
             : ""}
         </span>
         {/* Fecha de corte del Forecast: el timeline desde acá cuenta como futuro */}
@@ -1620,6 +1717,48 @@ export function JobCostFull() {
           </div>
         );
       })()}
+
+      {/* La barra del bloque: aparece cuando hay mas de una celda marcada y
+          muestra que se va a mover antes de moverlo. Va pegada al borde de la
+          PANTALLA, como las flechas, para que no se escape al desplazarse. */}
+      {bloque && (bloque.f1 > bloque.f0 || bloque.c1 > bloque.c0) ? (
+        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 print:hidden">
+          <div className="flex items-center gap-2 rounded-lg border-2 border-blue-500 bg-white px-3 py-2 shadow-xl">
+            <span className="text-xs font-semibold text-blue-900">
+              {bloque.f1 - bloque.f0 + 1} {bloque.f1 === bloque.f0 ? "línea" : "líneas"} ×{" "}
+              {bloque.c1 - bloque.c0 + 1}{" "}
+              {bloque.c1 === bloque.c0 ? "semana" : "semanas"}
+              <span className="ml-2 tabular font-bold">
+                {usd(celdasDelBloque().reduce((a, x) => a + x.monto, 0))}
+              </span>
+            </span>
+            {[
+              [-4, "⏪", "Un mes atrás"],
+              [-1, "◀", "Una semana atrás"],
+              [1, "▶", "Una semana adelante"],
+              [4, "⏩", "Un mes adelante"],
+            ].map(([d, txt, t]) => (
+              <button
+                key={String(d)}
+                type="button"
+                onClick={() => moverBloque(Number(d))}
+                title={String(t)}
+                className="rounded border border-blue-600 px-2 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+              >
+                {txt}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setBloque(null)}
+              title="Soltar el bloque (Esc)"
+              className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Flechas flotantes: pegadas al borde de la pantalla, no a la pagina,
           asi que estan donde sea que uno este mirando. Aparecen solo mientras
@@ -2074,6 +2213,15 @@ export function JobCostFull() {
                     // esta en el buffer. Se marca en ambar para que se vea
                     // DONDE quedo el trabajo, no solo cuantos cambios hay.
                     const sinGuardar = c.weeks.some((w) => pend.has(clave(r.id, w)));
+                    // ¿Esta celda cae dentro del bloque seleccionado?
+                    const enBloque = (() => {
+                      if (!bloque) return false;
+                      const f = navRowIds.indexOf(r.id);
+                      const ci = navCols.indexOf(c.key);
+                      return (
+                        f >= bloque.f0 && f <= bloque.f1 && ci >= bloque.c0 && ci <= bloque.c1
+                      );
+                    })();
                     return (
                       <td
                         key={c.key}
@@ -2081,7 +2229,7 @@ export function JobCostFull() {
                         title={sinGuardar ? "Sin guardar — apretá Guardar" : undefined}
                         className={`p-0 text-center${cutBorder(i)}${
                           sinGuardar ? " bg-amber-100 ring-2 ring-inset ring-amber-500" : ""
-                        }`}
+                        }${enBloque ? " bg-blue-100 ring-1 ring-inset ring-blue-500" : ""}`}
                         onDragOver={(e) => {
                           if (isDropTarget) {
                             e.preventDefault();
@@ -2179,12 +2327,17 @@ export function JobCostFull() {
                               e.dataTransfer.setData("text/plain", c.key);
                             }}
                             onDragEnd={() => setDragSrc(null)}
-                            onClick={() =>
-                              canSched &&
-                              !paint.paintOn &&
-                              !colPast &&
-                              openCell(r.id, c.key, val ? String(val) : "")
-                            }
+                            onClick={(e) => {
+                              if (!canSched || paint.paintOn || colPast) return;
+                              // Shift+clic estira el bloque desde la celda
+                              // anclada; el clic a secas vuelve a una sola.
+                              if (e.shiftKey) {
+                                extenderBloque(r.id, c.key);
+                                return;
+                              }
+                              setBloque(null);
+                              openCell(r.id, c.key, val ? String(val) : "");
+                            }}
                             {...(canPaintHere && paint.paintOn ? paint.cellPaint(doPaint) : {})}
                             className={`tabular block min-h-[16px] w-full px-1 text-[10px] ${colPast ? "cursor-default" : canSched && paint.paintOn ? "cursor-crosshair" : canDrag ? "cursor-grab hover:ring-1 hover:ring-inset hover:ring-blue-400" : canSched ? "cursor-pointer hover:ring-1 hover:ring-inset hover:ring-blue-400" : ""} ${isSel ? "ring-2 ring-inset ring-slate-900" : ""} ${isDropTarget ? "outline outline-2 outline-dashed outline-blue-500" : ""}`}
                             style={{
