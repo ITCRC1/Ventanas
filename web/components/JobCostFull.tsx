@@ -781,29 +781,36 @@ export function JobCostFull() {
     });
   }, []);
 
+  const indiceBase = useMemo(() => indexCells(cells.data ?? []), [cells.data]);
+
   // El indice que lee TODA la grilla: lo guardado, con lo pendiente encima.
-  // Asi los totales de fila, de columna y el arrastre ven lo que el usuario
-  // acaba de escribir, sin tocar cada lugar que lee una celda.
+  // Asi los totales de fila, de columna y el arrastre ven lo que se acaba de
+  // escribir, sin tocar cada lugar que lee una celda.
+  //
+  // ⚠️ Esto se reconstruia ENTERO en cada edicion: un filter + un find por
+  // cada pendiente sobre las ~19.600 celdas (78 lineas x 251 semanas) y
+  // despues indexCells de nuevo sobre todas. Por eso la pagina se sentia
+  // lenta. Ahora se clona el mapa de afuera y SOLO las filas tocadas: el
+  // costo pasa a ser el de los pendientes, no el del cronograma entero.
   const index = useMemo(() => {
-    const base = cells.data ?? [];
-    if (pend.size === 0) return indexCells(base);
-    const fusion = base.filter((c) => !pend.has(`${c.wbs_id}|${c.week_start}`));
+    if (pend.size === 0) return indiceBase;
+    const porDefecto = states.data?.[0]?.id ?? 1;
+    const m: typeof indiceBase = new Map(indiceBase);
     for (const c of pend.values()) {
-      if (c.planned_amount === null) continue; // pendiente de BORRADO
-      const antes = base.find(
-        (b) => b.wbs_id === c.wbs_id && b.week_start === c.week_start,
-      );
-      fusion.push({
-        wbs_id: c.wbs_id,
-        week_start: c.week_start,
-        planned_amount: String(c.planned_amount),
-        // Sin estado propio se conserva el que tenia; si es nueva, el primero.
-        state_id: c.state_id ?? antes?.state_id ?? states.data?.[0]?.id ?? 1,
-        note: antes?.note ?? null,
-      });
+      const fila = new Map(m.get(c.wbs_id) ?? []);
+      if (c.planned_amount === null) {
+        fila.delete(c.week_start);
+      } else {
+        fila.set(c.week_start, {
+          amount: c.planned_amount,
+          // Sin estado propio se conserva el que tenia; si es nueva, el primero.
+          state_id: c.state_id ?? fila.get(c.week_start)?.state_id ?? porDefecto,
+        });
+      }
+      m.set(c.wbs_id, fila);
     }
-    return indexCells(fusion);
-  }, [cells.data, pend, states.data]);
+    return m;
+  }, [indiceBase, pend, states.data]);
 
   // Título de cada sección numerada: sale de las filas section_header (o de la
   // fila con código entero, p.ej. '6' = Property Sale) — nunca se inventa.
@@ -890,6 +897,22 @@ export function JobCostFull() {
   const allLines = rows
     .filter((x): x is { kind: "line"; r: WbsFinancials; tl: number } => x.kind === "line")
     .map((x) => x.r);
+  // ⚠️ Cada fila de subtotal (una por categoria) y el PROJECT TOTAL recorrian
+  // por su cuenta las ~19.600 combinaciones de linea x columna llamando a
+  // columnTotal. Con seis categorias eso son siete barridos completos en CADA
+  // render. Acá se hace UNO, memorizado: el subtotal despues solo suma de una
+  // lista ya calculada.
+  const totalPorLineaYColumna = useMemo(() => {
+    const m = new Map<number, number[]>();
+    for (const l of allLines) {
+      m.set(
+        l.id,
+        columns.map((c) => columnTotal(index, l.id, c.weeks)),
+      );
+    }
+    return m;
+  }, [allLines, columns, index]);
+
   // Ventas (proceeds) — FUERA de los totales; se muestran como referencia al final.
   const proceedsLines = (financials.data ?? []).filter((r) => r.kind === "proceeds");
 
@@ -1002,6 +1025,14 @@ export function JobCostFull() {
   }, [nodoGrilla]);
 
   // ── Guardar lo pendiente ────────────────────────────────────────────────
+  //
+  // Guarda SOLO. El buffer existe igual —para marcar en ambar lo que todavia
+  // no llego, para juntar en un lote lo que se escribio seguido y para que el
+  // boton siga estando cuando uno quiere forzarlo— pero nadie tiene que
+  // apretar nada: a los 1.2 s sin tocar nada, se va.
+  //
+  // Por que con espera y no al instante: pegar un rango de Excel o tabular
+  // por diez celdas seguidas generaba diez pedidos. Asi es uno solo.
   const guardar = async () => {
     if (pend.size === 0) return;
     const lote = [...pend.values()];
@@ -1020,6 +1051,15 @@ export function JobCostFull() {
   };
 
   const descartar = () => setPend(new Map());
+
+  // El temporizador del guardado automatico. Se reinicia con cada edicion.
+  const guardarRef = useRef(guardar);
+  guardarRef.current = guardar;
+  useEffect(() => {
+    if (pend.size === 0) return;
+    const t = setTimeout(() => void guardarRef.current(), 1200);
+    return () => clearTimeout(t);
+  }, [pend]);
 
   // El navegador avisa si se cierra la pestaña con cambios sin guardar. Es la
   // unica red que queda cuando el guardado dejo de ser automatico.
@@ -1255,7 +1295,7 @@ export function JobCostFull() {
         </td>
         <td colSpan={8} />
         {columns.map((c, i) => {
-          const v = ls.reduce((s, l) => s + columnTotal(index, l.id, c.weeks), 0);
+          const v = ls.reduce((s, l) => s + (totalPorLineaYColumna.get(l.id)?.[i] ?? 0), 0);
           return (
             <td
               key={c.key}
@@ -1317,22 +1357,24 @@ export function JobCostFull() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">
-          {/* Guardar: aparece SOLO cuando hay algo que guardar. Un boton que
-              esta siempre encendido no dice nada; este, cuando se ve, es
-              porque hay trabajo sin grabar. */}
+          {/* Guarda solo. El recuadro informa, no manda: aparece mientras algo
+              esta en camino y se va cuando el servidor confirmo. El boton
+              queda para forzarlo sin esperar. */}
           {pend.size > 0 ? (
             <div className="flex items-center gap-2 rounded-md border-2 border-amber-500 bg-amber-50 px-2 py-1">
               <span className="text-xs font-semibold text-amber-900">
-                {pend.size} {pend.size === 1 ? "cambio sin guardar" : "cambios sin guardar"}
+                {upsertCells.isPending
+                  ? "Guardando…"
+                  : `${pend.size} ${pend.size === 1 ? "cambio" : "cambios"} por guardar`}
               </span>
               <button
                 type="button"
                 onClick={() => void guardar()}
                 disabled={upsertCells.isPending}
                 className="rounded bg-amber-600 px-3 py-1 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
-                title="Manda al servidor todo lo que escribiste, en un solo lote"
+                title="Mandalo ya, sin esperar el guardado automático"
               >
-                {upsertCells.isPending ? "Guardando…" : "💾 Guardar"}
+                💾 Guardar ya
               </button>
               <button
                 type="button"
@@ -2237,7 +2279,10 @@ export function JobCostFull() {
               </td>
               <td colSpan={8} />
               {columns.map((c, i) => {
-                const v = allLines.reduce((s, l) => s + columnTotal(index, l.id, c.weeks), 0);
+                const v = allLines.reduce(
+                  (s, l) => s + (totalPorLineaYColumna.get(l.id)?.[i] ?? 0),
+                  0,
+                );
                 return (
                   <td
                     key={c.key}
