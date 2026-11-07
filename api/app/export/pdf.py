@@ -138,11 +138,14 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
     # PDF no aparecia por ningun lado — habia que abrir la app para saberlo.
     # No se confunde con Beneficiary: ese es el titular de la cuenta que recibe
     # la transferencia (siempre el holding cuando es SEND), no el proveedor.
+    # Sin "Category": decia "Overhead" en todas las filas, lo mismo que la
+    # primera mitad de "Type" (Overhead / Personnel). Una columna que repite el
+    # mismo valor diez veces no informa y le estaba robando ancho a las dos que
+    # si importan — quien cobra y por que.
     heads = [
-        '<th class="first" style="width:14%">Vendor</th>',
-        f'<th style="width:17%">{escape(_sent_when(disb))}</th>',
+        '<th class="first" style="width:18%">Vendor</th>',
+        f'<th style="width:20%">{escape(_sent_when(disb))}</th>',
         '<th style="width:7%">Amount</th>',
-        '<th style="width:7%">Category</th>',
         '<th style="width:9%">Type</th>',
         '<th style="width:10%">Name</th>',
         '<th style="width:5%">Transfer</th>',
@@ -164,7 +167,6 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
             f'<td class="vendor">{escape(r.get("vendor") or "")}</td>'
             f'<td class="desc">{escape(r["description"] or "")}</td>'
             f'<td class="num">{amt}</td>'
-            f'<td>{escape(r["reason"] or "")}</td>'
             f'<td>{escape(str(tipo))}</td>'
         )
         # Bloque de transferencia: solo en la 1ª fila, con rowspan sobre todas y
@@ -182,16 +184,16 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
         body += f"<tr>{left}{mid}</tr>"
 
     credit = Decimal(str(disb.credit_applied or 0))
-    # 11 columnas: etiqueta (2) + monto (1) + 8 vacias.
+    # 10 columnas: etiqueta (2) + monto (1) + 7 vacias.
     footer = (
         f'<tr class="credit"><td class="desc" colspan="2">Credit applied</td>'
-        f'<td class="num">({_usd(credit)})</td><td colspan="8"></td></tr>'
+        f'<td class="num">({_usd(credit)})</td><td colspan="7"></td></tr>'
         if credit
         else ""
     )
     footer += (
         f'<tr class="total"><td class="desc" colspan="2">Total</td>'
-        f'<td class="num">{_usd(total)}</td><td colspan="8"></td></tr>'
+        f'<td class="num">{_usd(total)}</td><td colspan="7"></td></tr>'
     )
     return f'<table class="bd"><thead><tr>{head}</tr></thead><tbody>{body}{footer}</tbody></table>'
 
