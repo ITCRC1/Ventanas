@@ -21,13 +21,30 @@ from __future__ import annotations
 import csv
 import io
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
+# ⚠️ LAFISE mezcla los dos idiomas en el MISMO archivo: enero sale "JAN",
+# abril "APR", agosto "AUG", diciembre "DEC", y el resto en español. Con solo
+# las abreviaturas en español, `_parse_date` devolvía None y la fila se
+# descartaba sin decir nada. En el estado de ene-2025 a nov-2026 eso tiraba
+# 166 de 563 filas —enero, abril, agosto y diciembre COMPLETOS— y el archivo
+# "entraba" igual, con los meses faltantes como única señal.
 MESES = {
-    "ENE": 1, "FEB": 2, "MAR": 3, "ABR": 4, "MAY": 5, "JUN": 6,
-    "JUL": 7, "AGO": 8, "SET": 9, "SEP": 9, "OCT": 10, "NOV": 11, "DIC": 12,
+    "ENE": 1, "JAN": 1,
+    "FEB": 2,
+    "MAR": 3,
+    "ABR": 4, "APR": 4,
+    "MAY": 5,
+    "JUN": 6,
+    "JUL": 7,
+    "AGO": 8, "AUG": 8,
+    "SET": 9, "SEP": 9,
+    "OCT": 10,
+    "NOV": 11,
+    "DIC": 12, "DEC": 12,
 }
 
 _DATE_TXT = re.compile(r"(\d{1,2})[/\-]([A-Za-z]{3})[/\-](\d{4})")
@@ -61,6 +78,37 @@ class Statement:
 
 def _clean(s: object) -> str:
     return re.sub(r"\s+", " ", str(s or "").replace("\n", " ")).strip()
+
+
+def _decodificar(data: bytes) -> str:
+    """Texto del archivo, venga en el juego de caracteres que venga.
+
+    ⚠️ LAFISE exporta el CSV en Latin-1, no en UTF-8. Leerlo como UTF-8 con
+    errors="replace" no explota: deja "Descripción" convertido en
+    "Descripci\ufffdn", el mapa de encabezados no reconoce NINGUNA columna y el
+    archivo entra con cero movimientos sin una sola queja. Pasó el 2026-11-07
+    con el estado de ene-2025 a nov-2026, que es justo el que tapaba cinco
+    meses faltantes de la cuenta operativa.
+
+    UTF-8 primero y en modo estricto: si el archivo es UTF-8 de verdad, falla
+    ninguna. Si no, cae a cp1252 y a latin-1, que nunca fallan.
+    """
+    for codec in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            return data.decode(codec)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
+def _llave(h: object) -> str:
+    """Encabezado normalizado: sin acentos, sin mayúsculas, sin espacios de más.
+
+    Así "Descripción", "DESCRIPCION" y "descripcion" son la misma llave, y el
+    mapa deja de depender de cómo vino escrito el acento.
+    """
+    t = unicodedata.normalize("NFKD", _clean(h).lower())
+    return "".join(c for c in t if not unicodedata.combining(c))
 
 
 def _num(v: object) -> Decimal | None:
@@ -130,9 +178,19 @@ def _read_meta(text: str, st: Statement) -> None:
         elif low.strip().startswith("cliente"):
             st.client = _clean(line.split(None, 1)[1]) if len(line.split(None, 1)) > 1 else None
         elif low.strip().startswith("moneda"):
-            parts = line.split()
-            if parts:
-                st.currency = parts[-1].strip()
+            # La línea es "Moneda,USD,Tipo de cuenta,Cuenta de Ahorro": el último
+            # token es "Ahorro", no la moneda. Se toma el campo que sigue a
+            # "Moneda" y se acepta solo si parece un código de moneda.
+            # ⚠️ Acá la línea llega con los campos unidos por ESPACIOS
+            # (quien llama ya pasó el CSV por el lector), así que hay que
+            # partir por separadores Y por espacios.
+            campos = [_clean(x) for x in re.split(r"[,;\t\s]+", line) if _clean(x)]
+            for i, c in enumerate(campos):
+                if _llave(c).startswith("moneda") and i + 1 < len(campos):
+                    cand = campos[i + 1].upper()
+                    if re.fullmatch(r"[A-Z]{3}", cand):
+                        st.currency = cand
+                    break
         if "desde" in low or "hasta" in low:
             if "desde" in low:
                 dd = _parse_date_from_groups(line, first=True)
@@ -177,14 +235,18 @@ def parse_pdf(data: bytes) -> Statement:
 
 # --- CSV ---------------------------------------------------------------------
 
+# Las llaves van SIN acentos: `_llave()` se los quita antes de buscar, así que
+# escribirlos acá de dos o tres maneras ya no hace falta.
 _HEADER_MAP = {
-    "fecha": 0, "número de confirmación": 1, "numero de confirmacion": 1,
-    "número de confirmaci�n": 1, "n. de confirmación": 1,
-    "confirmación": 1, "confirmacion": 1, "referencia": 6,
-    "descripción": 2, "descripcion": 2, "detalle": 2,
-    "débito": 3, "debito": 3, "debe": 3,
-    "crédito": 4, "credito": 4, "haber": 4,
-    "saldo": 5, "tipo de movimiento": 7, "tipo": 7,
+    "fecha": 0, "fecha movimiento": 0,
+    "numero de confirmacion": 1, "nro. de confirmacion": 1,
+    "n. de confirmacion": 1, "confirmacion": 1,
+    "referencia": 6,
+    "descripcion": 2, "detalle": 2, "concepto": 2,
+    "debito": 3, "debe": 3, "cargo": 3,
+    "credito": 4, "haber": 4, "abono": 4,
+    "saldo": 5, "saldo disponible": 5,
+    "tipo de movimiento": 7, "tipo": 7,
 }
 
 
@@ -192,7 +254,7 @@ def _map_header(headers: list[str]) -> dict[int, int] | None:
     """Devuelve {idx_col_archivo: idx_col_normalizado} o None si no reconoce."""
     out: dict[int, int] = {}
     for i, h in enumerate(headers):
-        key = _clean(h).lower()
+        key = _llave(h)
         if key in _HEADER_MAP:
             out[i] = _HEADER_MAP[key]
     # necesita al menos Fecha, Descripción y (Débito o Crédito)
@@ -204,7 +266,7 @@ def _map_header(headers: list[str]) -> dict[int, int] | None:
 
 def parse_csv(data: bytes) -> Statement:
     st = Statement()
-    text = data.decode("utf-8-sig", errors="replace")
+    text = _decodificar(data)
     # LAFISE suele exportar con ; en locale CR; detectar el separador
     sample = text[:4000]
     delim = ";" if sample.count(";") > sample.count(",") else ","
@@ -219,8 +281,15 @@ def parse_csv(data: bytes) -> Statement:
             break
     _read_meta("\n".join(" ".join(r) for r in reader[: (header_idx or 20)]), st)
     if colmap is None:
-        _finalize(st)
-        return st
+        # Antes devolvía un estado vacío y el archivo "entraba" con cero
+        # movimientos. Un archivo que no se pudo leer no es un archivo sin
+        # movimientos: hay que decirlo.
+        vistos = [", ".join(_clean(c) for c in r if _clean(c)) for r in reader[:25]]
+        raise ValueError(
+            "No se encontró la fila de encabezados (Fecha / Descripción / "
+            "Débito o Crédito) en el CSV. Primeras filas leídas: "
+            + " | ".join(v for v in vistos if v)[:400]
+        )
     for row in reader[header_idx + 1:]:
         if not any(_clean(c) for c in row):
             continue

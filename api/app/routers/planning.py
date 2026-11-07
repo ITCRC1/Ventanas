@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import json
 import secrets
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import require_permission
 from app.core.problems import Problem
 from app.deps import get_current_user, get_db
+from app.export.planning_excel import planning_to_xlsx
 from app.repositories import disbursement as disb_repo
 from app.repositories import schedule as sched_repo
 from app.repositories import wbs as wbs_repo
@@ -520,3 +522,64 @@ def to_short_payment(data: ToShortPaymentIn, db: Session = Depends(get_db)) -> d
         "skipped": skipped,
         "total_added": str(sum((Decimal(a["amount"]) for a in added), Decimal(0))),
     }
+
+
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@router.get("/export.xlsx", dependencies=[_can_view])
+def export_xlsx(
+    db: Session = Depends(get_db),
+    period_from: str = "",
+    months: int = 3,
+    only_budget: bool = True,
+    only_planned: bool = True,
+    q: str = "",
+) -> Response:
+    """La tabla del tab Planning, tal como está en pantalla, en Excel.
+
+    Los filtros viajan por query para que el archivo diga lo mismo que la
+    pantalla desde donde se bajó: la ventana de meses, los dos interruptores y
+    el texto del buscador. Sin eso, el Excel contaría otra historia y nadie
+    sabría cuál de las dos mirar.
+    """
+    if not period_from:
+        hoy = date.today()
+        period_from = f"{hoy.year:04d}-{hoy.month:02d}"
+    months = max(1, min(24, months))
+
+    snap = build_snapshot(db, period_from, months)
+    win = snap["months"]
+    texto = q.strip().lower()
+
+    filas = []
+    for f in snap["rows"]:
+        plan = f.get("planned") or {}
+        tiene_plan = abs(sum(float(v or 0) for v in plan.values())) >= 0.005
+        if only_budget and float(f.get("budget_revised") or 0) <= 0:
+            continue
+        if only_planned and not tiene_plan:
+            continue
+        if texto and texto not in str(f["wbs_code"]).lower() and texto not in (
+            f.get("title") or ""
+        ).lower():
+            continue
+        filas.append(f)
+
+    notas = {
+        r["wbs_id"]: dict(r)
+        for r in db.execute(
+            text("SELECT wbs_id, note, suggested_amount, move_to_month FROM planning_note")
+        ).mappings()
+    }
+
+    data = planning_to_xlsx(
+        project_name=snap.get("project_name"),
+        meses=win,
+        filas=filas,
+        notas=notas,
+    )
+    nombre = f"Planning_{win[0]}_{win[-1]}.xlsx" if win else "Planning.xlsx"
+    return Response(
+        data, media_type=_XLSX, headers={"Content-Disposition": f'attachment; filename="{nombre}"'}
+    )
