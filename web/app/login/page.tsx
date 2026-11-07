@@ -3,7 +3,7 @@
 import { ApiError } from "@/lib/api";
 import { useAuthConfig, useDevLogin, usePasswordLogin, useSharedLogin } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const USERS = [
   { username: "bismark", label: "Financial Controller" },
@@ -29,9 +29,12 @@ export default function LoginPage() {
   const err = devLogin.error ?? sharedLogin.error ?? passwordLogin.error;
   const isDev = config.data?.dev_login ?? false;
 
-  const vencida =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("vencida") === "1";
+  // En un efecto y no al renderizar: leer window durante el render le da al
+  // servidor un HTML distinto al del navegador y React avisa por hidratación.
+  const [vencida, setVencida] = useState(false);
+  useEffect(() => {
+    setVencida(new URLSearchParams(window.location.search).get("vencida") === "1");
+  }, []);
 
   function dest() {
     const next =
