@@ -75,6 +75,35 @@ async function escribir<T>(metodo: string, path: string, init: RequestInit): Pro
   }
 }
 
+/** El nombre con el que se guarda el archivo.
+ *
+ * ⚠️ Antes era `path.split("/").pop()`, que con una ruta que lleva filtros se
+ * trae la query entera: el Planning bajaba como
+ * "export.xlsx_period_from=2026-10&months=3&only_budget=true&...".
+ *
+ * El backend ya manda el nombre bueno en Content-Disposition. Se usa ese; si
+ * no viniera, el último tramo de la ruta SIN la query.
+ */
+function nombreDescarga(res: Response, path: string): string {
+  const cd = res.headers.get("content-disposition") ?? "";
+  // filename*=UTF-8''… tiene prioridad sobre filename="…" (RFC 6266).
+  const estrella = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd);
+  if (estrella?.[1]) {
+    try {
+      return decodeURIComponent(estrella[1].trim().replace(/^"|"$/g, ""));
+    } catch {
+      /* sigue con el otro */
+    }
+  }
+  const simple = /filename="?([^";]+)"?/i.exec(cd);
+  if (simple?.[1]) return simple[1].trim();
+  // Sin cabecera: el ultimo tramo SIN la query. Si ese tramo no trae punto
+  // -por ejemplo ".../file/xml"- se usa como extension, para no bajar un
+  // archivo llamado "xml" que el sistema no sabe abrir.
+  const base = path.split("?")[0].split("/").filter(Boolean).pop() ?? "archivo";
+  return base.includes(".") ? base : `archivo.${base}`;
+}
+
 /** Abre un PDF, Excel o adjunto de /api/* respetando la sesión.
  *
  * Un `<a href="/api/...">` suelto le entrega al navegador lo que conteste la
@@ -99,7 +128,7 @@ export async function abrirArchivo(path: string, descargar = false): Promise<voi
     if (descargar) {
       const a = document.createElement("a");
       a.href = url;
-      a.download = path.split("/").pop() ?? "archivo";
+      a.download = nombreDescarga(res, path);
       document.body.appendChild(a);
       a.click();
       a.remove();
