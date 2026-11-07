@@ -9,7 +9,6 @@ import { num } from "@/lib/format";
 import {
   useApplyLedgerHistory,
   useCategories,
-  useClearCell,
   useCreateWbs,
   useCutoff,
   useEditWbsMeta,
@@ -26,7 +25,6 @@ import {
   useTaskStates,
   useUpdateWbsDates,
   useUpdateWbsField,
-  useUpsertCell,
   useUpsertCells,
   useWbsList,
 } from "@/lib/hooks";
@@ -34,7 +32,15 @@ import { PaintToolbar, softenHex, usePaintTool } from "@/lib/paint";
 import { type View, buildColumns, columnTotal, indexCells, yearsOf } from "@/lib/schedule";
 import type { Category, Phase, TaskState, Wbs, WbsFinancials } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, type ReactNode, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 const STATE_COLOR: Record<string, string> = {
   not_started: "#CCCCCC",
@@ -595,6 +601,15 @@ const fst = (i: number): CSSProperties => ({
   boxSizing: "border-box",
 });
 
+/** Una celda del cronograma escrita y todavia sin guardar.
+ *  `planned_amount: null` = pendiente de BORRADO. */
+type PendCell = {
+  wbs_id: number;
+  week_start: string;
+  planned_amount: number | null;
+  state_id?: number;
+};
+
 export function JobCostFull() {
   const qc = useQueryClient();
   const me = useMe();
@@ -626,8 +641,6 @@ export function JobCostFull() {
   const [dragSrc, setDragSrc] = useState<{ wbsId: number; key: string; weeks: string[] } | null>(
     null,
   );
-  const upsertCell = useUpsertCell();
-  const clearCell = useClearCell();
   const upsertCells = useUpsertCells();
   // Buffer de edición inline de la celda del cronograma (tipo Excel). null = no editando.
   const [editBuf, setEditBuf] = useState<string | null>(null);
@@ -666,13 +679,15 @@ export function JobCostFull() {
     const existing = rowIdx.get(targetWeek);
     const newAmount = (existing?.amount ?? 0) + total;
     const newState = existing?.state_id ?? carryState ?? states.data?.[0]?.id ?? 1;
-    for (const w of toClear) await clearCell.mutateAsync({ wbs_id: wbsId, week_start: w });
-    await upsertCell.mutateAsync({
-      wbs_id: wbsId,
-      week_start: targetWeek,
-      planned_amount: newAmount,
-      state_id: newState,
-    });
+    anotar([
+      ...toClear.map((w) => ({ wbs_id: wbsId, week_start: w, planned_amount: null })),
+      {
+        wbs_id: wbsId,
+        week_start: targetWeek,
+        planned_amount: newAmount,
+        state_id: newState,
+      },
+    ]);
   }
 
   // Ids actuales (category/phase/state) por línea — la vista financials sólo trae
@@ -731,7 +746,53 @@ export function JobCostFull() {
     return columns.findIndex((c) => (c.weeks[0] ?? c.key) >= co);
   }, [columns, cutoff.data?.cutoff_date]);
   const cutBorder = (i: number) => (i === cutIdx ? " border-l-4 border-red-600" : "");
-  const index = useMemo(() => indexCells(cells.data ?? []), [cells.data]);
+  // ── Ediciones sin guardar ────────────────────────────────────────────
+  //
+  // Antes cada celda se grababa sola al salir del campo. Funcionaba, pero el
+  // guardado no era un acto de nadie: se escribia y pasaba algo, en silencio.
+  // Y cuando NO pasaba —la sesion vencida del 2026-11-07— tampoco se notaba.
+  //
+  // Ahora lo que se escribe queda acá, a la vista y en ambar, hasta que se
+  // aprieta Guardar. Entonces se manda TODO en un solo lote.
+  //
+  // El teclado no cambia: se sigue escribiendo, tabulando y pegando desde
+  // Excel igual que siempre. Lo unico que cambia es cuando viaja.
+  const [pend, setPend] = useState<Map<string, PendCell>>(() => new Map());
+
+  const clave = (wbsId: number, week: string) => `${wbsId}|${week}`;
+
+  const anotar = useCallback((nuevas: PendCell[]) => {
+    if (!nuevas.length) return;
+    setPend((prev) => {
+      const m = new Map(prev);
+      for (const c of nuevas) m.set(`${c.wbs_id}|${c.week_start}`, c);
+      return m;
+    });
+  }, []);
+
+  // El indice que lee TODA la grilla: lo guardado, con lo pendiente encima.
+  // Asi los totales de fila, de columna y el arrastre ven lo que el usuario
+  // acaba de escribir, sin tocar cada lugar que lee una celda.
+  const index = useMemo(() => {
+    const base = cells.data ?? [];
+    if (pend.size === 0) return indexCells(base);
+    const fusion = base.filter((c) => !pend.has(`${c.wbs_id}|${c.week_start}`));
+    for (const c of pend.values()) {
+      if (c.planned_amount === null) continue; // pendiente de BORRADO
+      const antes = base.find(
+        (b) => b.wbs_id === c.wbs_id && b.week_start === c.week_start,
+      );
+      fusion.push({
+        wbs_id: c.wbs_id,
+        week_start: c.week_start,
+        planned_amount: String(c.planned_amount),
+        // Sin estado propio se conserva el que tenia; si es nueva, el primero.
+        state_id: c.state_id ?? antes?.state_id ?? states.data?.[0]?.id ?? 1,
+        note: antes?.note ?? null,
+      });
+    }
+    return indexCells(fusion);
+  }, [cells.data, pend, states.data]);
 
   // Título de cada sección numerada: sale de las filas section_header (o de la
   // fila con código entero, p.ej. '6' = Property Sale) — nunca se inventa.
@@ -847,6 +908,38 @@ export function JobCostFull() {
     .map((x) => x.r.id);
   const navCols = columns.map((c) => c.key);
   const firstState = () => states.data?.[0]?.id ?? 1;
+
+  // ── Guardar lo pendiente ────────────────────────────────────────────────
+  const guardar = async () => {
+    if (pend.size === 0) return;
+    const lote = [...pend.values()];
+    // Se limpia DESPUES de que el servidor confirma. Si falla, lo escrito
+    // sigue en pantalla y el boton sigue ahi para reintentar: perder el
+    // trabajo de alguien por un error de red no es una opcion.
+    await upsertCells.mutateAsync(lote);
+    setPend((prev) => {
+      const m = new Map(prev);
+      for (const c of lote) {
+        const k = `${c.wbs_id}|${c.week_start}`;
+        if (m.get(k) === c) m.delete(k);
+      }
+      return m;
+    });
+  };
+
+  const descartar = () => setPend(new Map());
+
+  // El navegador avisa si se cierra la pestaña con cambios sin guardar. Es la
+  // unica red que queda cuando el guardado dejo de ser automatico.
+  useEffect(() => {
+    if (pend.size === 0) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [pend.size]);
   // El HISTORIAL (columnas enteramente antes del Forecast Cut-off) está BLOQUEADO:
   // no se edita/pinta/arrastra a mano — solo cambia por el ledger. Para editarlo,
   // el owner mueve el Forecast cut-off. La celda es "pasado" si TODAS sus semanas < corte.
@@ -884,9 +977,7 @@ export function JobCostFull() {
     const t = (buf ?? "").trim();
     if (t === "") {
       if (Math.abs(cur) > 0.005)
-        upsertCells.mutate(
-          weeks.map((w) => ({ wbs_id: wbsId, week_start: w, planned_amount: null })),
-        );
+        anotar(weeks.map((w) => ({ wbs_id: wbsId, week_start: w, planned_amount: null })));
       return;
     }
     const val = evalMath(t) ?? Number(t.replace(/[^0-9.-]/g, ""));
@@ -894,11 +985,11 @@ export function JobCostFull() {
     if (Math.abs(cur - val) < 0.005) return;
     if (weeks.length === 1) {
       const st = index.get(wbsId)?.get(weeks[0])?.state_id ?? firstState();
-      upsertCell.mutate({ wbs_id: wbsId, week_start: weeks[0], planned_amount: val, state_id: st });
+      anotar([{ wbs_id: wbsId, week_start: weeks[0], planned_amount: val, state_id: st }]);
       return;
     }
     const per = Math.round((val / weeks.length) * 100) / 100;
-    upsertCells.mutate(
+    anotar(
       weeks.map((w, i) => ({
         wbs_id: wbsId,
         week_start: w,
@@ -945,7 +1036,7 @@ export function JobCostFull() {
         cells.push({ wbs_id: rId, week_start: wk, planned_amount: v });
       }),
     );
-    if (cells.length) upsertCells.mutate(cells);
+    if (cells.length) anotar(cells);
   };
 
   if (financials.isLoading || weeks.isLoading)
@@ -1135,6 +1226,34 @@ export function JobCostFull() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">
+          {/* Guardar: aparece SOLO cuando hay algo que guardar. Un boton que
+              esta siempre encendido no dice nada; este, cuando se ve, es
+              porque hay trabajo sin grabar. */}
+          {pend.size > 0 ? (
+            <div className="flex items-center gap-2 rounded-md border-2 border-amber-500 bg-amber-50 px-2 py-1">
+              <span className="text-xs font-semibold text-amber-900">
+                {pend.size} {pend.size === 1 ? "cambio sin guardar" : "cambios sin guardar"}
+              </span>
+              <button
+                type="button"
+                onClick={() => void guardar()}
+                disabled={upsertCells.isPending}
+                className="rounded bg-amber-600 px-3 py-1 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+                title="Manda al servidor todo lo que escribiste, en un solo lote"
+              >
+                {upsertCells.isPending ? "Guardando…" : "💾 Guardar"}
+              </button>
+              <button
+                type="button"
+                onClick={descartar}
+                disabled={upsertCells.isPending}
+                className="rounded border border-amber-600 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                title="Deja la pantalla como estaba antes de tus cambios"
+              >
+                Descartar
+              </button>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -1273,7 +1392,7 @@ export function JobCostFull() {
         <span className="ml-2 text-xs text-slate-400">
           {allLines.length} lines · {weekList.length} weeks
           {canSched
-            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period"
+            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period · lo que escribís queda en ámbar hasta que apretás 💾 Guardar"
             : ""}
         </span>
         {/* Fecha de corte del Forecast: el timeline desde acá cuenta como futuro */}
@@ -1768,11 +1887,18 @@ export function JobCostFull() {
                       dragSrc.wbsId === r.id &&
                       dragSrc.key !== c.key &&
                       !paint.paintOn;
+                    // Sin guardar: cualquiera de las semanas de esta columna
+                    // esta en el buffer. Se marca en ambar para que se vea
+                    // DONDE quedo el trabajo, no solo cuantos cambios hay.
+                    const sinGuardar = c.weeks.some((w) => pend.has(clave(r.id, w)));
                     return (
                       <td
                         key={c.key}
                         data-print="hide"
-                        className={`p-0 text-center${cutBorder(i)}`}
+                        title={sinGuardar ? "Sin guardar — apretá Guardar" : undefined}
+                        className={`p-0 text-center${cutBorder(i)}${
+                          sinGuardar ? " bg-amber-100 ring-2 ring-inset ring-amber-500" : ""
+                        }`}
                         onDragOver={(e) => {
                           if (isDropTarget) {
                             e.preventDefault();
