@@ -102,11 +102,28 @@ def upsert_statement(
 
 def insert_tx(db: Session, account_id: int, statement_id: int, batch: str, m: Any) -> int:
     """Inserta un movimiento; idempotente por la UNIQUE de bank_tx. rowcount=1 si es nuevo."""
+    # ⚠️ La UNIQUE incluye txn_no y la descripción, y eso no alcanza. El
+    # 2026-11-07, al resubir el estado completo de LAFISE, entraron 176 copias
+    # de movimientos que YA estaban: las viejas traían un txn_no inventado por
+    # un ETL anterior ("XLS-Bank Statement LAFISE-12") y la nueva el número de
+    # confirmación de verdad ("94637733"), así que para la UNIQUE eran dos
+    # movimientos distintos. La cadena de saldos quedó 92,750.02 abajo.
+    #
+    # Cuando el banco reporta el SALDO de la fila, ese saldo identifica al
+    # movimiento: dos movimientos reales no pueden dejar el mismo saldo. Por
+    # eso se mira primero por (cuenta, fecha, débito, crédito, saldo), sin
+    # importar cómo venga escrito el número ni el texto. Si no hay saldo
+    # —los PDF viejos no siempre lo traen— no se aplica, y manda la UNIQUE.
     res = db.execute(
         text(
             "INSERT INTO bank_tx (account_id, tx_date, txn_no, description, debit, credit, balance, "
             "statement_id, import_batch) "
-            "VALUES (:a,:d,:n,:desc,:deb,:cr,:bal,:sid,:b) "
+            "SELECT :a,:d,:n,:desc,:deb,:cr,:bal,:sid,:b "
+            "WHERE :bal IS NULL OR NOT EXISTS ("
+            "  SELECT 1 FROM bank_tx x "
+            "   WHERE x.account_id = :a AND x.tx_date = :d AND x.balance = :bal "
+            "     AND x.debit  IS NOT DISTINCT FROM :deb "
+            "     AND x.credit IS NOT DISTINCT FROM :cr) "
             "ON CONFLICT (account_id, tx_date, txn_no, description, debit, credit) DO NOTHING"
         ),
         {
