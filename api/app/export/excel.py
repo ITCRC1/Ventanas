@@ -16,9 +16,9 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 from collections import defaultdict
+from collections.abc import Iterable
 from io import BytesIO
 from typing import Any
-from collections.abc import Iterable
 
 from openpyxl import Workbook
 from openpyxl.formatting.rule import CellIsRule
@@ -80,7 +80,7 @@ def _suma(refs: Iterable[str]) -> str:
 
     Excel admite 255 argumentos por `SUM`; con mas, se parte en varias.
     """
-    partes = [x for x in refs]
+    partes = list(refs)
     if not partes:
         return "=0"
     trozos = [partes[i:i + 200] for i in range(0, len(partes), 200)]
@@ -350,10 +350,11 @@ class ExcelExporter:
         ).scalar()
         _a = gc(min(self.week_col.values()))
         _b = gc(self.total_col - 1)
+        _c = self.cutoff
         self._futuro_f = (
-            '=SUMIF($%s$2:$%s$2,">="&DATE(%d,%d,%d),%s{r}:%s{r})'
-            % (_a, _b, self.cutoff.year, self.cutoff.month, self.cutoff.day, _a, _b)
-            if self.cutoff
+            f'=SUMIF(${_a}$2:${_b}$2,">="&DATE({_c.year},{_c.month},{_c.day}),'
+            f"{_a}{{r}}:{_b}{{r}})"
+            if _c
             else "=0"
         )
 
@@ -1035,9 +1036,10 @@ class ExcelExporter:
                     # Cost, que es la única fuente del cronograma.
                     jcr = self.week_col.get(w)
                     if jcr:
+                        _w = gc(jcr)
                         cell.value = (
-                            "=SUMIF('Job Cost Report'!$B:$B,$D%d,"
-                            "'Job Cost Report'!%s:%s)" % (row, gc(jcr), gc(jcr))
+                            f"=SUMIF('Job Cost Report'!$B:$B,$D{row},"
+                            f"'Job Cost Report'!{_w}:{_w})"
                         )
                     else:
                         cell.value = round(v, 2)
@@ -1063,9 +1065,10 @@ class ExcelExporter:
                     # los códigos que la venta agrupa.
                     jcr = self.week_col.get(w)
                     if jcr:
+                        _w = gc(jcr)
                         ws.cell(row, wc, _suma(
-                            "SUMIF('Job Cost Report'!$B:$B,\"%s\","
-                            "'Job Cost Report'!%s:%s)" % (cd, gc(jcr), gc(jcr))
+                            f"SUMIF('Job Cost Report'!$B:$B,\"{cd}\","
+                            f"'Job Cost Report'!{_w}:{_w})"
                             for cd in codes
                         )).number_format = WK
                     else:
