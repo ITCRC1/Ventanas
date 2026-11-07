@@ -180,9 +180,18 @@ def short_payments(db: Session) -> list[dict[str, Any]]:
 
 
 def breakdown(db: Session, disb_no: int, disb_sub: int) -> list[dict[str, object]]:
+    # ⚠️ `vendor` no está en v_breakdown_pdf y se trae con un join a la línea.
+    # Se podría agregar a la vista, pero eso es DDL contra producción para un
+    # dato que ya está a un join de distancia: no vale el riesgo.
     rows = db.execute(
         text(
-            "SELECT * FROM v_breakdown_pdf WHERE disb_no = :n AND disb_sub = :s ORDER BY line_no"
+            "SELECT v.*, dl.vendor "
+            "FROM v_breakdown_pdf v "
+            "JOIN disbursement d "
+            "  ON d.disb_no = v.disb_no AND d.disb_sub = v.disb_sub "
+            "LEFT JOIN disbursement_line dl "
+            "  ON dl.disbursement_id = d.id AND dl.line_no = v.line_no "
+            "WHERE v.disb_no = :n AND v.disb_sub = :s ORDER BY v.line_no"
         ),
         {"n": disb_no, "s": disb_sub},
     ).mappings().all()

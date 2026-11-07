@@ -83,6 +83,9 @@ table.bd th, table.bd td {
 table.bd th { background: #fff; color: #000; font-weight: bold; text-align: center; }
 th.first { color: #c00000; text-align: left; }
 td.desc { text-align: left; }
+/* Vendor: izquierda y en negrita. Es la primera columna y es lo que se
+   busca de un vistazo al repasar la tanda. */
+td.vendor { text-align: left; font-weight: bold; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.mid { text-align: center; vertical-align: middle; }
 td.grand { text-align: right; vertical-align: middle; font-weight: bold; font-size: 9px; white-space: nowrap; }
@@ -131,17 +134,22 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
     # Cabecera: primera celda roja "To be sent …", resto centradas.
     # Sin columna "Reason" (iba vacía). Anchos con holgura (suman 98%); TOTAL más
     # ancho para que el monto se lea completo y en una línea.
+    # Vendor va PRIMERO, a pedido (2026-11-07): es a quien se le paga, y en el
+    # PDF no aparecia por ningun lado — habia que abrir la app para saberlo.
+    # No se confunde con Beneficiary: ese es el titular de la cuenta que recibe
+    # la transferencia (siempre el holding cuando es SEND), no el proveedor.
     heads = [
-        f'<th class="first" style="width:19%">{escape(_sent_when(disb))}</th>',
+        '<th class="first" style="width:14%">Vendor</th>',
+        f'<th style="width:17%">{escape(_sent_when(disb))}</th>',
         '<th style="width:7%">Amount</th>',
         '<th style="width:7%">Category</th>',
-        '<th style="width:10%">Type</th>',
-        '<th style="width:11%">Name</th>',
-        '<th style="width:6%">Transfer</th>',
-        '<th style="width:7%">Bank Name</th>',
-        '<th style="width:8%">Beneficiary</th>',
-        '<th style="width:9%">Account</th>',
-        '<th style="width:11%">TOTAL</th>',
+        '<th style="width:9%">Type</th>',
+        '<th style="width:10%">Name</th>',
+        '<th style="width:5%">Transfer</th>',
+        '<th style="width:6%">Bank Name</th>',
+        '<th style="width:7%">Beneficiary</th>',
+        '<th style="width:8%">Account</th>',
+        '<th style="width:10%">TOTAL</th>',
     ]
     head = "".join(heads)
 
@@ -153,6 +161,7 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
         # donde salía el Type en las tandas viejas.
         tipo = r.get("type") or r.get("payee_name") or ""
         left = (
+            f'<td class="vendor">{escape(r.get("vendor") or "")}</td>'
             f'<td class="desc">{escape(r["description"] or "")}</td>'
             f'<td class="num">{amt}</td>'
             f'<td>{escape(r["reason"] or "")}</td>'
@@ -173,14 +182,15 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
         body += f"<tr>{left}{mid}</tr>"
 
     credit = Decimal(str(disb.credit_applied or 0))
+    # 11 columnas: etiqueta (2) + monto (1) + 8 vacias.
     footer = (
-        f'<tr class="credit"><td class="desc">Credit applied</td>'
+        f'<tr class="credit"><td class="desc" colspan="2">Credit applied</td>'
         f'<td class="num">({_usd(credit)})</td><td colspan="8"></td></tr>'
         if credit
         else ""
     )
     footer += (
-        f'<tr class="total"><td class="desc">Total</td>'
+        f'<tr class="total"><td class="desc" colspan="2">Total</td>'
         f'<td class="num">{_usd(total)}</td><td colspan="8"></td></tr>'
     )
     return f'<table class="bd"><thead><tr>{head}</tr></thead><tbody>{body}{footer}</tbody></table>'
@@ -230,6 +240,7 @@ table.bd th, table.bd td { border: 0.7px solid #7a7a7a; padding: 1px 3px; font-s
 table.bd th { background: #fff; color: #000; font-weight: bold; text-align: center; }
 table.bd th.first { color: #c00000; text-align: left; }
 table.bd td.desc { text-align: left; }
+table.bd td.vendor { text-align: left; font-weight: bold; }
 table.bd td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 table.bd td.mid { text-align: center; vertical-align: middle; }
 table.bd td.grand { text-align: right; vertical-align: middle; font-weight: bold; font-size: 9px;
