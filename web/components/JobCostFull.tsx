@@ -629,6 +629,17 @@ export function JobCostFull() {
   const cutoff = useCutoff();
   const setCutoff = useSetCutoff();
   const scroller = useRef<HTMLDivElement>(null);
+  // ⚠️ Ademas del ref, el nodo en estado. Los efectos de abajo -la rueda y el
+  // observador de visibilidad- se enganchan AL NODO, y con `[]` corrian una
+  // sola vez al montar: en ese momento el componente todavia devuelve
+  // "Loading Job Cost…" y la grilla no existe, asi que scroller.current era
+  // null y se enganchaban a nada. Nunca volvian a correr. Con el nodo en
+  // estado, los efectos se rehacen cuando la grilla aparece de verdad.
+  const [nodoGrilla, setNodoGrilla] = useState<HTMLDivElement | null>(null);
+  const fijarGrilla = useCallback((el: HTMLDivElement | null) => {
+    scroller.current = el;
+    setNodoGrilla(el);
+  }, []);
 
   const [view, setView] = useState<View>("month");
   // Años seleccionados (multi-selección: se pueden ver 2+ años juntos, útil para
@@ -951,7 +962,7 @@ export function JobCostFull() {
   // Shift + rueda: el navegador no lo hace solo cuando el contenedor tambien
   // desplaza en vertical, asi que se traduce a mano.
   useEffect(() => {
-    const sc = scroller.current;
+    const sc = nodoGrilla;
     if (!sc) return;
     const rueda = (e: WheelEvent) => {
       if (!e.shiftKey) return;
@@ -962,7 +973,7 @@ export function JobCostFull() {
     };
     sc.addEventListener("wheel", rueda, { passive: false });
     return () => sc.removeEventListener("wheel", rueda);
-  }, []);
+  }, [nodoGrilla]);
 
   // Alt + flechas. Con Alt y no a secas porque las flechas solas ya mueven la
   // celda seleccionada al editar, y pisarlas romperia el tecleo.
@@ -981,14 +992,14 @@ export function JobCostFull() {
   // uno esta leyendo otra cosa, no tienen nada que mover.
   const [grillaALaVista, setGrillaALaVista] = useState(false);
   useEffect(() => {
-    const sc = scroller.current;
+    const sc = nodoGrilla;
     if (!sc) return;
     const obs = new IntersectionObserver(([x]) => setGrillaALaVista(x.isIntersecting), {
       threshold: 0,
     });
     obs.observe(sc);
     return () => obs.disconnect();
-  }, []);
+  }, [nodoGrilla]);
 
   // ── Guardar lo pendiente ────────────────────────────────────────────────
   const guardar = async () => {
@@ -1611,7 +1622,7 @@ export function JobCostFull() {
       ) : null}
 
       <div
-        ref={scroller}
+        ref={fijarGrilla}
         className="max-h-[72vh] overflow-auto rounded-lg border border-slate-200 bg-white"
       >
         <table className="border-collapse text-[11px]">
