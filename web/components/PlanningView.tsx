@@ -1,5 +1,7 @@
 "use client";
 
+import { api } from "@/lib/api";
+
 import { moneyUsd, num } from "@/lib/format";
 import {
   type PackageSubmission,
@@ -292,13 +294,34 @@ export function PlanningDoc({
               · {rows.length} project #s — prepare the Short Payment from here
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="rounded border border-teal-600 bg-teal-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-teal-700 print:hidden"
-          >
-            🖨 Print / PDF
-          </button>
+          <div className="flex items-center gap-2 print:hidden">
+            {/* El Excel sale con los MISMOS filtros que hay en pantalla: la
+                ventana de meses, los dos interruptores y el buscador. Si no
+                viajaran, el archivo contaría otra historia que la pantalla
+                desde donde se bajó y no se sabría cuál mirar. */}
+            <button
+              type="button"
+              onClick={() =>
+                void api.abrir(
+                  `/planning/export.xlsx?period_from=${start}&months=${months}` +
+                    `&only_budget=${onlyBudget}&only_planned=${onlyPlanned}` +
+                    `&q=${encodeURIComponent(filter.trim())}`,
+                  true,
+                )
+              }
+              className="rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+              title="La tabla tal como se ve, en Excel, con los totales por fórmula"
+            >
+              ⬇ Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded border border-teal-600 bg-teal-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-teal-700"
+            >
+              🖨 Print / PDF
+            </button>
+          </div>
         </div>
 
         {/* Controles */}

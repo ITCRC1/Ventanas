@@ -39,7 +39,10 @@ SUBTOTAL = "FFDCE6F4"
 GRIS = "FF787B86"
 BLANCO = Font(bold=True, color="FFFFFFFF", size=9)
 
-MONEDA = '"$"#,##0;[Red]-"$"#,##0'
+# La tercera seccion del formato es la del CERO: la pantalla muestra una raya
+# donde no hay monto, y el Excel hacia lo mismo con un 0 que ensuciaba la
+# lectura. El valor sigue siendo 0 y suma igual; solo cambia como se ve.
+MONEDA = '"$"#,##0;[Red]-"$"#,##0;"—"'
 FINO = Side(style="thin", color="FFD0D5DD")
 MEDIO = Side(style="medium", color="FF9AA4B2")
 
