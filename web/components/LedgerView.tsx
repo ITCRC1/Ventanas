@@ -502,6 +502,12 @@ export function LedgerView() {
   const importDisb = useImportDisbursement();
   const deploy = useDeployToJobCost();
   const [disbNo, setDisbNo] = useState("");
+  // ⚠️ La caja pide el NUMERO de la tanda, pero en todas las pantallas la tanda
+  // se llama "#28.1". El 2026-11-08 se escribio 28.1 -lo que decia el
+  // encabezado- y la API contesto 422 "no paso la validacion", que no explica
+  // nada. Se acepta tal cual y se usa la parte entera: el import trae TODAS las
+  // sub-tandas de ese numero, asi que 28 y 28.1 piden lo mismo.
+  const numeroTanda = (t: string): number => Number.parseInt(t.trim().split(".")[0], 10);
   // Filtro rápido por N° de proyecto (Cost Code) — también matchea cuenta/proveedor.
   const [filter, setFilter] = useState("");
   // Lo más reciente primero (por defecto): abrir el Ledger en el mes en curso.
@@ -571,17 +577,19 @@ export function LedgerView() {
           </label>
           <input
             id="disb-no"
-            type="number"
+            type="text"
+            inputMode="decimal"
             placeholder="e.g. 12"
+            title="El número de la tanda. Si el mes tiene varias (#28.0 y #28.1), con poner 28 entran todas."
             className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
             value={disbNo}
             onChange={(e) => setDisbNo(e.target.value)}
           />
           <button
             type="button"
-            disabled={!disbNo || importDisb.isPending}
+            disabled={!Number.isFinite(numeroTanda(disbNo)) || importDisb.isPending}
             onClick={async () => {
-              const res = await importDisb.mutateAsync(Number(disbNo));
+              const res = await importDisb.mutateAsync(numeroTanda(disbNo));
               setEdits({});
               const parts = [
                 `${res.imported} new line${res.imported === 1 ? "" : "s"}`,
@@ -600,10 +608,10 @@ export function LedgerView() {
           </button>
           <button
             type="button"
-            disabled={!disbNo || deploy.isPending}
+            disabled={!Number.isFinite(numeroTanda(disbNo)) || deploy.isPending}
             title="Places each WBS in the 3rd week of the month in the Job Cost. Warns if the month already has amounts."
             onClick={async () => {
-              const res = await deploy.mutateAsync(Number(disbNo));
+              const res = await deploy.mutateAsync(numeroTanda(disbNo));
               if (res.conflicts.length > 0) {
                 const lines = res.conflicts
                   .map(
