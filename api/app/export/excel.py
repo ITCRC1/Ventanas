@@ -1754,12 +1754,18 @@ class ExcelExporter:
 
         DATEF = "yyyy-mm-dd"  # formato de fecha local a esta hoja
         headers = [
-            "Date", "No.", "Description", "Debit", "Credit", "Account", "Type", "Balance",
+            "Date", "No.", "Description", "Debit", "Credit", "Account", "Type",
+            # ⚠️ Dos definiciones distintas de "saldo". La H la calculamos
+            # nosotros encadenando movimiento a movimiento; la I es la que
+            # reporta el banco —y es la que la app llama "Balance". Con el
+            # mismo rotulo se leen una por la otra: en LAFISE difieren
+            # $92,750.02 al cierre.
+            "Balance (chained)",
             # ⚠️ B2 del audit: las dos columnas que faltaban. El saldo de la H
             # se encadena desde los debitos y creditos; el banco reporta el
             # suyo en cada movimiento. Mientras no se comparen, un faltante en
             # el detalle no se ve: la cadena sigue cuadrando consigo misma.
-            "Bank reported", "Difference",
+            "Balance (bank)", "Difference",
         ]
         COL_BANCO, COL_DIF = 9, 10
 
@@ -1839,10 +1845,33 @@ class ExcelExporter:
                 ws.cell(r, 7, e["class_label"])
                 # saldo = saldo anterior + crédito(E) − débito(D)  → fórmula viva
                 ws.cell(r, 8, f"={prev_saldo}+E{r}-D{r}").number_format = MONEY
+                # ⚠️ El saldo que el banco reporta en ESTA fila, y la diferencia
+                # contra el nuestro. Antes solo se escribia el del ultimo
+                # movimiento, asi que el descuadre aparecia agregado al pie y no
+                # habia manera de saber en que movimiento empezo. En LAFISE son
+                # $92,750.02 que arrancan en la fila 296 —el primer duplicado—
+                # y nadie podia verlo.
+                if e["balance"] is not None:
+                    bc = ws.cell(r, COL_BANCO, round(float(e["balance"]), 2))
+                    bc.number_format = MONEY
+                    ws.cell(
+                        r, COL_DIF, f"=ROUND({gc(COL_BANCO)}{r}-H{r},2)"
+                    ).number_format = MONEY
                 prev_saldo = f"H{r}"
                 r += 1
 
             last_data_row = r - 1
+            # Rojo en cada fila que no cuadre. Excel lee la celda vacia como 0,
+            # asi que las filas sin saldo del banco no se pintan.
+            ws.conditional_formatting.add(
+                f"{gc(COL_DIF)}{opening_row + 1}:{gc(COL_DIF)}{last_data_row}",
+                CellIsRule(
+                    operator="notEqual",
+                    formula=["0"],
+                    fill=PatternFill("solid", fgColor="FFF4CCCC"),
+                    font=Font(color="FF9C0006"),
+                ),
+            )
             # --- Saldo final = último saldo corrido (fórmula viva) ---
             for i in range(1, len(headers) + 1):
                 ws.cell(r, i).fill = TOTAL
@@ -1853,6 +1882,12 @@ class ExcelExporter:
             # El saldo que reporta el BANCO en el ultimo movimiento. Es dato
             # del estado de cuenta, no un calculo nuestro: por eso va pegado.
             saldo_banco = rows[-1]["balance"]
+            if saldo_banco is None:
+                # Una celda vacia y una diferencia de cero se leen igual, y no
+                # son lo mismo: esta cuenta no trae saldo del banco en ninguna
+                # fila, asi que no hay con que contrastarla. Hay que decirlo.
+                nc = ws.cell(r, COL_BANCO, "sin saldo reportado por el banco")
+                nc.font = Font(italic=True, color="FF808080", size=9)
             if saldo_banco is not None:
                 bc = ws.cell(r, COL_BANCO, round(float(saldo_banco), 2))
                 bc.number_format = MONEY
@@ -1963,6 +1998,7 @@ class ExcelExporter:
         r = hr + 1
         prev_saldo: str | None = None       # ref a la celda Saldo de la fila anterior
         all_data_rows: list[int] = []       # todas las filas de datos (para TOTAL)
+        fila_de: dict[int, int] = {}        # id del wire -> en que fila quedo
 
         for key, label, note in BLOCKS:
             # banda de bloque (nombre + nota)
@@ -1993,11 +2029,9 @@ class ExcelExporter:
                 rc = ws.cell(r, 8, float(e["amount_received"] or 0))
                 rc.number_format = MONEY
                 rc.font = GREEN
-                # Saldo LAFISE corrido = saldo anterior + recibido (FÓRMULA VIVA)
-                formula = f"=H{r}" if prev_saldo is None else f"={prev_saldo}+H{r}"
-                sal = ws.cell(r, 9, formula)
-                sal.number_format = MONEY
-                prev_saldo = f"I{r}"
+                # El saldo se encadena despues, en el orden global: aca solo se
+                # anota en que fila quedo este wire.
+                fila_de[e["id"]] = r
                 ws.cell(r, 10, e["notas"])
                 block_rows.append(r)
                 all_data_rows.append(r)
@@ -2017,6 +2051,23 @@ class ExcelExporter:
             sub.number_format = MONEY
             sub.font = BOLD
             r += 1
+
+        # ⚠️ El saldo corre en el MISMO orden que la app —`sort_order` global—,
+        # no por bloque. No es lo mismo: al dar de alta un wire,
+        # `create_us_wire` le pone sort_order = max + 1, asi que una fila nueva
+        # de Ventanas I queda ULTIMA en el orden y PRIMERA en el dibujo.
+        # Encadenando por bloque, el Excel le daria un saldo que la app no le
+        # da, y toda la cadena quedaria corrida. El TOTAL no cambia (sumar no
+        # depende del orden), que es lo que lo hacia invisible.
+        for e in rows:
+            fr = fila_de.get(e["id"])
+            if fr is None:
+                continue
+            sal = ws.cell(
+                fr, 9, f"=H{fr}" if prev_saldo is None else f"={prev_saldo}+H{fr}"
+            )
+            sal.number_format = MONEY
+            prev_saldo = f"I{fr}"
 
         # --- fila TOTAL TRANSFER (enviado / recibido / saldo final) ---
         total_row = r
@@ -2065,9 +2116,21 @@ class ExcelExporter:
         # ⚠️ C8 del audit: ese numero es un campo que alguien mantiene a mano en
         # `settings`. Debajo va el saldo que el estado de cuenta de LAFISE
         # reporta en la hoja Banks, por formula, y la diferencia entre los dos.
-        # Hoy coinciden al centavo; el dia que dejen de coincidir se ve aqui en
-        # vez de descubrirse meses despues.
-        fila_cierre = getattr(self, "cierre_banco", {}).get("Ventanas LAFISE (operativa)")
+        # El control YA ESTA MARCANDO: al 2026-11-08 `settings.lafise_balance`
+        # dice 49,673.41 y el estado de cuenta 48,209.76 —1,463.65 de brecha—.
+        # Se deja anotado para que el comentario no desmienta al archivo.
+        # ⚠️ El nombre exacto no alcanza: el resto del sistema ubica esta cuenta
+        # con ILIKE '%LAFISE%operativa%' (bank_recon.resolve_account), asi que
+        # puede llamarse distinto sin dejar de ser la misma. Buscandola por
+        # literal, un renombre apaga este control sin que nada avise.
+        fila_cierre = next(
+            (
+                fila
+                for nombre, fila in getattr(self, "cierre_banco", {}).items()
+                if "lafise" in nombre.lower() and "operativa" in nombre.lower()
+            ),
+            None,
+        )
         if fila_cierre:
             r += 1
             e = ws.cell(r, 8, "Per Banks sheet")
