@@ -62,6 +62,26 @@ async function crudo<T>(path: string, init?: RequestInit): Promise<T> {
 // POST crea dos. Ese se reporta como fallo pero sin reintento automático.
 const REPETIBLE = new Set(["PATCH", "PUT", "DELETE"]);
 
+/** ¿Tiene sentido volver a mandar esto?
+ *
+ * ⚠️ Antes se encolaba CUALQUIER fallo de PATCH/PUT/DELETE. El 2026-11-08 el
+ * usuario escribió 28 en el número de la tanda de noviembre; el 28 ya existía,
+ * la API contestó 409 — correctamente — y ese 409 se quedó en la cola para
+ * siempre: «Reintentar» lo volvía a mandar, volvía a dar 409, y la barra se
+ * quedaba en «Sin guardar» sin manera de salir. La pantalla ya había revertido
+ * el número y avisado; la barra insistía con un trabajo que nunca iba a
+ * terminar.
+ *
+ * Un 4xx no es un tropiezo: el servidor entendió y dijo que no. Repetirlo da
+ * lo mismo. Se reintenta lo que puede andar la próxima vez — un corte de red
+ * (sin status), un 5xx, un timeout o un «vuelva más tarde».
+ */
+function vale_la_pena_reintentar(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return true; // red caída, DNS, CORS…
+  const s = e.problem.status;
+  return s >= 500 || s === 408 || s === 429;
+}
+
 async function escribir<T>(metodo: string, path: string, init: RequestInit): Promise<T> {
   empezoAGuardar();
   try {
@@ -69,7 +89,8 @@ async function escribir<T>(metodo: string, path: string, init: RequestInit): Pro
     terminoBien();
     return r;
   } catch (e) {
-    const repetir = REPETIBLE.has(metodo) ? () => crudo<T>(path, init) : null;
+    const repetir =
+      REPETIBLE.has(metodo) && vale_la_pena_reintentar(e) ? () => crudo<T>(path, init) : null;
     terminoMal(`${metodo} ${path}`, repetir);
     throw e;
   }

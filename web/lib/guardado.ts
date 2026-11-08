@@ -70,6 +70,12 @@ export function terminoMal(etiqueta: string, reintentar: (() => Promise<unknown>
   emitir({ enVuelo, fallos, estado: "error" });
 }
 
+/** Baja la bandera roja. Lo que la API rechazó de plano no se puede reintentar
+ *  y la pantalla ya avisó: sin esto, el aviso se queda puesto para siempre. */
+export function limpiarError(): void {
+  emitir({ fallos: [], estado: estado.enVuelo ? "guardando" : "guardado" });
+}
+
 export function olvidarFallo(id: number): void {
   const fallos = estado.fallos.filter((f) => f.id !== id);
   emitir({ fallos, estado: fallos.length ? "error" : estado.enVuelo ? "guardando" : "guardado" });

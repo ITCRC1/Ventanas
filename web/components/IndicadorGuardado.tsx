@@ -12,7 +12,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import { leer, reintentarTodo, suscribir } from "@/lib/guardado";
+import { leer, limpiarError, reintentarTodo, suscribir } from "@/lib/guardado";
 
 const vacio = { estado: "limpio" as const, ultimo: null, fallos: [], enVuelo: 0 };
 
@@ -33,7 +33,9 @@ export function IndicadorGuardado() {
           className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700"
           title={s.fallos.map((f) => f.etiqueta).join("\n")}
         >
-          ● Sin guardar{n ? ` (${n})` : ""}
+          {/* Sin cola no hay nada pendiente: la API lo rechazó y la pantalla
+              ya revirtió. Decir «sin guardar» ahí asusta de gratis. */}
+          ● {n ? `Sin guardar (${n})` : "Rechazado"}
         </span>
         {n > 0 && (
           <button
@@ -44,6 +46,14 @@ export function IndicadorGuardado() {
             Reintentar
           </button>
         )}
+        <button
+          type="button"
+          onClick={limpiarError}
+          title="Quitar el aviso"
+          className="rounded px-1.5 py-0.5 text-xs font-bold text-red-700 hover:bg-red-100"
+        >
+          ✕
+        </button>
       </div>
     );
   }
