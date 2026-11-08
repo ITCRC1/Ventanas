@@ -8,6 +8,8 @@ export interface User {
   role: string;
   role_id: number;
   permissions: string[];
+  // Entro con una clave temporal: hay que cambiarla antes de seguir.
+  must_change?: boolean;
 }
 
 export interface AuthConfig {

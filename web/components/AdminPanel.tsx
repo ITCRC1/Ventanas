@@ -28,6 +28,10 @@ interface AdminUser {
   role: string;
   is_active: boolean;
   has_password: boolean;
+  last_login: string | null;
+  invite_pending: boolean;
+  invite_token?: string | null;
+  invite_days?: number | null;
 }
 
 // --- componente --------------------------------------------------------------
@@ -253,14 +257,20 @@ function Users() {
     queryKey: ["admin-roles"],
     queryFn: () => api.get<Role[]>("/admin/roles"),
   });
-  const [nf, setNf] = useState({ full_name: "", email: "", role_id: 0, password: "" });
+  const [nf, setNf] = useState({ full_name: "", email: "", role_id: 0 });
+  // El link recien emitido. Se muestra UNA vez: si se pierde, se emite otro.
+  const [link, setLink] = useState<{ nombre: string; url: string; dias: number } | null>(null);
+  const urlDe = (t: string) =>
+    `${typeof window === "undefined" ? "" : window.location.origin}/invite?t=${t}`;
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
 
   const createUser = useMutation({
-    mutationFn: (v: typeof nf) => api.post("/admin/users", v),
-    onSuccess: () => {
-      setNf({ full_name: "", email: "", role_id: 0, password: "" });
+    mutationFn: (v: typeof nf) => api.post<AdminUser>("/admin/users", v),
+    onSuccess: (u) => {
+      if (u.invite_token)
+        setLink({ nombre: u.full_name, url: urlDe(u.invite_token), dias: u.invite_days ?? 7 });
+      setNf({ full_name: "", email: "", role_id: 0 });
       invalidate();
     },
   });
@@ -269,16 +279,57 @@ function Users() {
       api.patch(`/admin/users/${v.id}`, v.body),
     onSuccess: invalidate,
   });
-  const setPw = useMutation({
-    mutationFn: (v: { id: number; password: string }) =>
-      api.post(`/admin/users/${v.id}/password`, { password: v.password }),
-    onSuccess: () => alert("Password updated."),
+  // ⚠️ Reemplaza al viejo "reset password", donde el administrador tecleaba
+  // una clave y se la mandaba por fuera. Ahora emite un link y la persona pone
+  // la suya: el admin no la ve ni la elige.
+  const reinvitar = useMutation({
+    mutationFn: (v: { id: number; nombre: string }) =>
+      api.post<{ invite_token: string; invite_days: number }>(`/admin/users/${v.id}/invite`, {}),
+    onSuccess: (r, v) =>
+      setLink({ nombre: v.nombre, url: urlDe(r.invite_token), dias: r.invite_days }),
+    onSettled: invalidate,
   });
 
   const roleOpts = roles.data ?? [];
 
   return (
     <div className="space-y-4">
+      {/* ⚠️ El link se ve UNA sola vez. No se guarda en ningun lado en claro:
+          en la base vive hasheado, asi que no hay de donde recuperarlo. */}
+      {link ? (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+          <p className="text-sm font-semibold text-emerald-900">
+            Invite link for {link.nombre}
+          </p>
+          <p className="mb-2 text-xs text-emerald-800">
+            Send this link to the person: they open it and create their own password. It works
+            once and expires in {link.dias} days. You won&apos;t see it again.
+          </p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={link.url}
+              onFocus={(e) => e.currentTarget.select()}
+              className="flex-1 rounded border border-emerald-300 bg-white px-2 py-1 font-mono text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard?.writeText(link.url)}
+              className="rounded bg-emerald-700 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-800"
+            >
+              Copy
+            </button>
+            <button
+              type="button"
+              onClick={() => setLink(null)}
+              className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-800"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* alta */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <h3 className="mb-2 text-sm font-semibold">Add user</h3>
@@ -308,9 +359,9 @@ function Users() {
             ))}
           </select>
           <input
-            value={nf.password}
-            onChange={(e) => setNf({ ...nf, password: e.target.value })}
-            placeholder="Temp password"
+            hidden
+            readOnly
+            value=""
             className="rounded border border-slate-300 px-2 py-1 text-sm"
           />
         </div>
@@ -319,10 +370,7 @@ function Users() {
             onClick={() => createUser.mutate(nf)}
             disabled={
               createUser.isPending ||
-              !nf.full_name ||
-              !nf.email ||
-              !nf.role_id ||
-              nf.password.length < 6
+              !nf.full_name || !nf.email || !nf.role_id
             }
             className="rounded bg-[#2d3a5c] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
@@ -332,7 +380,8 @@ function Users() {
             <span className="text-xs text-red-600">{createUser.error.problem.title}</span>
           )}
           <span className="text-xs text-slate-400">
-            Password: min 6 characters. The user signs in with email + password.
+            No password here: creating the user produces a one-time invite link.
+            Send it to the person &mdash; they open it and choose their own password.
           </span>
         </div>
       </div>
@@ -346,7 +395,8 @@ function Users() {
               <th className="px-3 py-2 text-left">Email</th>
               <th className="px-3 py-2 text-left">Profile</th>
               <th className="px-3 py-2 text-center">Active</th>
-              <th className="px-3 py-2 text-center">Password</th>
+              <th className="px-3 py-2 text-center">Access</th>
+              <th className="px-3 py-2 text-left">Last sign-in</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
@@ -380,22 +430,26 @@ function Users() {
                   />
                 </td>
                 <td className="px-3 py-1.5 text-center text-xs">
-                  {u.has_password ? (
-                    <span className="text-emerald-600">set</span>
+                  {u.invite_pending ? (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">
+                      invitation sent
+                    </span>
+                  ) : u.has_password ? (
+                    <span className="text-emerald-600">active</span>
                   ) : (
-                    <span className="text-amber-600">none</span>
+                    <span className="text-red-600">no access</span>
                   )}
+                </td>
+                <td className="px-3 py-1.5 text-xs text-slate-500">
+                  {u.last_login ? new Date(u.last_login).toLocaleString() : "never"}
                 </td>
                 <td className="px-3 py-1.5 text-right">
                   <button
-                    onClick={() => {
-                      const p = prompt(`New password for ${u.full_name} (min 6):`);
-                      if (p && p.length >= 6) setPw.mutate({ id: u.id, password: p });
-                      else if (p) alert("Too short.");
-                    }}
-                    className="text-xs text-indigo-600 hover:underline"
+                    onClick={() => reinvitar.mutate({ id: u.id, nombre: u.full_name })}
+                    disabled={reinvitar.isPending}
+                    className="text-xs text-indigo-600 hover:underline disabled:opacity-40"
                   >
-                    reset password
+                    invite link
                   </button>
                 </td>
               </tr>

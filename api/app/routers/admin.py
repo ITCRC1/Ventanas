@@ -14,10 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
 from app.core.problems import Problem
-from app.core.security import hash_password
-from app.deps import get_db
+from app.core.security import INVITE_DAYS, nueva_invitacion
+from app.deps import get_current_user, get_db
+from app.models.access import AppUser
 from app.schemas.admin import (
-    PasswordIn,
+    InviteOut,
     PermissionOut,
     RoleIn,
     RolePermsIn,
@@ -148,12 +149,42 @@ def delete_role(role_id: int, db: Session = Depends(get_db)) -> None:
 
 _USER_SQL = """
 SELECT u.id, u.username, u.full_name, u.email, u.role_id, r.name AS role, u.is_active,
-       (c.user_id IS NOT NULL) AS has_password
+       (c.user_id IS NOT NULL) AS has_password,
+       u.last_login,
+       -- Hay una invitacion viva sin usar: la persona todavia no entro.
+       EXISTS (SELECT 1 FROM user_invite i
+                WHERE i.user_id = u.id AND i.used_at IS NULL
+                  AND i.expires_at > now()) AS invite_pending
   FROM app_user u
   JOIN role r ON r.id = u.role_id
   LEFT JOIN user_credential c ON c.user_id = u.id
  ORDER BY u.full_name
 """
+
+
+def _crear_invitacion(db: Session, user_id: int, creado_por: int | None) -> str:
+    """Una invitacion nueva, y las anteriores de esa persona quedan muertas.
+
+    ⚠️ Se guarda el HASH del token. El token en claro se devuelve una sola vez,
+    en esta respuesta: si el administrador pierde el link, se emite otro, no se
+    recupera el viejo.
+    """
+    token, token_hash = nueva_invitacion()
+    # Invalidar las anteriores: dos links vivos para la misma persona son dos
+    # puertas abiertas, y basta con la ultima.
+    db.execute(
+        text("UPDATE user_invite SET used_at = now() "
+             "WHERE user_id = :u AND used_at IS NULL"),
+        {"u": user_id},
+    )
+    db.execute(
+        text(
+            "INSERT INTO user_invite (user_id, token_hash, expires_at, created_by) "
+            "VALUES (:u, :h, now() + make_interval(days => :d), :c)"
+        ),
+        {"u": user_id, "h": token_hash, "d": INVITE_DAYS, "c": creado_por},
+    )
+    return token
 
 
 @router.get("/users", response_model=list[UserOut])
@@ -172,7 +203,11 @@ def _username_from_email(db: Session, email: str) -> str:
 
 
 @router.post("/users", response_model=UserOut, status_code=201)
-def create_user(data: UserIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_user(
+    data: UserIn,
+    db: Session = Depends(get_db),
+    user: AppUser = Depends(get_current_user),
+) -> dict[str, Any]:
     email = data.email.strip().lower()
     if db.execute(text("SELECT 1 FROM app_user WHERE lower(email) = :e"), {"e": email}).scalar_one_or_none():
         raise Problem(status_code=409, title="Ya existe un usuario con ese correo")
@@ -186,13 +221,19 @@ def create_user(data: UserIn, db: Session = Depends(get_db)) -> dict[str, Any]:
         ),
         {"u": username, "f": data.full_name, "e": email, "r": data.role_id},
     ).scalar_one()
-    if data.password:
+    # ⚠️ No se graba ninguna clave. El administrador se lleva un link y la
+    # persona elige la suya. Antes el admin tecleaba una clave y se la mandaba
+    # por WhatsApp: viajaba en claro, quedaba en el historial del chat, y el
+    # admin la conocia para siempre.
+    token = _crear_invitacion(db, uid, user.id)
+    fila = dict(
         db.execute(
-            text("INSERT INTO user_credential (user_id, password_hash) VALUES (:i, :h) "
-                 "ON CONFLICT (user_id) DO UPDATE SET password_hash = :h, updated_at = now()"),
-            {"i": uid, "h": hash_password(data.password)},
-        )
-    return db.execute(text(_USER_SQL.replace("ORDER BY u.full_name", "WHERE u.id = :i")), {"i": uid}).mappings().one()  # noqa: E501
+            text(_USER_SQL.replace("ORDER BY u.full_name", "WHERE u.id = :i")), {"i": uid}
+        ).mappings().one()
+    )
+    fila["invite_token"] = token
+    fila["invite_days"] = INVITE_DAYS
+    return fila
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -221,12 +262,21 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)) -
     return dict(row)
 
 
-@router.post("/users/{user_id}/password", status_code=204)
-def set_user_password(user_id: int, data: PasswordIn, db: Session = Depends(get_db)) -> None:
-    if db.execute(text("SELECT 1 FROM app_user WHERE id = :i"), {"i": user_id}).scalar_one_or_none() is None:
+@router.post("/users/{user_id}/invite", response_model=InviteOut)
+def reinvite_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    user: AppUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Un link nuevo: para quien no abrio el primero, o para reiniciar la clave.
+
+    ⚠️ Reemplaza al viejo `POST /users/{id}/password`, donde el administrador
+    tecleaba la clave. Aca no la ve ni la elige. Si alguien queda afuera y hace
+    falta la salida de emergencia, sigue estando `etl/set_password.py`, que
+    escribe directo contra la base.
+    """
+    if db.execute(
+        text("SELECT 1 FROM app_user WHERE id = :i"), {"i": user_id}
+    ).scalar_one_or_none() is None:
         raise Problem(status_code=404, title="Usuario no encontrado")
-    db.execute(
-        text("INSERT INTO user_credential (user_id, password_hash) VALUES (:i, :h) "
-             "ON CONFLICT (user_id) DO UPDATE SET password_hash = :h, updated_at = now()"),
-        {"i": user_id, "h": hash_password(data.password)},
-    )
+    return {"invite_token": _crear_invitacion(db, user_id, user.id), "invite_days": INVITE_DAYS}

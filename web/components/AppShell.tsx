@@ -236,6 +236,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (me.isError) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
   }, [me.isError, router, pathname]);
 
+  // ⚠️ Clave temporal: no se entra a ningun lado hasta cambiarla. La columna
+  // `must_change` existia en la base desde la migracion 0043 y nadie la leia,
+  // asi que una clave puesta por el administrador podia quedar para siempre.
+  useEffect(() => {
+    if (me.data?.must_change && pathname !== "/cuenta") router.replace("/cuenta");
+  }, [me.data?.must_change, pathname, router]);
+
   // Guard por perfil: si la ruta actual pide un permiso que el perfil no tiene,
   // redirigir a la primera sección que sí puede ver.
   useEffect(() => {
@@ -341,17 +348,22 @@ export function AppShell({ children }: { children: ReactNode }) {
             {/* "Bajar todo": el libro completo. En la barra y no dentro de un
                 tab — el archivo que resume TODO no puede estar escondido. */}
             <BotonMasterFile />
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/cuenta")}
+              title="Mi cuenta — cambiar contrase\u00f1a"
+              className="flex items-center gap-2 rounded-md px-1 py-0.5 transition hover:bg-white/10"
+            >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-[11px] font-semibold">
                 {initials}
               </span>
-              <span className="hidden leading-tight sm:block">
+              <span className="hidden leading-tight text-left sm:block">
                 <span className="block text-xs font-medium">{me.data.full_name}</span>
                 <span className="block text-micro uppercase tracking-wide text-brand-300">
                   {me.data.role}
                 </span>
               </span>
-            </div>
+            </button>
             <button
               type="button"
               className="rounded-md border border-white/25 px-3 py-1 text-xs text-white transition hover:border-white/50 hover:bg-white/10"

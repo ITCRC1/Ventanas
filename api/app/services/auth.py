@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.permissions import user_permissions
@@ -51,4 +51,12 @@ def user_out(db: Session, user: AppUser) -> UserOut:
         role=role.code if role else "",
         role_id=user.role_id,
         permissions=sorted(user_permissions(db, user.role_id)),
+        # ⚠️ `must_change` existia desde la 0043 y nadie la leia. La pantalla la
+        # usa para mandar a /cuenta antes de dejar entrar a ningun lado.
+        must_change=bool(
+            db.execute(
+                text("SELECT must_change FROM user_credential WHERE user_id = :i"),
+                {"i": user.id},
+            ).scalar()
+        ),
     )
