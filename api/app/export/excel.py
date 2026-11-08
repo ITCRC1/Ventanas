@@ -87,6 +87,21 @@ def _suma(refs: Iterable[str]) -> str:
     return "=" + "+".join("SUM(" + ",".join(t) + ")" for t in trozos)
 
 
+def _fecha(v: object) -> object:
+    """Texto ISO -> date, para que Excel la trate como fecha.
+
+    El LEDGER guarda las fechas como texto. Lo que no sea `YYYY-MM-DD` se
+    devuelve sin tocar: es preferible una celda con texto raro a una vacía que
+    esconda que ahí había algo.
+    """
+    if isinstance(v, dt.date) or v is None:
+        return v
+    try:
+        return dt.date.fromisoformat(str(v).strip()[:10])
+    except ValueError:
+        return v
+
+
 def _quarter(d: dt.date) -> str:
     return f"Q{(d.month - 1) // 3 + 1} {d.year}"
 
@@ -149,11 +164,31 @@ class ExcelExporter:
         return bio.getvalue()
 
     def _sheet_ledger(self) -> None:
+        """El LEDGER, igual que lo muestra la app.
+
+        ⚠️ Lee `ledger_sheet_row`, NO `ledger_entry`.
+
+        Hasta el 2026-11-08 esta hoja exportaba `ledger_entry`, una tabla vieja
+        que quedó al lado y que ya nadie alimenta: 261 filas por $1,439,283.17
+        pagados, cuando el proyecto lleva $14,313,437.35. El dueño veía una
+        DÉCIMA PARTE del gasto.
+
+        Y no se quedaba acá: el Job Cost y el Dashboard no calculan el gasto,
+        lo traen de esta hoja con `SUMIF(LEDGER!$A:$A, wbs, LEDGER!$G:$G)`. Un
+        solo origen equivocado ensuciaba tres hojas sin que nada avisara,
+        porque el libro seguía cuadrando consigo mismo.
+
+        De ahí dos reglas que hay que respetar al tocar esto:
+          · el Cost Code va en la columna A y el Amount Paid en la G;
+          · `v_wbs_financials.spend` suma `amount_paid` de las filas
+            `kind='data'`, así que la hoja tiene que traer esas mismas filas.
+        """
         ws = self.wb.active
         ws.title = "LEDGER"
         cols = [
             "Cost Code", "Date", "Invoice #", "Payee", "Description",
-            "Amount", "Amount Paid", "Amount Due", "Funding Source",
+            "Amount", "Amount Paid", "Amount Due", "Account",
+            "Beneficiary", "Paid Total", "Date Paid",
         ]
         ws.append([])
         ws.append([])
@@ -164,29 +199,62 @@ class ExcelExporter:
         rows = self.db.execute(
             text(
                 """
-                SELECT w.wbs_code AS cost_code, l.entry_date AS date, l.invoice_no AS invoice,
-                       p.name AS payee, l.description, l.amount, l.amount_paid, l.funding_source
-                FROM ledger_entry l
-                LEFT JOIN wbs_item w ON w.id = l.wbs_id
-                LEFT JOIN payee p    ON p.id = l.payee_id
-                ORDER BY l.id
+                SELECT kind, section, cost_code, account, entry_date, invoice_no,
+                       payee, beneficiary, description, amount, amount_paid,
+                       paid_total, date_paid
+                FROM ledger_sheet_row
+                ORDER BY row_no
                 """
             )
         ).mappings()
         r = 4
         for e in rows:
+            if e["kind"] != "data":
+                # Encabezados del LEDGER: los tres de arriba (Project, Address…)
+                # y los separadores de sección. Se escriben como rótulo para que
+                # el libro se lea igual que la pantalla. Van SIN cost code, así
+                # que los SUMIF del Job Cost no los ven.
+                etq = (e["cost_code"] or e["section"] or "").strip()
+                val = (e["account"] or "").strip()
+                if etq or val:
+                    ws.cell(r, 2, etq).font = Font(bold=True)
+                    if val:
+                        ws.cell(r, 3, val)
+                    r += 1
+                continue
             ws.cell(r, 1, (e["cost_code"] or "").strip())
-            ws.cell(r, 2, e["date"])
-            ws.cell(r, 3, e["invoice"])
+            # ⚠️ En `ledger_sheet_row` la fecha es TEXTO, no `date`. Se convierte
+            # cuando se puede para que Excel la ordene y la filtre como fecha; lo
+            # que no sea una fecha ISO se escribe tal cual en vez de perderse.
+            ws.cell(r, 2, _fecha(e["entry_date"]))
+            ws.cell(r, 3, e["invoice_no"])
             ws.cell(r, 4, e["payee"])
             ws.cell(r, 5, e["description"])
             ws.cell(r, 6, float(e["amount"] or 0)).number_format = MONEY
             ws.cell(r, 7, float(e["amount_paid"] or 0)).number_format = MONEY
             ws.cell(r, 8, f"=F{r}-G{r}").number_format = MONEY  # Amount Due VIVO
-            ws.cell(r, 9, e["funding_source"])
+            ws.cell(r, 9, e["account"])
+            ws.cell(r, 10, e["beneficiary"])
+            # `paid_total` y `date_paid` son TEXTO libre en el LEDGER —se ven
+            # cosas como "PAGO6374.70 OCTUBRE". Se copian tal cual: convertirlos
+            # a número perdería lo que el usuario escribió.
+            ws.cell(r, 11, e["paid_total"])
+            ws.cell(r, 12, e["date_paid"])
             r += 1
         self.ledger_last = max(r - 1, 4)
-        for c, w in zip(range(1, 10), [12, 12, 14, 26, 46, 14, 14, 14, 18], strict=False):
+        # GRAN TOTAL arriba, como en la pantalla. Va FUERA de la tabla: adentro
+        # se sumaría a sí mismo en cuanto alguien agregue una fila.
+        ws.cell(2, 5, "GRAND TOTAL").font = Font(bold=True)
+        for col in (6, 7):
+            cel = ws.cell(2, col, f"=SUM({gc(col)}4:{gc(col)}{self.ledger_last})")
+            cel.number_format = MONEY
+            cel.font = Font(bold=True)
+            cel.fill = TOTAL
+        for c, w in zip(
+            range(1, 13),
+            [12, 12, 14, 26, 46, 14, 14, 14, 30, 24, 14, 12],
+            strict=False,
+        ):
             ws.column_dimensions[gc(c)].width = w
         ws.freeze_panes = "B4"
         # ⚠️ L15 del audit: tabla de Excel de verdad, no un autofiltro suelto.
@@ -194,7 +262,7 @@ class ExcelExporter:
         # SUMIF del Job Cost— en vez de quedarse fuera sin que nadie lo note.
         # El autofiltro no se pone: Excel no admite los dos sobre el mismo
         # rango, y la tabla ya trae el suyo.
-        t = Table(displayName="Ledger", ref=f"A3:I{self.ledger_last}")
+        t = Table(displayName="Ledger", ref=f"A3:L{self.ledger_last}")
         t.tableStyleInfo = TableStyleInfo(
             name="TableStyleLight1", showRowStripes=True, showColumnStripes=False
         )
