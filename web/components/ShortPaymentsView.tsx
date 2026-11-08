@@ -565,7 +565,9 @@ function NewBatchBar({ batches }: { batches: ShortPaymentBatch[] }) {
   const valid = /^\d{4}-\d{2}$/.test(month);
 
   const submit = async () => {
-    if (!valid || taken || busy) return;
+    // `taken` ya no bloquea: un mes puede tener varias tandas y el backend le
+    // asigna el siguiente sub libre.
+    if (!valid || busy) return;
     setBusy(true);
     try {
       const d = await create.mutateAsync({
@@ -586,6 +588,17 @@ function NewBatchBar({ batches }: { batches: ShortPaymentBatch[] }) {
     }
   };
 
+  // El siguiente sub libre de ese número. La primera tanda del mes es .0 y
+  // las que vengan después se numeran solas: .1, .2…
+  const proximoSub = valid
+    ? Math.max(
+        -1,
+        ...(batches ?? [])
+          .filter((b) => b.disb_no === disbNoFor(month))
+          .map((b) => b.disb_sub),
+      ) + 1
+    : 0;
+
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5">
       <span className="text-sm font-semibold text-emerald-900">＋ New payment batch</span>
@@ -600,7 +613,7 @@ function NewBatchBar({ batches }: { batches: ShortPaymentBatch[] }) {
       </label>
       {valid ? (
         <span className="rounded bg-white px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-300">
-          Disbursement #{disbNoFor(month)} · {monthName(month)}
+          Disbursement #{disbNoFor(month)}.{proximoSub} · {monthName(month)}
         </span>
       ) : null}
       <label className="flex items-center gap-1 text-xs text-emerald-800">
@@ -613,16 +626,17 @@ function NewBatchBar({ batches }: { batches: ShortPaymentBatch[] }) {
       </label>
       <button
         type="button"
-        disabled={!valid || !!taken || busy}
+        disabled={!valid || busy}
         onClick={submit}
         className="ml-auto rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
       >
-        {busy ? "Creating…" : `Create #${valid ? disbNoFor(month) : ""}`}
+        {busy ? "Creating…" : `Create #${valid ? `${disbNoFor(month)}.${proximoSub}` : ""}`}
       </button>
       {taken ? (
         <span className="w-full text-[11px] text-amber-700">
-          ⚠ {monthName(month)} already exists (Disbursement #{taken.disb_no}.{taken.disb_sub}) —
-          pick another month.
+          {monthName(month)} ya tiene la tanda #{taken.disb_no}.{taken.disb_sub}. Ésta se crea
+          como <b>#{disbNoFor(month)}.{proximoSub}</b> — un mes puede tener varias (un pago
+          directo aparte del Short Payment, por ejemplo).
         </span>
       ) : null}
     </div>

@@ -79,21 +79,52 @@ def create_disbursement(db: Session, data: DisbursementIn) -> Disbursement:
     period = data.period_month.replace(day=1)
     # El número sale del mes (regla del owner); se puede overridear con data.disb_no.
     disb_no = data.disb_no or disb_no_for_period(period)
-    # Una tanda por mes: si ya existe, se avisa claro en vez de reventar por el
-    # UNIQUE(disb_no, disb_sub).
-    clash = db.execute(
-        select(Disbursement).where(Disbursement.disb_no == disb_no, Disbursement.disb_sub == 0)
+    # ⚠️ Un mes puede tener MAS DE UNA tanda. Antes la segunda se rechazaba con
+    # un 409 y no habia manera de registrarla: si en octubre hubo un pago
+    # directo aparte del Short Payment, no entraba a ningun lado. Ahora la
+    # segunda nace como SUB-desembolso del mismo numero —#28.1, #28.2…— que es
+    # como el UNIQUE(disb_no, disb_sub) ya estaba pensado y como el Ledger ya
+    # los importa (trae todos los subs de un numero).
+    #
+    # `disb_sub` explicito gana; si no, se toma el siguiente libre.
+    #
+    # ⚠️ La base exige que una sub-tanda apunte a su padre (CHECK
+    # `sub_needs_parent`): el modelo ya preveia los subs y la numeracion suelta
+    # no alcanza. El padre es siempre el .0 de ese numero.
+    padre = db.execute(
+        select(Disbursement).where(
+            Disbursement.disb_no == disb_no, Disbursement.disb_sub == 0
+        )
     ).scalars().first()
-    if clash is not None:
+    sub = data.disb_sub
+    if sub is None:
+        usados = [
+            r[0]
+            for r in db.execute(
+                select(Disbursement.disb_sub).where(Disbursement.disb_no == disb_no)
+            ).all()
+        ]
+        sub = (max(usados) + 1) if usados else 0
+    elif db.execute(
+        select(Disbursement).where(
+            Disbursement.disb_no == disb_no, Disbursement.disb_sub == sub
+        )
+    ).scalars().first() is not None:
         raise Problem(
             status_code=409,
             title="Esa tanda ya existe",
-            detail=f"Ya hay un Disbursement #{disb_no} "
-            f"({clash.period_month:%B %Y}); abrilo en vez de crear otro.",
+            detail=f"Ya hay un Disbursement #{disb_no}.{sub}; abrilo en vez de crear otro.",
+        )
+    if sub > 0 and padre is None:
+        raise Problem(
+            status_code=409,
+            title="Falta la tanda principal",
+            detail=f"No existe el Disbursement #{disb_no}.0 del que colgar esta sub-tanda.",
         )
     d = Disbursement(
         disb_no=disb_no,
-        disb_sub=0,
+        disb_sub=sub,
+        parent_id=padre.id if sub > 0 and padre else None,
         period_month=period,
         send_date=data.send_date,
         notes=data.notes,

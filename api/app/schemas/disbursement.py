@@ -173,6 +173,9 @@ class DisbursementDetail(DisbursementOut):
 class DisbursementIn(BaseModel):
     period_month: date  # cualquier día del mes; se normaliza al día 1
     disb_no: int | None = None  # si falta, se asigna el siguiente
+    # Sub-tanda del mismo mes (#28.1, #28.2…). Si falta, se toma el siguiente
+    # libre: la primera del mes es .0 y las siguientes se numeran solas.
+    disb_sub: int | None = None
     send_date: date | None = None
     notes: str | None = None
 
