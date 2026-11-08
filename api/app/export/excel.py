@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 from io import BytesIO
@@ -102,6 +103,17 @@ def _fecha(v: object) -> object:
         return dt.date.fromisoformat(str(v).strip()[:10])
     except ValueError:
         return v
+
+
+def _clean_cat(name: str) -> str:
+    """Quita el prefijo numerico de la categoria: "0-Property" -> "Property".
+
+    Es lo mismo que hace `cleanCatName` en web/lib/paint.tsx. La hoja Timeline
+    ya lo hacia con una funcion anidada que Timeline Detail no podia ver, asi
+    que el Detail mostraba "0-PROPERTY ACQUISITION" donde la pantalla muestra
+    "PROPERTY ACQUISITION".
+    """
+    return re.sub(r"^\d+\s*-\s*", "", (name or "").strip())
 
 
 def _quarter(d: dt.date) -> str:
@@ -309,7 +321,7 @@ class ExcelExporter:
         fixed = [
             "Status", "WBS", "Task Title", "Owner", "Category", "Phase",
             "Budget Original", "Budget Change", "Budget Revised",
-            "Spend", "Remaining", "Forecast", "Variance",
+            "Spend", "Remaining", "Forecast", "Over/Under",
         ]
         hr = 5
         for i, h in enumerate(fixed, 1):
@@ -415,6 +427,18 @@ class ExcelExporter:
         kcell.alignment = Alignment(horizontal="center", wrap_text=True)
         ws.cell(4, self.check_col, "CONTROL")
         ws.column_dimensions[gc(self.check_col)].width = 15
+
+        # % Compl (Spend / Revised): la columna que la app tiene en su bloque
+        # congelado y aca faltaba. Va DESPUES de check_col a proposito, porque
+        # `money_cols` llega hasta check_col: asi un porcentaje nunca entra por
+        # error en un subtotal.
+        self.pct_col = col + 3
+        pcell = ws.cell(hr, self.pct_col, "% COMPL")
+        pcell.fill = HDR
+        pcell.font = WHITE
+        pcell.alignment = Alignment(horizontal="center", wrap_text=True)
+        ws.cell(4, self.pct_col, "KPI")
+        ws.column_dimensions[gc(self.pct_col)].width = 11
 
         # El corte que separa historia de futuro. Es el mismo de `settings` que
         # usa la app: con otro, el Excel y la pantalla dirian forecasts
@@ -553,14 +577,28 @@ class ExcelExporter:
                     r, 10, f"=SUMIF(LEDGER!$A:$A,$B{r},LEDGER!$G:$G)"
                 ).number_format = MONEY                                                # Spend
                 ws.cell(r, 11, f"=I{r}-J{r}").number_format = MONEY                     # Remaining
+                ws.cell(
+                    r, self.pct_col, f'=IFERROR(J{r}/I{r},"")'
+                ).number_format = "0.0%"                                                # % Compl
+                # ⚠️ El PLAN POST-CORTE y el control se escriben SIEMPRE, tambien
+                # cuando hay override manual de Forecast. Antes vivian dentro del
+                # `else`: la linea con override quedaba en blanco, el subtotal la
+                # contaba como 0 y el control la perdia de vista —justo la linea
+                # que mas conviene vigilar—. Hoy no se dispara porque
+                # `forecast_total` esta NULL en las 78, pero se arma solo el dia
+                # que alguien use el override en la app.
+                ws.cell(r, self.future_col, self._futuro_f.format(r=r)).number_format = MONEY
+                ws.cell(r, self.check_col, f"=ROUND({gc(self.total_col)}{r}-I{r},2)").number_format = MONEY
                 if e["forecast_ovr"] is not None:  # override manual del app = dato base
                     ws.cell(r, 12, float(e["forecast_ovr"])).number_format = MONEY
                 else:  # Forecast = Spend + Timeline Total (vivo)
                     # C1: gastado + plan POSTERIOR al corte, no el total.
                     ws.cell(r, 12, f"=J{r}+{gc(self.future_col)}{r}").number_format = MONEY
-                    ws.cell(r, self.future_col, self._futuro_f.format(r=r)).number_format = MONEY
-                    ws.cell(r, self.check_col, f"=ROUND({gc(self.total_col)}{r}-I{r},2)").number_format = MONEY
-                ws.cell(r, 13, f"=I{r}-L{r}").number_format = MONEY                     # Variance
+                # ⚠️ Over/Under = Forecast − Revised, igual que la app
+                # (v_wbs_financials.over_under): POSITIVO = por encima del
+                # presupuesto, y asi se pinta rojo en pantalla. Estaba al reves
+                # (I−L), asi que un sobregiro se leia como ahorro.
+                ws.cell(r, 13, f"=L{r}-I{r}").number_format = MONEY                     # Over/Under
                 write_timeline_line(r, code, cat)
                 r += 1
             last_cost = r - 1
@@ -615,7 +653,7 @@ class ExcelExporter:
                 ws.cell(r, 12, f"=J{r}+{gc(self.future_col)}{r}").number_format = MONEY
                 ws.cell(r, self.future_col, self._futuro_f.format(r=r)).number_format = MONEY
                 ws.cell(r, self.check_col, f"=ROUND({gc(self.total_col)}{r}-I{r},2)").number_format = MONEY
-                ws.cell(r, 13, f"=I{r}-L{r}").number_format = MONEY
+                ws.cell(r, 13, f"=L{r}-I{r}").number_format = MONEY
                 for c in money_cols:
                     ws.cell(r, c).font = BOLD
                 sale_totals.append(r)
@@ -643,7 +681,9 @@ class ExcelExporter:
             range(1, 14), [11, 10, 42, 14, 20, 20, 15, 14, 15, 15, 15, 15, 14], strict=False
         ):
             ws.column_dimensions[gc(c)].width = width
-        ws.freeze_panes = ws.cell(hr + 1, 7)
+        # Congelar DESPUES de la ultima columna de dinero (M), como la app: al
+        # correr el cronograma hasta 2027 se sigue viendo contra que presupuesto.
+        ws.freeze_panes = ws.cell(hr + 1, 14)
         ws.conditional_formatting.add(
             f"K{hr + 1}:K{r}",
             CellIsRule(
@@ -883,9 +923,18 @@ class ExcelExporter:
 
         # ---- filas ----
         r = hr + 1
-        subtotal_rows: list[int] = []
+        # ⚠️ Dos listas, igual que el Job Cost. `grand` del front filtra
+        # kind='proceeds' ANTES de sumar (Timeline.tsx), asi que la venta
+        # -$480,000- no puede entrar en la fila rotulada PROJECT TOTAL.
+        cost_totals: list[int] = []
+        sale_totals: list[int] = []
         for cat in ordered:
-            g = groups[cat]
+            # ⚠️ `.get` y no `[...]`: `ordered` trae TODAS las categorias activas
+            # y `groups` solo las que tienen lineas. El comentario de arriba ya
+            # prometia que las vacias salen con su TOTAL en 0, pero con el
+            # corchete una categoria nueva sin lineas tiraba KeyError y se caia
+            # el libro entero. El `if g:` de abajo ya cubre el resto.
+            g = groups.get(cat)
             # encabezado de categoría (banda)
             for i in range(1, total_col + 1):
                 ws.cell(r, i).fill = CATF
@@ -905,22 +954,30 @@ class ExcelExporter:
             # subtotales por categoría (misma regla de kind que el front)
             if sales:
                 _agg(r, phase_rows, "TOTAL EXPENSES", TOTAL)
-                subtotal_rows.append(r)
+                cost_totals.append(r)
                 r += 1
                 for i in range(1, total_col + 1):
                     ws.cell(r, i).fill = VENTA_FILL
                 ws.cell(r, 1, "TOTAL SALES · " + ", ".join(c for _i, c in sales)).font = BOLD
                 _leaf(r, sales, bold=True, paint=False)  # mantiene el verde de la fila
-                subtotal_rows.append(r)
+                sale_totals.append(r)
                 r += 1
             else:
                 _agg(r, phase_rows, f"TOTAL {_clean(cat).upper()}", TOTAL)
-                subtotal_rows.append(r)
+                cost_totals.append(r)
                 r += 1
 
-        # PROJECT TOTAL = suma de todos los subtotales (= todas las líneas,
-        # costos + ventas, igual que `grand` del front).
-        _agg(r, subtotal_rows, "PROJECT TOTAL", TOTAL)
+        # PROJECT TOTAL = solo gasto, como `grand` del front. La venta va en su
+        # propia fila y el NET aparte —las tres filas del Job Cost—. Antes esta
+        # hoja ponia el NET debajo del rotulo PROJECT TOTAL: el mismo libro
+        # decia 20,560,442.73 aca y 21,040,442.73 en el Job Cost, bajo el mismo
+        # nombre y sin nada que lo avisara.
+        _agg(r, cost_totals, "PROJECT TOTAL — EXPENSES", TOTAL)
+        if sale_totals:
+            r += 1
+            _agg(r, sale_totals, "PROJECT TOTAL — SALES", VENTA_FILL)
+            r += 1
+            _agg(r, cost_totals + sale_totals, "NET (EXPENSES + SALES)", TOTAL)
 
         # ancho de columnas izquierdas + congelar identidad/presupuesto.
         for c, wd in zip(range(1, 8), [22, 26, 15, 14, 14, 14, 15], strict=False):
@@ -1173,11 +1230,12 @@ class ExcelExporter:
 
         # ---- cuerpo: categoría (cabecera + gastos + subtotal[s]) ----
         r = hr + 1
-        subtotal_rows: list[int] = []
+        cost_totals: list[int] = []
+        sale_totals: list[int] = []
         for cat, lines in groups.items():
             for i in range(1, total_col + 1):
                 ws.cell(r, i).fill = CAT_FILL
-            ws.cell(r, 1, cat.upper()).font = BOLD
+            ws.cell(r, 1, _clean_cat(cat).upper()).font = BOLD
             r += 1
 
             costs = [e for e in lines if e["kind"] != "proceeds"]
@@ -1191,20 +1249,29 @@ class ExcelExporter:
 
             if sales:
                 _sum_row(r, "TOTAL EXPENSES", cost_idx, GASTO_FILL)
-                subtotal_rows.append(r)
+                cost_totals.append(r)
                 r += 1
                 sale_codes = [(e["wbs_code"] or "").strip() for e in sales]
                 _venta_row(r, "TOTAL SALES · " + ", ".join(sale_codes), sale_codes)
-                subtotal_rows.append(r)
+                sale_totals.append(r)
                 r += 1
             else:
-                _sum_row(r, f"TOTAL {cat.upper()}", cost_idx, GASTO_FILL)
-                subtotal_rows.append(r)
+                _sum_row(r, f"TOTAL {_clean_cat(cat).upper()}", cost_idx, GASTO_FILL)
+                cost_totals.append(r)
                 r += 1
 
-        # ---- PROJECT TOTAL: suma TODAS las líneas (= suma de todos los subtotales) ----
-        _sum_row(r, "PROJECT TOTAL", subtotal_rows, TOTAL)
+        # ---- PROJECT TOTAL: solo gasto, como `grand` del front. Venta y NET
+        # en filas propias, igual que el Job Cost. ----
+        _sum_row(r, "PROJECT TOTAL — EXPENSES", cost_totals, TOTAL)
         last = r
+        if sale_totals:
+            r += 1
+            _sum_row(r, "PROJECT TOTAL — SALES", sale_totals, VENTA_FILL)
+            r += 1
+            _sum_row(r, "NET (EXPENSES + SALES)", cost_totals + sale_totals, TOTAL)
+            # `last` alimenta el rango del formato condicional: tiene que ser la
+            # ultima fila escrita, no la del subtotal de gasto.
+            last = r
         r += 1
 
         # ---- Remaining / Funding negativos en rojo (como el app) ----
@@ -1317,7 +1384,16 @@ class ExcelExporter:
                 # quedaba con el estado del dia que se bajo el archivo.
                 ws.cell(
                     r, C_EST,
-                    f'=IFERROR(XLOOKUP(${gc(C_WBS)}{r},{JC}!$B:$B,{JC}!$A:$A),"")',
+                    # ⚠️ NO usar XLOOKUP: openpyxl la escribe sin el prefijo
+                    # `_xlfn.` que exige el formato, asi que Excel la lee como
+                    # funcion desconocida y devuelve #NAME? — y el IFERROR lo
+                    # esconde, dejando las 78 celdas de Status EN BLANCO sin que
+                    # nada avise. El color si se pinta, asi que se ve una celda
+                    # coloreada y vacia y no hay motivo para sospechar.
+                    # INDEX/MATCH no necesita prefijo y corre en cualquier
+                    # version de Excel y en LibreOffice.
+                    f'=IFERROR(INDEX({JC}!$A:$A,'
+                    f'MATCH(${gc(C_WBS)}{r},{JC}!$B:$B,0)),"")',
                 ).alignment = Alignment(horizontal="center")
                 ws.cell(r, C_EST).fill = STATE_FILL.get(
                     ln["state"], STATE_FILL["not_started"]
@@ -1361,8 +1437,14 @@ class ExcelExporter:
                 e = ws.cell(r, C_EST, "TOTAL SALES")
                 e.font = VENTA_FONT
                 e.alignment = Alignment(horizontal="right")
+                # ⚠️ Buscar por el codigo UNIDO, no uno por uno: las lineas de
+                # venta no son filas del Job Cost. Su unico rastro es la celda B
+                # de la fila TOTAL SALES, que con varias lleva "6, 7". Codigo
+                # por codigo no encuentra nada y la fila entera sale en $0.
+                # Hoy anda porque hay una sola venta; con dos, no.
+                unidos = ", ".join(codes)
                 for col, src in ((C_PRE, "I"), (C_GAS, "J"), (C_REM, "K")):
-                    ws.cell(r, col, _suma(sumif(c, src) for c in codes))
+                    ws.cell(r, col, "=" + sumif(unidos, src))
                     ws.cell(r, col).number_format = MONEY
                     ws.cell(r, col).font = VENTA_FONT
                 sale_totals.append(r)
