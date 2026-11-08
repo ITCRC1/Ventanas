@@ -156,7 +156,11 @@ class ExcelExporter:
         # Mismo orden que las pestañas del app.
         order = ["Timeline", "Timeline Detail", "Job Cost Report", "Dashboard",
                  "Short Payment", "LEDGER", "Credits", "Banks",
-                 "US Wire Transfers", "Invoices", "Legend"]
+                 "US Wire Transfers", "Invoices", "Invoice Receipts", "Legend"]
+        # ⚠️ Una hoja que no figure aca cae al final en silencio: `order.index`
+        # falla y el `key` devuelve 99. Asi fue como "Invoice Receipts" -las 156
+        # facturas de verdad- quedaba DESPUES del Legend, que es el cierre del
+        # libro. Al agregar una hoja hay que agregarla tambien a esta lista.
         with contextlib.suppress(Exception):
             self.wb._sheets.sort(
                 key=lambda sh: order.index(sh.title) if sh.title in order else 99
@@ -2181,7 +2185,11 @@ class ExcelExporter:
 
         ws["A1"] = "DASHBOARD VENTANAS — Invoices"
         ws["A1"].font = Font(bold=True, size=14)
-        ws["A2"] = "Live model. Subtotal = Σ lines · Total = Subtotal + Tax."
+        ws["A2"] = (
+            "Live model. Subtotal = Σ lines · Total = Subtotal + Tax. "
+            "Empty means the invoice-capture module has no entries yet — the "
+            "invoices that arrived by mail are in the 'Invoice Receipts' tab."
+        )
         ws["A2"].font = Font(italic=True, color="FF808080")
 
         cols = [
@@ -2323,12 +2331,27 @@ class ExcelExporter:
                 SELECT r.received_at, r.invoice_date, r.invoice_no,
                        r.issuer_name, r.issuer_id, r.oferta, r.proyecto,
                        r.currency, r.subtotal, r.tax, r.total, r.status,
+                       r.doc_type,
                        r.xml_bytes IS NOT NULL AS tiene_xml, r.has_pdf,
-                       (SELECT string_agg(DISTINCT w.wbs_code, ', ' ORDER BY w.wbs_code)
-                          FROM invoice_receipt_link l
-                          JOIN ledger_entry le ON le.id = l.ledger_entry_id
-                          JOIN wbs_item     w  ON w.id  = le.wbs_id
-                         WHERE l.receipt_id = r.id) AS wbs
+                       -- ⚠️ Conviven dos llaves de enlace y la vieja ya casi no se
+                       -- usa: `ledger_entry_id` esta NULO en 23 de los 44 vinculos.
+                       -- `sheet_row_id` los cubre los 44 y es la que lee la app
+                       -- (routers/invoice_receipts.py). Yendo solo por la vieja, 23
+                       -- recibos conciliados salian SIN proyecto: el dueño los veia
+                       -- marcados "linked" sin saber contra que linea. Se consultan
+                       -- las dos y se toma lo que responda.
+                       (SELECT string_agg(DISTINCT c, ', ' ORDER BY c) FROM (
+                          SELECT w.wbs_code AS c
+                            FROM invoice_receipt_link l
+                            JOIN ledger_entry le ON le.id = l.ledger_entry_id
+                            JOIN wbs_item     w  ON w.id  = le.wbs_id
+                           WHERE l.receipt_id = r.id
+                          UNION
+                          SELECT NULLIF(btrim(s.cost_code), '')
+                            FROM invoice_receipt_link l
+                            JOIN ledger_sheet_row s ON s.id = l.sheet_row_id
+                           WHERE l.receipt_id = r.id
+                        ) q(c) WHERE c IS NOT NULL) AS wbs
                 FROM invoice_receipt r
                 ORDER BY r.invoice_date DESC NULLS LAST, r.invoice_no DESC, r.id DESC
                 """
@@ -2362,13 +2385,26 @@ class ExcelExporter:
             ws.cell(r, 7, e["proyecto"])
             cu = ws.cell(r, 8, e["currency"])
             cu.alignment = Alignment(horizontal="center")
-            ws.cell(r, 9, float(e["subtotal"] or 0)).number_format = MONEY
-            ws.cell(r, 10, float(e["tax"] or 0)).number_format = MONEY
+            # ⚠️ Una nota de credito RESTA. Es la misma regla que
+            # routers/invoice_receipts.py::_sign y que
+            # web/components/InvoiceReceipts.tsx::sgn. El export nunca leia
+            # `doc_type`, asi que sumaba las 8 NC como si fueran facturas: el
+            # total en colones salia ₡5,097,873.78 alto y el de dolares
+            # $26,506.42. La pantalla y el libro decian cosas distintas de lo
+            # mismo.
+            sg = -1 if e["doc_type"] == "NC" else 1
+            ws.cell(r, 9, sg * float(e["subtotal"] or 0)).number_format = MONEY
+            ws.cell(r, 10, sg * float(e["tax"] or 0)).number_format = MONEY
             # El total es DATO: lo declara el XML. No se recalcula.
-            ws.cell(r, 11, float(e["total"] or 0)).number_format = MONEY
+            ws.cell(r, 11, sg * float(e["total"] or 0)).number_format = MONEY
             ws.cell(r, 12, f"=ROUND(I{r}+J{r}-K{r},2)").number_format = MONEY
             ws.cell(r, 13, e["status"]).alignment = Alignment(horizontal="center")
             ws.cell(r, 14, e["wbs"])
+            # El tipo va al final para no correr las 15 columnas de lugar:
+            # sin esto, una fila en negativo no tiene explicacion a la vista.
+            dt = ws.cell(r, 16, e["doc_type"])
+            if e["doc_type"] == "NC":
+                dt.font = Font(bold=True, color="FF9C0006")
             ws.cell(r, 15, ("XML" if e["tiene_xml"] else "")
                     + (" + PDF" if e["has_pdf"] else "")).alignment = Alignment(
                 horizontal="center"
@@ -2404,6 +2440,12 @@ class ExcelExporter:
                     f'=SUMIF($H${first}:$H${last},"{m}",${L}${first}:${L}${last})',
                 ).number_format = MONEY
                 ws.cell(r, col).font = BOLD
+            # El Check tambien al pie: mientras haya XML descuadrados, la suma
+            # de subtotales mas impuestos no da la de totales, y sin esta celda
+            # el hueco aparece sin aviso al que sume dos columnas a mano.
+            chk = ws.cell(r, 12, f"=ROUND(I{r}+J{r}-K{r},2)")
+            chk.number_format = MONEY
+            chk.font = BOLD
             ws.cell(
                 r, 15,
                 f'=COUNTIF($H${first}:$H${last},"{m}")&" inv."',
@@ -2427,7 +2469,7 @@ class ExcelExporter:
             ws.column_dimensions[gc(i)].width = w
         ws.freeze_panes = f"D{first}"
         if hay:
-            ws.auto_filter.ref = f"A{hr}:O{last}"
+            ws.auto_filter.ref = f"A{hr}:P{last}"
 
     def _sheet_legend(self) -> None:
         ws = self.wb.create_sheet("Legend")
