@@ -30,6 +30,8 @@ from sqlalchemy import text
 from sqlalchemy.engine.row import RowMapping
 from sqlalchemy.orm import Session
 
+from app.core.holding import HOLDING_BANK
+
 STATES = [
     ("not_started", "Not Started", "CCCCCC"),
     ("in_process", "In process", "FFFF00"),
@@ -1446,13 +1448,22 @@ class ExcelExporter:
             text(
                 """
                 SELECT d.id, d.disb_no, d.disb_sub, d.period_month, d.send_date, d.status,
-                       d.total_amount,
+                       d.total_amount, d.credit_applied,
                        dl.id AS line_id, dl.line_no, dl.description, dl.invoice_no,
                        dl.amount, dl.reason, dl.transfer,
                        w.wbs_code, w.title AS wbs_title,
                        COALESCE(cl.name, cw.name) AS category,
                        COALESCE(pl.name, pw.name) AS type,
-                       p.name AS payee_name, p.bank_name, p.legal_id, p.iban
+                       p.name AS payee_name,
+                       -- ⚠️ El banco se hereda del holding cuando el proveedor
+                       -- no trae uno propio, igual que la pantalla
+                       -- (repositories/disbursement.py) y el PDF de Breakdown.
+                       -- Sin esto 135 de 222 lineas salian con el banco en
+                       -- blanco: justo la cuenta a la que entra la plata.
+                       COALESCE(p.bank_name,
+                                CASE WHEN dl.id IS NULL THEN NULL ELSE :holding END)
+                         AS bank_name,
+                       p.legal_id, p.iban
                 FROM disbursement d
                 LEFT JOIN disbursement_line dl ON dl.disbursement_id = d.id
                 LEFT JOIN payee p    ON p.id  = dl.payee_id
@@ -1463,7 +1474,8 @@ class ExcelExporter:
                 LEFT JOIN phase    pw ON pw.id = w.phase_id
                 ORDER BY d.disb_no, d.disb_sub, dl.line_no
                 """
-            )
+            ),
+            {"holding": HOLDING_BANK},
         ).mappings().all()
 
         if not rows:
@@ -1581,7 +1593,17 @@ class ExcelExporter:
             tl.font = BOLD
             tl.alignment = Alignment(horizontal="left", vertical="center")
             if lines:
-                total_cell = ws.cell(tr, monto_col, f"=SUM({col_letter}{dr}:{col_letter}{last})")
+                # ⚠️ `disbursement.total_amount` = suma de lineas MENOS el credito
+                # aplicado (lo mantiene el trigger sync_credit_applied), y es lo
+                # que la app pinta en la barra. Sumar las lineas a secas
+                # sobreestima la tanda en cuanto se aplique un credito, sin que
+                # nada avise. Hoy credit_applied es 0 en las 25 tandas: el error
+                # estaria dormido hasta el dia que se use la hoja Credits.
+                credito = float(head["credit_applied"] or 0)
+                formula = f"=SUM({col_letter}{dr}:{col_letter}{last})"
+                if credito:
+                    formula += f"-{credito}"
+                total_cell = ws.cell(tr, monto_col, formula)
             else:
                 total_cell = ws.cell(tr, monto_col, 0)
             total_cell.number_format = MONEY
@@ -1642,6 +1664,10 @@ class ExcelExporter:
                 """
                 SELECT move_date, kind, description, amount
                 FROM v_credit_ledger
+                -- El saldo corrido se arma como =E(fila-1)+D(fila): solo es
+                -- correcto si las filas llegan ordenadas. La vista trae su
+                -- propio ORDER BY, pero eso no es una garantia del motor.
+                ORDER BY move_date, kind
                 """
             )
         ).mappings().all()
