@@ -2473,7 +2473,11 @@ class ExcelExporter:
 
     def _sheet_legend(self) -> None:
         ws = self.wb.create_sheet("Legend")
-        ws["B2"] = "Status legend"
+        # Los cinco colores se pintan en una sola columna de todo el libro
+        # (Dashboard, columna C). "Job Cost Report" tiene una columna que
+        # tambien se llama Status y trae los mismos textos SIN relleno, asi que
+        # quien lea la leyenda los busca donde no estan.
+        ws["B2"] = "Status legend — these colours are painted in Dashboard, column C"
         ws["B2"].font = Font(bold=True, size=12)
         r = 4
         for code, label, hexc in STATES:
@@ -2522,6 +2526,21 @@ class ExcelExporter:
             "   carry no exchange rate, so there is no single figure to give.",
             "   Check = Subtotal + Tax − Total. Red means the XML does not add",
             "   up to what it declares; the declared Total is what counts.",
+            "",
+            "THE OTHER TABS",
+            "   Invoices — the invoice-capture module. Empty today: it has no",
+            "      entries. The invoices the system does hold are in Invoice",
+            "      Receipts, the tab right next to it.",
+            "   Invoice Receipts — every invoice that arrived by mail. A credit",
+            "      note (Type = NC) subtracts: its row is negative on purpose.",
+            "   Short Payment — the disbursement being prepared, line by line.",
+            "      One month can have more than one batch (#28.0 and #28.1).",
+            "   Credits — the credit account statement; empty until there is a",
+            "      movement to record.",
+            "   US Wire Transfers — every transfer the owners sent, against what",
+            "      LAFISE received.",
+            "   Timeline / Timeline Detail — the same plan at two depths:",
+            "      category and WBS line. Every week in both is a formula.",
             "",
             "THE LEDGER IS AN EXCEL TABLE",
             "   Named 'Ledger'. A row typed under the last one joins the table,",
