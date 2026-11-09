@@ -350,7 +350,11 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
             type="button"
             onClick={async () => {
               await navigator.clipboard?.writeText(tsv());
-              setAviso("Grid copied — paste it into Excel with Ctrl+V");
+              setAviso(
+                `Copied. In Excel: click A1, Ctrl+V. Columns C to N are the ${anio} months ` +
+                  `— edit those. To bring it back: select columns A to N, Ctrl+C, then ` +
+                  `«Paste back» here.`,
+              );
             }}
             title="Copy the whole grid. Paste it into Excel and you have it as a table."
             className="rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
@@ -371,11 +375,20 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
       {panel ? (
         <div className="space-y-2 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
           <p className="text-xs font-semibold text-emerald-900">Paste back from Excel</p>
+          <ol className="ml-4 list-decimal space-y-0.5 text-[11px] text-emerald-800">
+            <li>
+              In Excel, edit the <b>{anio}</b> months &mdash; columns <b>C to N</b>.
+            </li>
+            <li>
+              Select <b>columns A to N</b> (WBS, TASK and the twelve months) and press
+              <b> Ctrl+C</b>. Leave the TOTAL and the {base} columns out; they are ignored anyway.
+            </li>
+            <li>Paste here and press «Read the block».</li>
+          </ol>
           <p className="text-[11px] text-emerald-800">
-            Copy the block in Excel and paste it here. The first column has to be the <b>WBS</b>,
-            then the twelve months of {anio}; a TASK column in between is fine. Rows are matched
-            by <b>WBS code</b>, not by position &mdash; so sorting or filtering in Excel does not
-            land the numbers on the wrong line. Nothing is saved until you press Save.
+            Rows are matched by <b>WBS code</b>, not by position &mdash; sorting or filtering in
+            Excel will not land the numbers on the wrong line. What comes back stays amber until
+            you press <b>Save</b>, so you can check it first.
           </p>
           <textarea
             value={texto}
