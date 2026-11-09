@@ -28,7 +28,7 @@
 
 import { Fragment, useMemo, useRef, useState } from "react";
 
-import { evalMath } from "@/lib/calc";
+import { type Reparto, evalMath, parseReparto, pesosCurva, repartir } from "@/lib/calc";
 import {
   useCutoff,
   useFinancials,
@@ -65,7 +65,12 @@ const IZQ: number[] = FIJAS.reduce<number[]>(
 // borde izquierdo pasa de acá: antes de eso está tapado por las fijas.
 const ANCHO_FIJO = FIJAS.reduce((a, c) => a + c.w, 0);
 
-type Pend = { wbs_id: number; week_start: string; planned_amount: number | null; state_id?: number };
+type Pend = {
+  wbs_id: number;
+  week_start: string;
+  planned_amount: number | null;
+  state_id?: number;
+};
 
 function usd(n: number): string {
   if (!n) return "";
@@ -94,6 +99,10 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
   // Lo escrito y todavía sin guardar, por celda semanal.
   const [pend, setPend] = useState<Map<string, Pend>>(new Map());
   const [sel, setSel] = useState<{ wbs: number; mes: number } | null>(null);
+  // Un bloque de meses de UNA fila. Una sola fila a proposito: el pedido era
+  // mover el monto de una linea entre meses, y un bloque rectangular sobre
+  // varias lineas a la vez es una forma comoda de pisar plata ajena sin verlo.
+  const [bloque, setBloque] = useState<{ wbs: number; m0: number; m1: number } | null>(null);
   const [panel, setPanel] = useState(false);
   const [texto, setTexto] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
@@ -217,17 +226,181 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
     }
   }
 
-  /** Escribe un mes y lo deja pendiente. */
+  /** Escribe un mes y lo deja pendiente.
+   *
+   *  ⚠️ Antes mira si lo escrito es una INSTRUCCION DE REPARTO (`80000>5`).
+   *  Va aca y no en el `onKeyDown` porque por aca pasan Enter, Tab, las cuatro
+   *  flechas y el blur: engancharlo en la tecla hubiera dejado la mitad de las
+   *  salidas sin cubrir, y `>5` se habria escrito como monto en algunas. */
   function anotarMes(wbs: number, mes: number, texto: string) {
+    const r = parseReparto(texto, mes);
+    if (r) {
+      repartirMeses(wbs, mes, r);
+      return;
+    }
     const nuevo = new Map(pend);
     aplicarMes(nuevo, wbs, mes, texto);
     setPend(nuevo);
   }
 
+  const rango = (a: number, b: number) =>
+    Array.from({ length: b - a + 1 }, (_, i) => a + i).filter((m) => m >= 1 && m <= 12);
+
+  /**
+   * Reparte un monto desde `mesDesde` hacia adelante.
+   *
+   * ⚠️ Los meses bloqueados se SALTAN y el monto se reparte entre los que
+   * quedan abiertos — la plata no se evapora ni se escribe sobre la historia
+   * del LEDGER. Y se DICE cuantos se saltaron: un reparto que calla lo que
+   * omitio sigue cuadrando contra si mismo y es justo el que nadie revisa.
+   */
+  function repartirMeses(wbs: number, mesDesde: number, r: Reparto) {
+    const monto = r.monto ?? total(wbs, anio, mesDesde);
+    const pedidos = rango(mesDesde, mesDesde + r.meses - 1);
+    const abiertos = pedidos.filter((m) => !bloqueado(m));
+    const trabados = pedidos.length - abiertos.length;
+    const recortado = mesDesde + r.meses - 1 > 12;
+
+    if (!abiertos.length) {
+      setAviso("Every month in that range is locked (history from the LEDGER) — nothing written.");
+      return;
+    }
+    const partes = repartir(monto, pesosCurva(abiertos.length, r.curva));
+    const nuevo = new Map(pend);
+    for (const [i, m] of abiertos.entries()) aplicarMes(nuevo, wbs, m, String(partes[i]));
+    setPend(nuevo);
+
+    const notas = [];
+    if (r.curva !== "flat") notas.push(`curve: ${r.curva}`);
+    if (trabados) notas.push(`${trabados} locked month(s) skipped`);
+    if (recortado) notas.push("clipped at DEC");
+    const forma =
+      r.curva === "flat" ? `${usd(partes[0])} each` : partes.map((p) => usd(p)).join(" · ");
+    setAviso(
+      `${usd(monto)} spread over ${MES[abiertos[0] - 1]}–${MES[abiertos[abiertos.length - 1] - 1]}` +
+        ` — ${forma}${notas.length ? ` (${notas.join(" · ")})` : ""}`,
+    );
+  }
+
+  /**
+   * Corre TODA la fila un mes. El hito se atraso y lo que viene atras se corre
+   * con el: en obra es el movimiento mas comun que hay.
+   *
+   * ⚠️ Si lo que se saldria del ano tiene plata, NO se corre y se dice por que.
+   * Tragarse diciembre al deslizar seria perder un monto entero dejando el
+   * resto perfectamente cuadrado.
+   */
+  function correrFila(wbs: number, d: 1 | -1) {
+    const vals = Array.from({ length: 12 }, (_, i) => total(wbs, anio, i + 1));
+    const cae = d > 0 ? vals[11] : vals[0];
+    if (Math.abs(cae) > 0.005) {
+      setAviso(
+        `${d > 0 ? "DEC" : "JAN"} holds ${usd(cae)} — slipping ${d > 0 ? "forward" : "back"}` +
+          ` would push it out of ${anio}. Move that month first.`,
+      );
+      return;
+    }
+    const nuevos = vals.map((_, i) => {
+      const src = i - d;
+      return src >= 0 && src <= 11 ? vals[src] : 0;
+    });
+    const trabado = nuevos.findIndex((v, i) => Math.abs(v - vals[i]) > 0.005 && bloqueado(i + 1));
+    if (trabado >= 0) {
+      setAviso(
+        `${MES[trabado]} is locked (history from the LEDGER) — the row cannot slip over it.`,
+      );
+      return;
+    }
+    const nuevo = new Map(pend);
+    let tocados = 0;
+    nuevos.forEach((v, i) => {
+      if (Math.abs(v - vals[i]) > 0.005) {
+        aplicarMes(nuevo, wbs, i + 1, v ? String(v) : "");
+        tocados++;
+      }
+    });
+    if (!tocados) {
+      setAviso("Nothing to slip on that row.");
+      return;
+    }
+    setPend(nuevo);
+    setAviso(`Row slipped one month ${d > 0 ? "forward" : "back"}.`);
+  }
+
+  /** Lo que hay hoy en el bloque marcado. */
+  const totalBloque = (): number =>
+    bloque ? rango(bloque.m0, bloque.m1).reduce((a, m) => a + total(bloque.wbs, anio, m), 0) : 0;
+
+  /** Reparte lo que el bloque ya suma, entre sus propios meses. */
+  function nivelarBloque(curva: Reparto["curva"]) {
+    if (!bloque) return;
+    repartirMeses(bloque.wbs, bloque.m0, {
+      monto: totalBloque(),
+      meses: bloque.m1 - bloque.m0 + 1,
+      curva,
+    });
+  }
+
+  /**
+   * Corre el bloque un mes.
+   *
+   * ⚠️ Si el mes donde aterriza —y que queda FUERA del bloque— ya tiene plata,
+   * se niega. Correr el bloque encima pisaria ese monto y el total de la fila
+   * bajaria sin que nada lo marque. Para eso esta correr la fila entera, que
+   * desplaza todo junto y no pisa nada.
+   */
+  function correrBloque(d: 1 | -1) {
+    if (!bloque) return;
+    const ms = rango(bloque.m0, bloque.m1);
+    const dest = ms.map((m) => m + d);
+    if (dest.some((m) => m < 1 || m > 12)) {
+      setAviso(`The block would run out of ${anio}.`);
+      return;
+    }
+    const trabado = dest.find((m) => bloqueado(m));
+    if (trabado) {
+      setAviso(`${MES[trabado - 1]} is locked (history from the LEDGER).`);
+      return;
+    }
+    const aterriza = d > 0 ? bloque.m1 + 1 : bloque.m0 - 1;
+    const ocupado = total(bloque.wbs, anio, aterriza);
+    if (Math.abs(ocupado) > 0.005) {
+      setAviso(
+        `${MES[aterriza - 1]} already holds ${usd(ocupado)} — moving the block there would replace it. Use Alt+←/→ to slip the whole row instead.`,
+      );
+      return;
+    }
+    const vals = ms.map((m) => total(bloque.wbs, anio, m));
+    const nuevo = new Map(pend);
+    // Se escribe el destino y se vacia SOLO la punta que queda afuera. Vaciar
+    // todo primero y reescribir no sirve: `aplicarMes` compara contra lo que
+    // hay GUARDADO, no contra este lote, asi que un mes que cae en su mismo
+    // valor no se reescribiria y quedaria el vaciado.
+    for (const [i, m] of dest.entries()) {
+      aplicarMes(nuevo, bloque.wbs, m, vals[i] ? String(vals[i]) : "");
+    }
+    const fuera = d > 0 ? bloque.m0 : bloque.m1;
+    if (!dest.includes(fuera)) aplicarMes(nuevo, bloque.wbs, fuera, "");
+    setPend(nuevo);
+    setBloque({ wbs: bloque.wbs, m0: bloque.m0 + d, m1: bloque.m1 + d });
+    setAviso(null);
+  }
+
+  /** Vacia los meses del bloque. */
+  function vaciarBloque() {
+    if (!bloque) return;
+    const ms = rango(bloque.m0, bloque.m1).filter((m) => !bloqueado(m));
+    const nuevo = new Map(pend);
+    for (const m of ms) aplicarMes(nuevo, bloque.wbs, m, "");
+    setPend(nuevo);
+    setAviso(`${MES[bloque.m0 - 1]}–${MES[bloque.m1 - 1]} cleared.`);
+  }
+
   /** La grilla entera como TSV, lista para pegar en Excel. */
   function tsv(): string {
     const cab = [
-      "WBS", "TASK",
+      "WBS",
+      "TASK",
       ...MES.map((m) => `${m} ${anio}`),
       `TOTAL ${anio}`,
       ...MES.map((m) => `${m} ${base}`),
@@ -267,7 +440,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
       const celdas = cruda.split("\t");
       if (celdas.length < 2) continue;
       const code = (celdas[0] ?? "").trim();
-      if (!code || /^wbs$/i.test(code)) continue;      // la fila de encabezado
+      if (!code || /^wbs$/i.test(code)) continue; // la fila de encabezado
       const wbs = porCode.get(code);
       if (wbs == null) {
         sinLinea.push(code);
@@ -368,24 +541,24 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2">
         {anioProp === undefined ? (
-        <label className="flex items-center gap-2 text-xs font-semibold text-teal-900">
-          Year
-          <select
-            value={anio}
-            onChange={(e) => {
-              if (pendientes && !window.confirm("You have unsaved edits. Discard them?")) return;
-              setPend(new Map());
-              setAnio(Number(e.target.value));
-            }}
-            className="rounded border border-teal-300 bg-white px-2 py-1 text-sm font-bold text-teal-900"
-          >
-            {[ahora, ahora + 1, ahora + 2, ahora + 3].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="flex items-center gap-2 text-xs font-semibold text-teal-900">
+            Year
+            <select
+              value={anio}
+              onChange={(e) => {
+                if (pendientes && !window.confirm("You have unsaved edits. Discard them?")) return;
+                setPend(new Map());
+                setAnio(Number(e.target.value));
+              }}
+              className="rounded border border-teal-300 bg-white px-2 py-1 text-sm font-bold text-teal-900"
+            >
+              {[ahora, ahora + 1, ahora + 2, ahora + 3].map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
         <span className="text-[11px] text-teal-800">
           editing <b>{anio}</b> · <b>{base}</b> read-only beside it
@@ -457,8 +630,8 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
           </ol>
           <p className="text-[11px] text-emerald-800">
             Rows are matched by <b>WBS code</b>, not by position &mdash; sorting or filtering in
-            Excel will not land the numbers on the wrong line. What comes back stays amber until
-            you press <b>Save</b>, so you can check it first.
+            Excel will not land the numbers on the wrong line. What comes back stays amber until you
+            press <b>Save</b>, so you can check it first.
           </p>
           <textarea
             value={texto}
@@ -494,6 +667,78 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
         </div>
       ) : null}
 
+      {/* ⚠️ La barra va FIJA al borde de la pantalla, no al pie de la tabla.
+          Con 78 lineas y 24 columnas, una barra al final de la pagina obliga a
+          bajar hasta el fondo para mover algo que se esta mirando arriba — que
+          es exactamente lo que el owner marco en rojo con las flechas de mes. */}
+      {bloque ? (
+        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 print:hidden">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-blue-500 bg-white px-3 py-2 shadow-xl">
+            <span className="text-xs font-semibold text-blue-900">
+              {MES[bloque.m0 - 1]}
+              {bloque.m1 > bloque.m0 ? `–${MES[bloque.m1 - 1]}` : ""}
+              <span className="ml-1 font-normal text-slate-500">
+                ({bloque.m1 - bloque.m0 + 1} {bloque.m1 === bloque.m0 ? "month" : "months"})
+              </span>
+              <span className="tabular ml-2 font-bold">{usd(totalBloque()) || "0"}</span>
+            </span>
+            <span className="h-4 w-px bg-slate-300" />
+            {/* Repartir lo que el bloque ya suma, entre sus propios meses. */}
+            {(
+              [
+                ["Level", "flat", "Equal split across the block"],
+                ["↗ Ramp", "up", "Light at the start, heavier at the end"],
+                ["↘ Taper", "down", "Heavy at the start, lighter at the end"],
+                ["▲ Peak", "bell", "Peak in the middle"],
+              ] as [string, Reparto["curva"], string][]
+            ).map(([etq, c, ayuda]) => (
+              <button
+                key={c}
+                type="button"
+                title={ayuda}
+                onClick={() => nivelarBloque(c)}
+                className="rounded border border-blue-600 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+              >
+                {etq}
+              </button>
+            ))}
+            <span className="h-4 w-px bg-slate-300" />
+            <button
+              type="button"
+              title="Move the block one month back"
+              onClick={() => correrBloque(-1)}
+              className="rounded border border-blue-600 px-2 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+            >
+              ◀
+            </button>
+            <button
+              type="button"
+              title="Move the block one month forward"
+              onClick={() => correrBloque(1)}
+              className="rounded border border-blue-600 px-2 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+            >
+              ▶
+            </button>
+            <button
+              type="button"
+              title="Clear the months in the block"
+              onClick={vaciarBloque}
+              className="rounded border border-slate-400 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              title="Release the block (Esc)"
+              onClick={() => setBloque(null)}
+              className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {aviso ? (
         <div className="flex items-center gap-2 rounded border border-slate-300 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-700">
           {aviso}
@@ -507,12 +752,27 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
         </div>
       ) : null}
 
-      <p className="text-[11px] text-slate-500">
-        Type a monthly total and it spreads across that month&apos;s weeks, the same rule the Job
-        Cost uses. Math works (<code>1000+500</code>, <code>=46500/3</code>). Enter, Tab and arrows
-        move; paste a block straight from Excel. Months entirely before the Forecast cut-off
-        {cutoff ? ` (${cutoff})` : ""} are history from the LEDGER and are locked.
-      </p>
+      <div className="space-y-1 text-[11px] text-slate-500">
+        <p>
+          Type a monthly total and it spreads across that month&apos;s weeks, the same rule the Job
+          Cost uses. Math works (<code>1000+500</code>, <code>=46500/3</code>). Enter, Tab and
+          arrows move; paste a block straight from Excel. Months entirely before the Forecast
+          cut-off{cutoff ? ` (${cutoff})` : ""} are history from the LEDGER and are locked.
+        </p>
+        <p>
+          <b className="text-slate-700">Spread it across months</b> — type it in the first month:{" "}
+          <code>80000&gt;5</code> puts 80,000 over 5 months from there; <code>&gt;5</code> spreads
+          whatever that cell already holds, without retyping it; <code>&gt;may</code> runs up to
+          May. Add <code>~up</code>, <code>~down</code> or <code>~bell</code> for a ramp instead of
+          a flat split. Locked months are skipped and the amount goes to the ones still open.
+        </p>
+        <p>
+          <b className="text-slate-700">Move it</b> — <kbd>Shift</kbd>+click a second month on the
+          same row to mark a block, then level it or slide it from the bar at the bottom.{" "}
+          <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> slips the whole row one month, for when a
+          milestone moves and everything behind it moves with it.
+        </p>
+      </div>
 
       {/* ⚠️ El alto se calcula contra la VENTANA, no un 66vh fijo.
           Con 66vh y casi 40vh de encabezados arriba, la pagina quedaba con una
@@ -563,281 +823,322 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
           className="overflow-auto rounded-lg border border-slate-200 bg-white"
           style={{ height: "calc(100vh - 330px)", minHeight: 320 }}
         >
-        <table className="border-collapse text-[11px]">
-          <thead className="sticky top-0 z-20">
-            <tr className="bg-[#0F5F59] text-white">
-              {FIJAS.map((c, i) => (
-                <th
-                  key={c.k}
-                  rowSpan={2}
-                  style={{ left: IZQ[i], width: c.w, minWidth: c.w }}
-                  className={`sticky z-30 bg-[#0F5F59] px-2 py-1 align-bottom ${
-                    i < 2 ? "text-left" : "text-right"
-                  }`}
-                >
-                  {c.etq}
-                </th>
-              ))}
-              {MES.map((m, i) => (
-                <th
-                  key={m}
-                  colSpan={2}
-                  className={`border-l-2 border-white/40 px-1 py-1 text-center ${
-                    bloqueado(i + 1) ? "text-white/50" : ""
-                  }`}
-                >
-                  {m}
-                  {bloqueado(i + 1) ? " 🔒" : ""}
-                </th>
-              ))}
-              <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {anio}</th>
-              <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {base}</th>
-              <th className="bg-[#8A5A00] px-2 py-1 text-right">VAR</th>
-            </tr>
-            <tr className="bg-[#1F4E79] text-white">
-              {MES.map((m) => (
-                <Fragment key={m}>
-                  {/* El año que se EDITA, resaltado; el anterior, apagado. */}
+          <table className="border-collapse text-[11px]">
+            <thead className="sticky top-0 z-20">
+              <tr className="bg-[#0F5F59] text-white">
+                {FIJAS.map((c, i) => (
                   <th
-                    data-mes={MES.indexOf(m) + 1}
-                    style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                    className="border-l-2 border-white/40 bg-[#2962FF] px-1 text-right text-[10px] font-bold"
+                    key={c.k}
+                    rowSpan={2}
+                    style={{ left: IZQ[i], width: c.w, minWidth: c.w }}
+                    className={`sticky z-30 bg-[#0F5F59] px-2 py-1 align-bottom ${
+                      i < 2 ? "text-left" : "text-right"
+                    }`}
                   >
-                    {anio} ✎
+                    {c.etq}
                   </th>
+                ))}
+                {MES.map((m, i) => (
                   <th
-                    style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                    className="px-1 text-right text-[10px] font-normal text-white/50"
+                    key={m}
+                    colSpan={2}
+                    className={`border-l-2 border-white/40 px-1 py-1 text-center ${
+                      bloqueado(i + 1) ? "text-white/50" : ""
+                    }`}
                   >
-                    {base}
+                    {m}
+                    {bloqueado(i + 1) ? " 🔒" : ""}
                   </th>
-                </Fragment>
-              ))}
-              <th colSpan={3} className="bg-[#8A5A00]" />
-            </tr>
-          </thead>
-          <tbody>
-            {grupos.map(([sec, ls]) => (
-              <Fragment key={sec}>
-                <tr className="bg-[#EAF0FA]">
-                  <td colSpan={FIJAS.length + 24 + 3} className="px-2 py-1 font-semibold text-teal-900">
-                    {sec} {(titulos.get(sec) ?? "").toUpperCase()}
-                  </td>
-                </tr>
-                {ls.map((l) => {
-                  const ta = anual(l.id, anio);
-                  const tb = anual(l.id, base);
-                  return (
-                    <tr key={l.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <Fija i={0} fondo="bg-white" cls="font-mono text-[10px]">
-                        {l.wbs_code}
-                      </Fija>
-                      <Fija i={1} fondo="bg-white" cls="truncate">
-                        <span title={l.title}>{l.title}</span>
-                      </Fija>
-                      {/* ⚠️ Presupuesto, gasto y variación salen de
+                ))}
+                <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {anio}</th>
+                <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {base}</th>
+                <th className="bg-[#8A5A00] px-2 py-1 text-right">VAR</th>
+              </tr>
+              <tr className="bg-[#1F4E79] text-white">
+                {MES.map((m) => (
+                  <Fragment key={m}>
+                    {/* El año que se EDITA, resaltado; el anterior, apagado. */}
+                    <th
+                      data-mes={MES.indexOf(m) + 1}
+                      style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                      className="border-l-2 border-white/40 bg-[#2962FF] px-1 text-right text-[10px] font-bold"
+                    >
+                      {anio} ✎
+                    </th>
+                    <th
+                      style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                      className="px-1 text-right text-[10px] font-normal text-white/50"
+                    >
+                      {base}
+                    </th>
+                  </Fragment>
+                ))}
+                <th colSpan={3} className="bg-[#8A5A00]" />
+              </tr>
+            </thead>
+            <tbody>
+              {grupos.map(([sec, ls]) => (
+                <Fragment key={sec}>
+                  <tr className="bg-[#EAF0FA]">
+                    <td
+                      colSpan={FIJAS.length + 24 + 3}
+                      className="px-2 py-1 font-semibold text-teal-900"
+                    >
+                      {sec} {(titulos.get(sec) ?? "").toUpperCase()}
+                    </td>
+                  </tr>
+                  {ls.map((l) => {
+                    const ta = anual(l.id, anio);
+                    const tb = anual(l.id, base);
+                    return (
+                      <tr key={l.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <Fija i={0} fondo="bg-white" cls="font-mono text-[10px]">
+                          {l.wbs_code}
+                        </Fija>
+                        <Fija i={1} fondo="bg-white" cls="truncate">
+                          <span title={l.title}>{l.title}</span>
+                        </Fija>
+                        {/* ⚠️ Presupuesto, gasto y variación salen de
                           `v_wbs_financials`, la misma vista que alimenta el Job
                           Cost. No se recalculan acá: si se calcularan aparte,
                           esta pantalla y aquella podrían decir cosas distintas
                           de la misma línea. */}
-                      <Fija i={2} fondo="bg-slate-50" cls="text-slate-600">
-                        {usd(Number(l.budget_revised))}
-                      </Fija>
-                      <Fija i={3} fondo="bg-slate-50" cls="text-slate-600">
-                        {usd(Number(l.spend))}
-                      </Fija>
-                      <Fija
-                        i={4}
-                        fondo="bg-slate-50"
-                        cls={
-                          Number(l.remaining) < 0 ? "font-semibold text-red-700" : "text-slate-700"
-                        }
-                      >
-                        {usd(Number(l.remaining))}
-                      </Fija>
-                      {MES.map((m, i) => {
-                        const mes = i + 1;
-                        const v = total(l.id, anio, mes);
-                        const vb = total(l.id, base, mes);
-                        const lock = bloqueado(mes);
-                        const ws = semanasDe.get(`${anio}-${String(mes).padStart(2, "0")}`) ?? [];
-                        const sucia = ws.some((w) => pend.has(`${l.id}|${w}`));
-                        const activa = sel?.wbs === l.id && sel?.mes === mes;
-                        return (
-                          <Fragment key={m}>
-                            {/* El año que se EDITA va en azul claro; el
+                        <Fija i={2} fondo="bg-slate-50" cls="text-slate-600">
+                          {usd(Number(l.budget_revised))}
+                        </Fija>
+                        <Fija i={3} fondo="bg-slate-50" cls="text-slate-600">
+                          {usd(Number(l.spend))}
+                        </Fija>
+                        <Fija
+                          i={4}
+                          fondo="bg-slate-50"
+                          cls={
+                            Number(l.remaining) < 0
+                              ? "font-semibold text-red-700"
+                              : "text-slate-700"
+                          }
+                        >
+                          {usd(Number(l.remaining))}
+                        </Fija>
+                        {MES.map((m, i) => {
+                          const mes = i + 1;
+                          const v = total(l.id, anio, mes);
+                          const vb = total(l.id, base, mes);
+                          const lock = bloqueado(mes);
+                          const ws = semanasDe.get(`${anio}-${String(mes).padStart(2, "0")}`) ?? [];
+                          const sucia = ws.some((w) => pend.has(`${l.id}|${w}`));
+                          const activa = sel?.wbs === l.id && sel?.mes === mes;
+                          const enBloque =
+                            bloque?.wbs === l.id && mes >= bloque.m0 && mes <= bloque.m1;
+                          return (
+                            <Fragment key={m}>
+                              {/* El año que se EDITA va en azul claro; el
                                 anterior, en gris. Antes los dos eran blancos y
                                 había que leer el encabezado para saber en cuál
                                 se estaba escribiendo. */}
-                            <td
-                              style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                              className={`border-l-2 border-slate-300 p-0 text-right ${
-                                lock
-                                  ? "bg-slate-200 text-slate-400"
-                                  : sucia
-                                    ? "bg-amber-100 ring-1 ring-inset ring-amber-500"
-                                    : "bg-[#EEF4FF]"
-                              }`}
-                            >
-                              {activa && buf !== null ? (
-                                <input
-                                  ref={cajaRef}
-                                  autoFocus
-                                  value={buf}
-                                  onChange={(e) => setBuf(e.target.value)}
-                                  onPaste={(e) => {
-                                    const txt = e.clipboardData.getData("text");
-                                    if (txt.includes("\t") || txt.includes("\n")) {
-                                      e.preventDefault();
-                                      pegar(l.id, mes, txt);
-                                      setBuf(null);
-                                      setSel(null);
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    const mover = (dm: number, dl: number) => {
+                              <td
+                                style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                                className={`border-l-2 border-slate-300 p-0 text-right ${
+                                  lock
+                                    ? "bg-slate-200 text-slate-400"
+                                    : sucia
+                                      ? "bg-amber-100 ring-1 ring-inset ring-amber-500"
+                                      : enBloque
+                                        ? "bg-blue-200 ring-1 ring-inset ring-blue-600"
+                                        : "bg-[#EEF4FF]"
+                                }`}
+                              >
+                                {activa && buf !== null ? (
+                                  <input
+                                    ref={cajaRef}
+                                    autoFocus
+                                    value={buf}
+                                    onChange={(e) => setBuf(e.target.value)}
+                                    onPaste={(e) => {
+                                      const txt = e.clipboardData.getData("text");
+                                      if (txt.includes("\t") || txt.includes("\n")) {
+                                        e.preventDefault();
+                                        pegar(l.id, mes, txt);
+                                        setBuf(null);
+                                        setSel(null);
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      const mover = (dm: number, dl: number) => {
+                                        anotarMes(l.id, mes, buf);
+                                        const orden = lineas.map((x) => x.id);
+                                        const i2 = orden.indexOf(l.id) + dl;
+                                        const m2 = mes + dm;
+                                        setBuf(null);
+                                        if (m2 >= 1 && m2 <= 12 && orden[i2] != null)
+                                          setSel({ wbs: orden[i2], mes: m2 });
+                                        else setSel(null);
+                                      };
+                                      // Alt+flecha corre la FILA, no el cursor.
+                                      if (
+                                        e.altKey &&
+                                        (e.key === "ArrowRight" || e.key === "ArrowLeft")
+                                      ) {
+                                        e.preventDefault();
+                                        anotarMes(l.id, mes, buf);
+                                        setBuf(null);
+                                        correrFila(l.id, e.key === "ArrowRight" ? 1 : -1);
+                                        return;
+                                      }
+                                      if (e.key === "Enter" || e.key === "ArrowDown") {
+                                        e.preventDefault();
+                                        mover(0, 1);
+                                      } else if (e.key === "Tab" || e.key === "ArrowRight") {
+                                        e.preventDefault();
+                                        mover(1, 0);
+                                      } else if (e.key === "ArrowLeft") {
+                                        e.preventDefault();
+                                        mover(-1, 0);
+                                      } else if (e.key === "ArrowUp") {
+                                        e.preventDefault();
+                                        mover(0, -1);
+                                      } else if (e.key === "Escape") {
+                                        setBuf(null);
+                                        setSel(null);
+                                        setBloque(null);
+                                      }
+                                    }}
+                                    onBlur={() => {
                                       anotarMes(l.id, mes, buf);
-                                      const orden = lineas.map((x) => x.id);
-                                      const i2 = orden.indexOf(l.id) + dl;
-                                      const m2 = mes + dm;
                                       setBuf(null);
-                                      if (m2 >= 1 && m2 <= 12 && orden[i2] != null)
-                                        setSel({ wbs: orden[i2], mes: m2 });
-                                      else setSel(null);
-                                    };
-                                    if (e.key === "Enter" || e.key === "ArrowDown") {
-                                      e.preventDefault();
-                                      mover(0, 1);
-                                    } else if (e.key === "Tab" || e.key === "ArrowRight") {
-                                      e.preventDefault();
-                                      mover(1, 0);
-                                    } else if (e.key === "ArrowLeft") {
-                                      e.preventDefault();
-                                      mover(-1, 0);
-                                    } else if (e.key === "ArrowUp") {
-                                      e.preventDefault();
-                                      mover(0, -1);
-                                    } else if (e.key === "Escape") {
-                                      setBuf(null);
-                                      setSel(null);
-                                    }
-                                  }}
-                                  onBlur={() => {
-                                    anotarMes(l.id, mes, buf);
-                                    setBuf(null);
-                                  }}
-                                  className="w-full bg-white px-1 py-0.5 text-right text-[11px] outline-none ring-2 ring-inset ring-[#2962FF]"
-                                />
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled={lock}
-                                  onClick={() => {
-                                    if (lock) return;
-                                    setSel({ wbs: l.id, mes });
-                                    setBuf(v ? String(v) : "");
-                                  }}
-                                  className="tabular w-full px-1 py-0.5 text-right disabled:cursor-not-allowed"
-                                  title={lock ? "History from the LEDGER — locked" : undefined}
-                                >
-                                  {usd(v)}
-                                </button>
-                              )}
-                            </td>
-                            <td
-                              style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                              className="tabular bg-slate-50 px-1 text-right text-[10px] text-slate-400"
-                            >
-                              {usd(vb)}
-                            </td>
-                          </Fragment>
-                        );
-                      })}
-                      <td className="tabular bg-amber-50 px-2 text-right font-bold">{usd(ta)}</td>
-                      <td className="tabular bg-amber-50/50 px-2 text-right text-slate-500">
-                        {usd(tb)}
-                      </td>
-                      <td
-                        className={`tabular bg-amber-50/50 px-2 text-right ${
-                          ta - tb > 0 ? "text-red-700" : "text-emerald-700"
-                        }`}
-                      >
-                        {usd(ta - tb)}
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-[#DCE6F4] font-semibold">
-                  <Fija i={0} fondo="bg-[#DCE6F4]" />
-                  <Fija i={1} fondo="bg-[#DCE6F4]" cls="whitespace-nowrap">
-                    Subtotal {sec}
-                  </Fija>
-                  <Fija i={2} fondo="bg-[#DCE6F4]">
-                    {usd(ls.reduce((a, l) => a + Number(l.budget_revised), 0))}
-                  </Fija>
-                  <Fija i={3} fondo="bg-[#DCE6F4]">
-                    {usd(ls.reduce((a, l) => a + Number(l.spend), 0))}
-                  </Fija>
-                  <Fija i={4} fondo="bg-[#DCE6F4]">
-                    {usd(ls.reduce((a, l) => a + Number(l.remaining), 0))}
-                  </Fija>
-                  {MES.map((m, i) => (
-                    <Fragment key={m}>
-                      <td
-                        style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                        className="tabular border-l-2 border-slate-400 bg-[#E3EDFF] px-1 text-right"
-                      >
-                        {usd(ls.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
-                      </td>
-                      <td className="tabular px-1 text-right text-[10px] text-slate-500">
-                        {usd(ls.reduce((s, l) => s + total(l.id, base, i + 1), 0))}
-                      </td>
-                    </Fragment>
-                  ))}
-                  <td className="tabular px-2 text-right">
-                    {usd(ls.reduce((s, l) => s + anual(l.id, anio), 0))}
-                  </td>
-                  <td className="tabular px-2 text-right text-slate-500">
-                    {usd(ls.reduce((s, l) => s + anual(l.id, base), 0))}
-                  </td>
-                  <td className="tabular px-2 text-right">
-                    {usd(ls.reduce((s, l) => s + anual(l.id, anio) - anual(l.id, base), 0))}
-                  </td>
-                </tr>
-              </Fragment>
-            ))}
-            <tr className="bg-[#0F5F59] font-bold text-white">
-              <Fija i={0} fondo="bg-[#0F5F59]" />
-              <Fija i={1} fondo="bg-[#0F5F59]" cls="whitespace-nowrap">
-                PROJECT TOTAL
-              </Fija>
-              <Fija i={2} fondo="bg-[#0F5F59]">
-                {usd(lineas.reduce((a, l) => a + Number(l.budget_revised), 0))}
-              </Fija>
-              <Fija i={3} fondo="bg-[#0F5F59]">
-                {usd(lineas.reduce((a, l) => a + Number(l.spend), 0))}
-              </Fija>
-              <Fija i={4} fondo="bg-[#0F5F59]">
-                {usd(lineas.reduce((a, l) => a + Number(l.remaining), 0))}
-              </Fija>
-              {MES.map((m, i) => (
-                <Fragment key={m}>
-                  <td
-                    style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                    className="tabular border-l-2 border-white/40 px-1 text-right"
-                  >
-                    {usd(lineas.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
-                  </td>
-                  <td className="tabular px-1 text-right text-[10px] text-white/70">
-                    {usd(lineas.reduce((s, l) => s + total(l.id, base, i + 1), 0))}
-                  </td>
+                                    }}
+                                    className="w-full bg-white px-1 py-0.5 text-right text-[11px] outline-none ring-2 ring-inset ring-[#2962FF]"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={lock}
+                                    onClick={(e) => {
+                                      if (lock) return;
+                                      // Shift+clic: marca de la celda anterior
+                                      // hasta esta, sin entrar a editar. Si no
+                                      // hay de donde partir, marca esta sola.
+                                      if (e.shiftKey) {
+                                        // ⚠️ El ancla NO se mueve. Si se moviera,
+                                        // marcar ENE-MAY y despues Shift+clic en
+                                        // AGO daria MAY-AGO en vez de ENE-AGO: la
+                                        // seleccion se iria caminando y nunca se
+                                        // podria agrandar un bloque ya hecho.
+                                        const ancla = sel?.wbs === l.id ? sel.mes : mes;
+                                        setBloque({
+                                          wbs: l.id,
+                                          m0: Math.min(ancla, mes),
+                                          m1: Math.max(ancla, mes),
+                                        });
+                                        setBuf(null);
+                                        if (sel?.wbs !== l.id) setSel({ wbs: l.id, mes });
+                                        return;
+                                      }
+                                      setBloque(null);
+                                      setSel({ wbs: l.id, mes });
+                                      setBuf(v ? String(v) : "");
+                                    }}
+                                    className="tabular w-full px-1 py-0.5 text-right disabled:cursor-not-allowed"
+                                    title={lock ? "History from the LEDGER — locked" : undefined}
+                                  >
+                                    {usd(v)}
+                                  </button>
+                                )}
+                              </td>
+                              <td
+                                style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                                className="tabular bg-slate-50 px-1 text-right text-[10px] text-slate-400"
+                              >
+                                {usd(vb)}
+                              </td>
+                            </Fragment>
+                          );
+                        })}
+                        <td className="tabular bg-amber-50 px-2 text-right font-bold">{usd(ta)}</td>
+                        <td className="tabular bg-amber-50/50 px-2 text-right text-slate-500">
+                          {usd(tb)}
+                        </td>
+                        <td
+                          className={`tabular bg-amber-50/50 px-2 text-right ${
+                            ta - tb > 0 ? "text-red-700" : "text-emerald-700"
+                          }`}
+                        >
+                          {usd(ta - tb)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-[#DCE6F4] font-semibold">
+                    <Fija i={0} fondo="bg-[#DCE6F4]" />
+                    <Fija i={1} fondo="bg-[#DCE6F4]" cls="whitespace-nowrap">
+                      Subtotal {sec}
+                    </Fija>
+                    <Fija i={2} fondo="bg-[#DCE6F4]">
+                      {usd(ls.reduce((a, l) => a + Number(l.budget_revised), 0))}
+                    </Fija>
+                    <Fija i={3} fondo="bg-[#DCE6F4]">
+                      {usd(ls.reduce((a, l) => a + Number(l.spend), 0))}
+                    </Fija>
+                    <Fija i={4} fondo="bg-[#DCE6F4]">
+                      {usd(ls.reduce((a, l) => a + Number(l.remaining), 0))}
+                    </Fija>
+                    {MES.map((m, i) => (
+                      <Fragment key={m}>
+                        <td
+                          style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                          className="tabular border-l-2 border-slate-400 bg-[#E3EDFF] px-1 text-right"
+                        >
+                          {usd(ls.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
+                        </td>
+                        <td className="tabular px-1 text-right text-[10px] text-slate-500">
+                          {usd(ls.reduce((s, l) => s + total(l.id, base, i + 1), 0))}
+                        </td>
+                      </Fragment>
+                    ))}
+                    <td className="tabular px-2 text-right">
+                      {usd(ls.reduce((s, l) => s + anual(l.id, anio), 0))}
+                    </td>
+                    <td className="tabular px-2 text-right text-slate-500">
+                      {usd(ls.reduce((s, l) => s + anual(l.id, base), 0))}
+                    </td>
+                    <td className="tabular px-2 text-right">
+                      {usd(ls.reduce((s, l) => s + anual(l.id, anio) - anual(l.id, base), 0))}
+                    </td>
+                  </tr>
                 </Fragment>
               ))}
-              <td className="tabular px-2 text-right">{usd(anioTot(anio))}</td>
-              <td className="tabular px-2 text-right text-white/70">{usd(anioTot(base))}</td>
-              <td className="tabular px-2 text-right">{usd(anioTot(anio) - anioTot(base))}</td>
-            </tr>
-          </tbody>
+              <tr className="bg-[#0F5F59] font-bold text-white">
+                <Fija i={0} fondo="bg-[#0F5F59]" />
+                <Fija i={1} fondo="bg-[#0F5F59]" cls="whitespace-nowrap">
+                  PROJECT TOTAL
+                </Fija>
+                <Fija i={2} fondo="bg-[#0F5F59]">
+                  {usd(lineas.reduce((a, l) => a + Number(l.budget_revised), 0))}
+                </Fija>
+                <Fija i={3} fondo="bg-[#0F5F59]">
+                  {usd(lineas.reduce((a, l) => a + Number(l.spend), 0))}
+                </Fija>
+                <Fija i={4} fondo="bg-[#0F5F59]">
+                  {usd(lineas.reduce((a, l) => a + Number(l.remaining), 0))}
+                </Fija>
+                {MES.map((m, i) => (
+                  <Fragment key={m}>
+                    <td
+                      style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                      className="tabular border-l-2 border-white/40 px-1 text-right"
+                    >
+                      {usd(lineas.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
+                    </td>
+                    <td className="tabular px-1 text-right text-[10px] text-white/70">
+                      {usd(lineas.reduce((s, l) => s + total(l.id, base, i + 1), 0))}
+                    </td>
+                  </Fragment>
+                ))}
+                <td className="tabular px-2 text-right">{usd(anioTot(anio))}</td>
+                <td className="tabular px-2 text-right text-white/70">{usd(anioTot(base))}</td>
+                <td className="tabular px-2 text-right">{usd(anioTot(anio) - anioTot(base))}</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
