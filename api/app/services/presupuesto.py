@@ -13,7 +13,13 @@ remanente:
 
     vencido   — planeado para una semana QUE YA PASÓ y que sigue en el
                 remanente: se presupuestó, no se ejecutó, y nadie lo movió.
-    arrastre  — lo planeado de hoy a fin del año en curso.
+    arrastre  — lo planeado ANTES del año que se presupuesta y que todavía no
+                pasó. Con el año siguiente eso es «lo que queda de este año»,
+                que es el caso normal. ⚠️ Con un año más lejano son TAMBIÉN los
+                años del medio: pidiendo 2028 desde nov-2026, el arrastre trae
+                los doce meses de 2027 ($4.7 M). El número es correcto —falta
+                por ejecutar antes del año pedido— pero la pantalla cambia el
+                rótulo a «Pending before <año>» para no llamarlo «este año».
     plan      — lo planeado dentro del año que se presupuesta.
     posterior — lo planeado en años más adelante.
 
@@ -112,7 +118,10 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
         elif w.year > anio:
             posterior[code] += monto
         elif w >= hoy:
-            arrastre[code] += monto          # pendiente de aquí a fin de año
+            # Pendiente, anterior al año presupuestado. A medida que pasan
+            # las semanas sin ejecutarse, cae al `vencido` de abajo: la plata no
+            # se pierde, cambia de tramo. El 31-dic el arrastre llega a cero.
+            arrastre[code] += monto
         elif w >= corte:
             vencido[code] += monto           # ⚠️ la semana ya pasó y sigue pendiente
 

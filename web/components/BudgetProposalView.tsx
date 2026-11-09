@@ -62,8 +62,14 @@ const TRAMOS = {
     cls: "text-red-700",
   },
   arrastre: {
+    // ⚠️ El rotulo cambia con el año elegido, porque el numero cambia de
+    // significado. El calculo es «todo lo planeado ANTES del año presupuestado
+    // que todavia no paso». Con el año siguiente eso es exactamente «lo que
+    // queda de este año» —son los unicos dias que caben en el medio—. Con 2028
+    // son TAMBIEN los doce meses de 2027: $4,735,479 bajo un rotulo que dice
+    // «this year» es una mentira de cuatro millones y medio.
     etq: "Carry-over from this year",
-    de: "Lo que el cronograma tiene de hoy a fin del año en curso. Se arrastra al presupuesto porque todavía no se gastó.",
+    de: "Lo que el cronograma tiene de hoy al 31 de diciembre del año en curso y todavía no se gastó. A medida que pasan las semanas sin ejecutarse, este monto NO desaparece: migra a «Overdue». El 31 de diciembre llega a cero.",
     linea: (f: BudgetProposalRow) => f.arrastre,
     cls: "text-amber-700",
   },
@@ -245,7 +251,13 @@ export function BudgetProposalView() {
           ).map(([k, v]) => {
             const tr = TRAMOS[k];
             const et =
-              k === "plan" || k === "posterior" ? `${tr.etq} ${anio}` : tr.etq;
+              k === "plan" || k === "posterior"
+                ? `${tr.etq} ${anio}`
+                : k === "arrastre" && anio > ahora + 1
+                  ? // Con un año lejano esto ya no es «lo que queda de este año»:
+                    // son todos los años que hay en el medio. Se dice asi.
+                    `Pending before ${anio}`
+                  : tr.etq;
             const cls =
               k === "sin_ubicar" && Math.abs(v) > 5 ? "text-red-700" : tr.cls;
             return (
@@ -377,7 +389,11 @@ function Desglose({
     <div className="rounded-lg border border-teal-300 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-teal-200 bg-teal-50 px-3 py-2">
         <span className="text-sm font-bold text-teal-900">
-          {tramo === "plan" || tramo === "posterior" ? `${tr.etq} ${anio}` : tr.etq}
+          {tramo === "plan" || tramo === "posterior"
+            ? `${tr.etq} ${anio}`
+            : tramo === "arrastre" && anio > new Date().getFullYear() + 1
+              ? `Pending before ${anio}`
+              : tr.etq}
         </span>
         <span className="tabular text-sm font-bold text-teal-900">{usd(total)}</span>
         <span className="text-[11px] text-teal-700">
