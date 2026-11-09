@@ -79,7 +79,7 @@ export function MatchReview() {
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full min-w-[1000px] text-xs">
-            <thead className="bg-[#0d6b72] text-left uppercase text-white">
+            <thead className="bg-[#2F956E] text-left uppercase text-white">
               <tr>
                 <th className="border-r border-white/20 px-3 py-2">Invoice — issuer / detail</th>
                 <th className="px-3 py-2">Ledger — description</th>

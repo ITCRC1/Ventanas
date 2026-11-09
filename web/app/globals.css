@@ -41,7 +41,11 @@ body {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  /* El blanco calido y el casi-negro verdoso de glif, en vez del gris azulado
+     de Tailwind. Es lo que cambia la sensacion de toda la app de una sola vez. */
+  background-color: #fbfaf6;
+  color: #151916;
+  @apply antialiased;
 }
 
 /* --- Números -------------------------------------------------------------

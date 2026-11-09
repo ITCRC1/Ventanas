@@ -933,7 +933,7 @@ export function InvoiceReceipts() {
       {/* Tabla */}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1600px] text-xs">
-          <thead className="bg-[#0d6b72] text-left uppercase text-white">
+          <thead className="bg-[#2F956E] text-left uppercase text-white">
             <tr>
               <th className="px-2 py-2">Received</th>
               <th className="px-2 py-2">Issuer</th>
@@ -950,10 +950,10 @@ export function InvoiceReceipts() {
               <th className="px-2 py-2 text-right">Total</th>
               <th className="px-2 py-2 text-right">Total (USD)</th>
               <th className="px-2 py-2 text-center">Files</th>
-              <th className="bg-[#8a5a00] px-2 py-2 text-center">Short Payment</th>
-              <th className="bg-[#8a5a00] px-2 py-2">Ledger entries (disbursements)</th>
-              <th className="bg-[#8a5a00] px-2 py-2">Status</th>
-              <th className="bg-[#8a5a00] px-2 py-2" />
+              <th className="bg-[#151916] px-2 py-2 text-center">Short Payment</th>
+              <th className="bg-[#151916] px-2 py-2">Ledger entries (disbursements)</th>
+              <th className="bg-[#151916] px-2 py-2">Status</th>
+              <th className="bg-[#151916] px-2 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

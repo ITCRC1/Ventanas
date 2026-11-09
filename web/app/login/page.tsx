@@ -65,8 +65,8 @@ export default function LoginPage() {
       {vencida ? (
         <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Your session expired after a spell of inactivity. Sign in again: we take you back to the
-          screen you were on. <strong>The last thing you typed may not have been
-          saved</strong> — check it when you come back.
+          screen you were on. <strong>The last thing you typed may not have been saved</strong> —
+          check it when you come back.
         </p>
       ) : null}
 
@@ -121,7 +121,9 @@ export default function LoginPage() {
               className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-sm"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && go(passwordLogin.mutateAsync({ email, password }))}
+              onKeyDown={(e) =>
+                e.key === "Enter" && go(passwordLogin.mutateAsync({ email, password }))
+              }
               placeholder="••••••••"
             />
             <button

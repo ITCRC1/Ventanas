@@ -704,7 +704,7 @@ function RunMonthButton({ disbNo, lines }: { disbNo: number; lines: number }) {
             ),
         });
       }}
-      className="rounded bg-[#2d3a5c] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#3d4a6c] disabled:opacity-40"
+      className="rounded bg-[#151916] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#2F956E] disabled:opacity-40"
     >
       {run.isPending ? "Running…" : "▶ Run the month"}
     </button>
@@ -868,7 +868,7 @@ export function ShortPaymentsView() {
           (b.status === "submitted" && canSubmit) || (b.status === "approved" && canApprove);
         return (
           <div key={b.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-[#2d3a5c] px-4 py-2 text-white">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-[#151916] px-4 py-2 text-white">
               <div>
                 <span className="font-semibold">To be sent {batchTitle(b)}</span>
                 <span className="ml-3 text-xs text-slate-300">

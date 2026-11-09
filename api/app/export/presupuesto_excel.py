@@ -61,22 +61,22 @@ from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter as gc
 
-TEAL = "FF0F5F59"
-AZUL = "FF1F4E79"
-AMBAR = "FF8A5A00"
-BANDA = "FFEAF0FA"
-SUBTOT = "FFDCE6F4"
-LEDGER = "FFFFF3CD"
-GRIS = "FF787B86"
-VERDE = "FFE8F5E9"
-ROJO = "FFF4CCCC"
+TEAL = "FF005C40"
+AZUL = "FF1161AA"
+AMBAR = "FF151916"
+BANDA = "FFF0F1EB"
+SUBTOT = "FFD8F4E6"
+LEDGER = "FFFFE8D6"
+GRIS = "FF65706A"
+VERDE = "FFD8F4E6"
+ROJO = "FFF8DCDE"
 MONEDA = '"$"#,##0;[Red]-"$"#,##0;"—"'
-MEDIO = Side(style="medium", color="FF9AA4B2")
+MEDIO = Side(style="medium", color="FF99A49D")
 # La divisoria entre bloques. Owner, 2026-11-09, marcandolas a mano sobre la
 # hoja: con 24 columnas de mes pegadas una a otra, el ojo pierde cual par
 # pertenece a que mes. Mas oscura que MEDIO porque tiene que leerse como una
 # separacion y no como el borde de una celda cualquiera.
-DIVISORIA = Side(style="medium", color="FF1F4E79")
+DIVISORIA = Side(style="medium", color="FF1161AA")
 BLANCO = Font(bold=True, color="FFFFFFFF", size=9)
 APAGADA = Font(size=9, color="FFAAB2BE")
 MESES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
@@ -297,7 +297,7 @@ def _hoja_datos(
                 cel.number_format = MONEDA
                 if col == 9 and f["vencido"]:
                     cel.fill = PatternFill("solid", fgColor=ROJO)
-                    cel.font = Font(bold=True, color="FF9C0006")
+                    cel.font = Font(bold=True, color="FF8E1F29")
                 elif col == 10 and f["arrastre"]:
                     cel.fill = PatternFill("solid", fgColor=LEDGER)
                 elif gris:
@@ -315,7 +315,7 @@ def _hoja_datos(
                 lg = ws.cell(r, 14, f["ritmo_ledger"])
                 lg.number_format = MONEDA
                 lg.fill = PatternFill("solid", fgColor=LEDGER)
-                lg.font = Font(size=9, color="FF8A5A00")
+                lg.font = Font(size=9, color="FF151916")
             continue
         tipo = _pintar_total(ws, r, N, p["t"] == "sub")
         ws.cell(r, 2, f"Subtotal {p['cat']}" if p["t"] == "sub" else f"TOTAL {anio}").font = tipo
@@ -492,7 +492,7 @@ def _hoja_meses(
         f"R{hr + 1}:R{ultima}",
         CellIsRule(operator="notBetween", formula=["-0.5", "0.5"],
                    fill=PatternFill("solid", bgColor=ROJO),
-                   font=Font(bold=True, color="FF9C0006")),
+                   font=Font(bold=True, color="FF8E1F29")),
     )
     # ⚠️ A..D fijas: el pedido era que la identidad no se vaya con el scroll.
     _cerrar(ws, hr, N, ultima, 5)
@@ -705,7 +705,7 @@ def _hoja_control(
         f"B{donde['sin_ubicar']}",
         CellIsRule(operator="notBetween", formula=["-5", "5"],
                    fill=PatternFill("solid", bgColor=ROJO),
-                   font=Font(bold=True, color="FF9C0006")),
+                   font=Font(bold=True, color="FF8E1F29")),
     )
     for col, w in ((1, 42), (2, 20), (3, 16)):
         ws.column_dimensions[gc(col)].width = w

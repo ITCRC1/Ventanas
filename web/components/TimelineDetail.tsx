@@ -267,7 +267,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
           className="border-collapse text-xs"
           style={{ userSelect: tool.paintOn ? "none" : "auto" }}
         >
-          <thead className="sticky top-0 z-30 bg-[#434343] text-left text-white">
+          <thead className="sticky top-0 z-30 bg-[#151916] text-left text-white">
             {/* Fila 1 — Trimestres */}
             <tr>
               {LEFT_COLS.map((c, i) =>
@@ -276,7 +276,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
                     key={c.label}
                     label={c.label}
                     help={COL_HELP[c.help]}
-                    className={`border border-slate-600 bg-[#434343] ${MONEYTH}`}
+                    className={`border border-slate-600 bg-[#151916] ${MONEYTH}`}
                     style={leftStyle(i, 32)}
                     align="right"
                     rowSpan={nHeaderRows}
@@ -284,7 +284,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
                 ) : (
                   <th
                     key={c.label}
-                    className={`border border-slate-600 bg-[#434343] ${c.money ? MONEYTH : "px-2 py-2"}`}
+                    className={`border border-slate-600 bg-[#151916] ${c.money ? MONEYTH : "px-2 py-2"}`}
                     rowSpan={nHeaderRows}
                     style={leftStyle(i, 32)}
                   >
@@ -304,7 +304,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
               <ColHead
                 label="Full Year"
                 help={COL_HELP.fullyear}
-                className="border border-slate-600 bg-[#2d3a5c] px-2 text-right text-xs uppercase"
+                className="border border-slate-600 bg-[#151916] px-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 align="right"
                 rowSpan={nHeaderRows}
@@ -370,40 +370,40 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
             })}
           </tbody>
           <tfoot className="sticky bottom-0 z-20">
-            <tr className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
+            <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
               <td
-                className="border border-slate-300 bg-[#C8DCF0] px-2 py-2"
+                className="border border-slate-300 bg-[#B8E8D2] px-2 py-2"
                 colSpan={6}
                 style={{ position: "sticky", left: 0, zIndex: 21 }}
               >
                 PROJECT TOTAL
               </td>
               <td
-                className="tabular border border-slate-300 bg-[#C8DCF0] px-2 py-2 text-right"
+                className="tabular border border-slate-300 bg-[#B8E8D2] px-2 py-2 text-right"
                 style={leftStyle(6, 21)}
               >
                 {moneyCell(grand.rev)}
               </td>
               <td
-                className="tabular border border-slate-300 bg-[#C8DCF0] px-2 py-2 text-right"
+                className="tabular border border-slate-300 bg-[#B8E8D2] px-2 py-2 text-right"
                 style={leftStyle(7, 21)}
               >
                 {moneyCell(grand.spend)}
               </td>
               <td
-                className="tabular border border-slate-300 bg-[#C8DCF0] px-2 py-2 text-right"
+                className="tabular border border-slate-300 bg-[#B8E8D2] px-2 py-2 text-right"
                 style={leftStyle(8, 21)}
               >
                 {moneyCell(grand.rem)}
               </td>
               <td
-                className="tabular border border-slate-300 bg-[#C8DCF0] px-2 py-2 text-right"
+                className="tabular border border-slate-300 bg-[#B8E8D2] px-2 py-2 text-right"
                 style={leftStyle(9, 21)}
               >
                 {moneyCell(grand.fc)}
               </td>
               <td
-                className="tabular border border-slate-300 bg-[#C8DCF0] px-2 py-2 text-right"
+                className="tabular border border-slate-300 bg-[#B8E8D2] px-2 py-2 text-right"
                 style={leftStyle(10, 21)}
               >
                 {moneyCell(grand.funding)}
@@ -416,7 +416,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
                   {gridCell(colSum(allLines, c.weeks))}
                 </td>
               ))}
-              <td className="tabular bg-[#2d3a5c] px-2 py-2 text-right text-white">
+              <td className="tabular bg-[#151916] px-2 py-2 text-right text-white">
                 {gridCell(yearSum(allLines))}
               </td>
             </tr>
@@ -477,7 +477,7 @@ function TimelineDetailGroup({
   // Fila de subtotal de categoría (reutilizable: TOTAL, o TOTAL GASTOS / TOTAL VENTA).
   // La VENTA se aísla en verde con borde propio para diferenciarla de los gastos.
   const catTotal = (label: string, s: Sums, ls: WbsFinancials[], key: string, venta = false) => {
-    const bg = venta ? "bg-[#DFF3E3]" : "bg-[#DCE6F4]";
+    const bg = venta ? "bg-[#D8F4E6]" : "bg-[#D8F4E6]";
     const bd = venta ? "border-emerald-600" : "border-slate-500";
     return (
       <tr key={key} className={`border-y-2 ${bd} ${bg} text-[12px] font-bold`}>
@@ -523,7 +523,7 @@ function TimelineDetailGroup({
             {gridCell(colSum(ls, c.weeks))}
           </td>
         ))}
-        <td className="tabular bg-[#cfe0f3] px-2 text-right">{gridCell(yearSum(ls))}</td>
+        <td className="tabular bg-[#D8F4E6] px-2 text-right">{gridCell(yearSum(ls))}</td>
       </tr>
     );
   };
@@ -531,15 +531,15 @@ function TimelineDetailGroup({
   const costs = lines.filter((l) => l.kind !== "proceeds");
   return (
     <>
-      <tr className="border-t-2 border-slate-400 bg-[#EAF0FA]">
+      <tr className="border-t-2 border-slate-400 bg-[#F0F1EB]">
         <td
-          className="border border-slate-300 bg-[#EAF0FA] px-2 py-1.5 text-[12px] font-bold uppercase text-slate-800"
+          className="border border-slate-300 bg-[#F0F1EB] px-2 py-1.5 text-[12px] font-bold uppercase text-slate-800"
           colSpan={FIXED}
           style={{ position: "sticky", left: 0, zIndex: 9 }}
         >
           <CategoryHead tool={tool} category={category} />
         </td>
-        <td colSpan={columns.length + 1} className="bg-[#EAF0FA]" />
+        <td colSpan={columns.length + 1} className="bg-[#F0F1EB]" />
       </tr>
       {/* La línea de venta (proceeds) NO se lista — va solo en TOTAL VENTA. */}
       {costs.map((r) => {
@@ -633,7 +633,7 @@ function TimelineDetailGroup({
                 </td>
               );
             })}
-            <td className="tabular bg-[#eef2f9] px-2 text-right font-medium">
+            <td className="tabular bg-[#FBFAF6] px-2 text-right font-medium">
               {gridCell(columnTotal(index, r.id, weekList))}
             </td>
           </tr>

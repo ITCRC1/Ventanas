@@ -134,7 +134,7 @@ export default function CuentaPage() {
           type="button"
           onClick={() => void guardar()}
           disabled={!puede}
-          className="w-full rounded bg-[#2d3a5c] px-4 py-2 font-medium text-white hover:bg-[#3d4a6c] disabled:opacity-40"
+          className="w-full rounded bg-[#151916] px-4 py-2 font-medium text-white hover:bg-[#2F956E] disabled:opacity-40"
         >
           {guardando ? "Saving…" : "Change password"}
         </button>

@@ -32,11 +32,11 @@ body { color: #1a1a1a; font-size: 11px; }
 h1 { font-size: 18px; margin: 0 0 2px; }
 .sub { color: #666; font-size: 11px; margin: 0 0 14px; }
 table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-th { background: #434343; color: #fff; text-align: left; padding: 5px 6px; font-size: 10px; }
+th { background: #151916; color: #fff; text-align: left; padding: 5px 6px; font-size: 10px; }
 td { padding: 4px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
-tr.total td { border-top: 2px solid #434343; font-weight: bold; background: #f0f4fa; }
-.credit td { color: #1a7f4b; }
+tr.total td { border-top: 2px solid #151916; font-weight: bold; background: #f0f4fa; }
+.credit td { color: #005C40; }
 .meta { margin: 10px 0; }
 .meta b { display: inline-block; width: 150px; }
 .letter { white-space: pre-wrap; line-height: 1.5; margin: 14px 0; }
@@ -90,7 +90,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
 td.mid { text-align: center; vertical-align: middle; }
 td.grand { text-align: right; vertical-align: middle; font-weight: bold; font-size: 9px; white-space: nowrap; }
 tr.total td { background: #d7e5f5; font-weight: bold; }
-tr.credit td { color: #1a7f4b; }
+tr.credit td { color: #005C40; }
 """
 
 
@@ -248,7 +248,7 @@ table.bd td.mid { text-align: center; vertical-align: middle; }
 table.bd td.grand { text-align: right; vertical-align: middle; font-weight: bold; font-size: 9px;
   white-space: nowrap; }
 table.bd tr.total td { background: #d7e5f5; font-weight: bold; }
-table.bd tr.credit td { color: #1a7f4b; }
+table.bd tr.credit td { color: #005C40; }
 """
 
 # Orden y etiquetas de la página "Payment Instructions" (llaves del payment_block).

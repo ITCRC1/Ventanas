@@ -63,14 +63,14 @@ export function VendorBudgetView({ owner }: { owner: string }) {
         {lineas.length > 0 && (
           <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
             <table className="w-full min-w-[1000px] border-collapse text-xs">
-              <thead className="sticky top-0 z-10 bg-[#434343] text-left text-white">
+              <thead className="sticky top-0 z-10 bg-[#151916] text-left text-white">
                 <tr>
                   <th className={TH}>WBS</th>
                   <th className={TH}>Date</th>
                   <th className={TH}>Concept</th>
                   <th className={TH}>Invoice #</th>
                   <th className={THR}>Committed</th>
-                  <th className={`${THR} bg-[#8a5a00]`}>Paid</th>
+                  <th className={`${THR} bg-[#151916]`}>Paid</th>
                   <th className={THR}>Due</th>
                 </tr>
               </thead>
@@ -87,7 +87,7 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                           lo que hace que a simple vista se vea dónde empieza
                           cada línea; con un gris suave, cuarenta asientos
                           seguidos se leen como una sola lista. */}
-                      <tr className="border-t-2 border-slate-400 bg-[#EAF0FA]">
+                      <tr className="border-t-2 border-slate-400 bg-[#F0F1EB]">
                         <td className="border border-slate-300 px-2 py-1.5 font-mono text-[12px] font-bold text-slate-800">
                           {l.wbs_code}
                         </td>
@@ -132,7 +132,7 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                       )}
 
                       {pagos.length > 0 && (
-                        <tr className="border-y-2 border-slate-500 bg-[#DCE6F4] text-[12px] font-bold">
+                        <tr className="border-y-2 border-slate-500 bg-[#D8F4E6] text-[12px] font-bold">
                           <td
                             className="border border-slate-300 px-2 py-1.5 text-right"
                             colSpan={4}
@@ -150,7 +150,7 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                 })}
               </tbody>
               <tfoot className="sticky bottom-0 z-10">
-                <tr className="bg-[#434343] font-semibold text-white">
+                <tr className="bg-[#151916] font-semibold text-white">
                   <td className={TD} colSpan={4}>
                     TOTAL {owner} · {todos.length} asientos
                   </td>

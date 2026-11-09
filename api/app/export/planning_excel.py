@@ -29,14 +29,14 @@ from openpyxl.worksheet.pagebreak import Break
 
 # Paleta: la de la app. El verde azulado de la barra, el ámbar de la banda de
 # anotaciones y el verde claro de la columna del plan.
-TEAL = "FF0F5F59"
+TEAL = "FF005C40"
 TEAL_SUAVE = "FFE2F0EE"
-AMBAR = "FF8A5A00"
+AMBAR = "FF151916"
 AMBAR_SUAVE = "FFFBF3E3"
 PLAN_FILL = "FFD9F2E6"
-BANDA = "FFEAF0FA"
-SUBTOTAL = "FFDCE6F4"
-GRIS = "FF787B86"
+BANDA = "FFF0F1EB"
+SUBTOTAL = "FFD8F4E6"
+GRIS = "FF65706A"
 BLANCO = Font(bold=True, color="FFFFFFFF", size=9)
 
 # La tercera seccion del formato es la del CERO: la pantalla muestra una raya
@@ -44,7 +44,7 @@ BLANCO = Font(bold=True, color="FFFFFFFF", size=9)
 # lectura. El valor sigue siendo 0 y suma igual; solo cambia como se ve.
 MONEDA = '"$"#,##0;[Red]-"$"#,##0;"—"'
 FINO = Side(style="thin", color="FFD0D5DD")
-MEDIO = Side(style="medium", color="FF9AA4B2")
+MEDIO = Side(style="medium", color="FF99A49D")
 
 MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun",
              "jul", "ago", "set", "oct", "nov", "dic"]

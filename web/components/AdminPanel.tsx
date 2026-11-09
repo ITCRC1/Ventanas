@@ -47,7 +47,7 @@ export function AdminPanel() {
             onClick={() => setTab(t)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${
               tab === t
-                ? "bg-[#2d3a5c] text-white"
+                ? "bg-[#151916] text-white"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -160,7 +160,7 @@ function Profiles() {
               newCode && newName && createRole.mutate({ code: newCode, name: newName })
             }
             disabled={createRole.isPending || !newCode || !newName}
-            className="w-full rounded bg-[#2d3a5c] px-2 py-1 text-sm font-medium text-white disabled:opacity-50"
+            className="w-full rounded bg-[#151916] px-2 py-1 text-sm font-medium text-white disabled:opacity-50"
           >
             + New profile
           </button>
@@ -367,7 +367,7 @@ function Users() {
           <button
             onClick={() => createUser.mutate(nf)}
             disabled={createUser.isPending || !nf.full_name || !nf.email || !nf.role_id}
-            className="rounded bg-[#2d3a5c] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded bg-[#151916] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
             Create user
           </button>

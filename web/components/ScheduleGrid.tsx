@@ -333,7 +333,7 @@ export function ScheduleGrid() {
               return (
                 <div
                   key={`L-cat-${row.category}`}
-                  className="flex items-center border-b border-t-2 border-slate-300 border-t-slate-400 bg-[#EAF0FA] px-3 text-[12px] font-bold uppercase text-slate-800"
+                  className="flex items-center border-b border-t-2 border-slate-300 border-t-slate-400 bg-[#F0F1EB] px-3 text-[12px] font-bold uppercase text-slate-800"
                   style={{ height: h }}
                 >
                   <span className="truncate">{row.category}</span>
@@ -344,7 +344,7 @@ export function ScheduleGrid() {
               return (
                 <div
                   key={`L-tot-${row.category}`}
-                  className="flex border-y-2 border-slate-500 bg-[#DCE6F4] text-[12px] font-bold"
+                  className="flex border-y-2 border-slate-500 bg-[#D8F4E6] text-[12px] font-bold"
                   style={{ height: h }}
                 >
                   <div
@@ -365,7 +365,7 @@ export function ScheduleGrid() {
               return (
                 <div
                   key="L-grand"
-                  className="flex border-t-2 border-slate-800 bg-[#C8DCF0] text-[12px] font-bold"
+                  className="flex border-t-2 border-slate-800 bg-[#B8E8D2] text-[12px] font-bold"
                   style={{ height: h }}
                 >
                   <div className="flex items-center px-3" style={{ width: W_ID + W_TXT * 2 }}>
@@ -467,13 +467,13 @@ export function ScheduleGrid() {
                 return (
                   <div
                     key={`R-cat-${row.category}`}
-                    className="border-b border-t-2 border-slate-300 border-t-slate-400 bg-[#EAF0FA]"
+                    className="border-b border-t-2 border-slate-300 border-t-slate-400 bg-[#F0F1EB]"
                     style={{ height: h }}
                   />
                 );
               }
               if (row.kind === "total" || row.kind === "grand") {
-                const bg = row.kind === "grand" ? "bg-[#C8DCF0]" : "bg-[#DCE6F4]";
+                const bg = row.kind === "grand" ? "bg-[#B8E8D2]" : "bg-[#D8F4E6]";
                 const border =
                   row.kind === "grand"
                     ? "border-t-2 border-slate-800"
@@ -550,7 +550,7 @@ export function ScheduleGrid() {
         {/* Columna fija FULL Year (suma de todo el horizonte por línea) */}
         <div className="shrink-0 border-l border-slate-200" style={{ width: YEAR_W }}>
           <div
-            className="sticky top-0 z-20 flex items-end justify-end border-b border-slate-200 bg-[#1a7f4b] px-2 pb-1 text-right text-xs font-semibold uppercase text-white"
+            className="sticky top-0 z-20 flex items-end justify-end border-b border-slate-200 bg-[#005C40] px-2 pb-1 text-right text-xs font-semibold uppercase text-white"
             style={{ height: HDR_H }}
           >
             FULL Year
@@ -561,7 +561,7 @@ export function ScheduleGrid() {
               return (
                 <div
                   key={`Y-cat-${row.category}`}
-                  className="border-b border-t-2 border-slate-300 border-t-slate-400 bg-[#EAF0FA]"
+                  className="border-b border-t-2 border-slate-300 border-t-slate-400 bg-[#F0F1EB]"
                   style={{ height: h }}
                 />
               );
@@ -572,10 +572,10 @@ export function ScheduleGrid() {
                 : colSum(row.lines, weekList);
             const cls =
               row.kind === "grand"
-                ? "bg-[#1a7f4b] text-white border-t-2 border-slate-800"
+                ? "bg-[#005C40] text-white border-t-2 border-slate-800"
                 : row.kind === "total"
-                  ? "bg-[#cfe0f3] font-semibold border-y-2 border-slate-500"
-                  : "bg-[#eef2f9] border-b border-slate-100";
+                  ? "bg-[#D8F4E6] font-semibold border-y-2 border-slate-500"
+                  : "bg-[#FBFAF6] border-b border-slate-100";
             const key =
               row.kind === "line"
                 ? `Y-${row.r.id}`

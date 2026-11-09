@@ -36,7 +36,7 @@ from app.core.holding import HOLDING_BANK
 # La divisoria entre bloques de columnas. Owner, 2026-11-09, marcandolas a mano
 # sobre la hoja: con decenas de columnas de semana y mes pegadas una a otra, el
 # ojo pierde donde empieza cada bloque.
-DIVISORIA = Side(style="medium", color="FF1F4E79")
+DIVISORIA = Side(style="medium", color="FF1161AA")
 
 
 def _divisorias(ws, cols, hr: int, ultima: int | None = None) -> None:
@@ -73,9 +73,9 @@ STATES = [
 ]
 STATE_FILL = {c: PatternFill("solid", fgColor="FF" + h) for c, _, h in STATES}
 
-HDR = PatternFill("solid", fgColor="FF434343")
+HDR = PatternFill("solid", fgColor="FF151916")
 SUBHDR = PatternFill("solid", fgColor="FFD9D9D9")
-TOTAL = PatternFill("solid", fgColor="FFC8DCF0")
+TOTAL = PatternFill("solid", fgColor="FFB8E8D2")
 CATF = PatternFill("solid", fgColor="FFF8F8F8")
 WHITE = Font(color="FFFFFFFF", bold=True)
 BOLD = Font(bold=True)
@@ -357,7 +357,7 @@ class ExcelExporter:
         ws["A2"] = "Live model. Edit the LEDGER and everything recalculates."
         ws["A2"].font = Font(italic=True, color="FF808080")
 
-        GREEN = PatternFill("solid", fgColor="FFDFF3E3")  # fondo TOTAL VENTA
+        GREEN = PatternFill("solid", fgColor="FFD8F4E6")  # fondo TOTAL VENTA
         WEEKFMT = "#,##0"
 
         fixed = [
@@ -408,7 +408,7 @@ class ExcelExporter:
                     self.week_col[w] = col
                     col += 1
                 mc = ws.cell(hr, col, dt.date(yy, mm, 1).strftime("%b").upper())
-                mc.fill = PatternFill("solid", fgColor="FFA2C4C9")
+                mc.fill = PatternFill("solid", fgColor="FFB8E8D2")
                 mc.font = BOLD
                 mc.alignment = Alignment(horizontal="center")
                 ws.cell(3, col, qname)
@@ -797,8 +797,8 @@ class ExcelExporter:
             CellIsRule(
                 operator="lessThan",
                 formula=["0"],
-                fill=PatternFill("solid", fgColor="FFF4CCCC"),
-                font=Font(color="FF9C0006"),
+                fill=PatternFill("solid", fgColor="FFF8DCDE"),
+                font=Font(color="FF8E1F29"),
             ),
         )
 
@@ -873,9 +873,9 @@ class ExcelExporter:
         ws = self.wb.create_sheet(nombre)
         ws.sheet_view.showGridLines = False
         ws["A1"] = titulo
-        ws["A1"].font = Font(bold=True, size=15, color="FF0F5F59")
+        ws["A1"].font = Font(bold=True, size=15, color="FF005C40")
         ws["A2"] = sub
-        ws["A2"].font = Font(size=10, color="FF787B86")
+        ws["A2"].font = Font(size=10, color="FF65706A")
         for i, h in enumerate(fijas, 1):
             c = ws.cell(hr, i, h)
             c.fill = HDR
@@ -906,7 +906,7 @@ class ExcelExporter:
     @staticmethod
     def _comp_pintar(ws: Any, mapa: list[dict[str, Any]], ult: int) -> None:
         """El color de cada fila: sección, subtotal, venta o total."""
-        verde = PatternFill("solid", fgColor="FFDFF3E3")
+        verde = PatternFill("solid", fgColor="FFD8F4E6")
         for e in mapa:
             relleno = {
                 "sec": CATF, "subtotal": TOTAL, "venta": verde,
@@ -983,8 +983,8 @@ class ExcelExporter:
             f"M{hr + 1}:M{ultima}",
             CellIsRule(
                 operator="greaterThan", formula=["1"],
-                fill=PatternFill("solid", fgColor="FFF4CCCC"),
-                font=Font(color="FF9C0006"),
+                fill=PatternFill("solid", fgColor="FFF8DCDE"),
+                font=Font(color="FF8E1F29"),
             ),
         )
         self._comp_cerrar(ws, hr, 13, ultima, 7, divis=[7, 10, 13])
@@ -1013,7 +1013,7 @@ class ExcelExporter:
             mescol[m] = (c, c + 1)
             ws.merge_cells(start_row=hr - 1, start_column=c, end_row=hr - 1, end_column=c + 1)
             t = ws.cell(hr - 1, c, MES[m - 1].upper())
-            t.fill = PatternFill("solid", fgColor="FF0F5F59")
+            t.fill = PatternFill("solid", fgColor="FF005C40")
             t.font = Font(bold=True, color="FFFFFFFF", size=10)
             t.alignment = Alignment(horizontal="center")
             for cc, anio in ((c, A), (c + 1, B)):
@@ -1027,7 +1027,7 @@ class ExcelExporter:
         T_A, T_B, T_V, T_P = c, c + 1, c + 2, c + 3
         ws.merge_cells(start_row=hr - 1, start_column=T_A, end_row=hr - 1, end_column=T_P)
         t = ws.cell(hr - 1, T_A, "FULL YEAR")
-        t.fill = PatternFill("solid", fgColor="FF8A5A00")
+        t.fill = PatternFill("solid", fgColor="FF151916")
         t.font = Font(bold=True, color="FFFFFFFF", size=10)
         t.alignment = Alignment(horizontal="center")
         for cc, etq, w in (
@@ -1035,7 +1035,7 @@ class ExcelExporter:
             (T_V, "VARIANCE $", 16), (T_P, "VAR %", 10),
         ):
             h = ws.cell(hr, cc, etq)
-            h.fill = PatternFill("solid", fgColor="FF8A5A00")
+            h.fill = PatternFill("solid", fgColor="FF151916")
             h.font = WHITE
             h.alignment = Alignment(horizontal="center", wrap_text=True)
             ws.column_dimensions[gc(cc)].width = w
@@ -1074,8 +1074,8 @@ class ExcelExporter:
             f"{gc(T_V)}{hr + 1}:{gc(T_V)}{ultima}",
             CellIsRule(
                 operator="greaterThan", formula=["0"],
-                fill=PatternFill("solid", fgColor="FFF4CCCC"),
-                font=Font(color="FF9C0006"),
+                fill=PatternFill("solid", fgColor="FFF8DCDE"),
+                font=Font(color="FF8E1F29"),
             ),
         )
         self._comp_cerrar(
@@ -1104,13 +1104,13 @@ class ExcelExporter:
         for m in range(1, 13):
             cc = col0 + m - 1
             h = ws.cell(hr, cc, MES[m - 1])
-            h.fill = PatternFill("solid", fgColor="FF1F4E79")
+            h.fill = PatternFill("solid", fgColor="FF1161AA")
             h.font = WHITE
             h.alignment = Alignment(horizontal="center")
             ws.column_dimensions[gc(cc)].width = 14
         tot = col0 + 12
         h = ws.cell(hr, tot, f"TOTAL {A}")
-        h.fill = PatternFill("solid", fgColor="FF8A5A00")
+        h.fill = PatternFill("solid", fgColor="FF151916")
         h.font = WHITE
         h.alignment = Alignment(horizontal="center", wrap_text=True)
         ws.column_dimensions[gc(tot)].width = 17
@@ -1154,7 +1154,7 @@ class ExcelExporter:
         JC = "'Job Cost Report'"
         MESES_UP = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG",
                     "SEP", "OCT", "NOV", "DEC"]
-        VENTA_FILL = PatternFill("solid", fgColor="FFDFF3E3")
+        VENTA_FILL = PatternFill("solid", fgColor="FFD8F4E6")
         GREY = Font(color="FF999999")
 
         def _clean(name: str) -> str:
@@ -1218,7 +1218,7 @@ class ExcelExporter:
                     week_col[w] = col
                     col += 1
                 mc = ws.cell(hr, col, MESES_UP[mm - 1])
-                mc.fill = PatternFill("solid", fgColor="FFA2C4C9")
+                mc.fill = PatternFill("solid", fgColor="FFB8E8D2")
                 mc.font = BOLD
                 mc.alignment = Alignment(horizontal="center")
                 ws.cell(3, col, qname)
@@ -1239,7 +1239,7 @@ class ExcelExporter:
             col += 1
         total_col = col
         tc = ws.cell(hr, col, "FULL YEAR")
-        tc.fill = PatternFill("solid", fgColor="FF1A7F4B")
+        tc.fill = PatternFill("solid", fgColor="FF005C40")
         tc.font = WHITE
         tc.alignment = Alignment(horizontal="center")
         ws.column_dimensions[gc(col)].width = 15
@@ -1454,11 +1454,11 @@ class ExcelExporter:
             summaryRight=True, summaryBelow=False, showOutlineSymbols=True
         )
         # Fills propios de esta vista (colores del app; los de módulo se reutilizan)
-        CAT_FILL = PatternFill("solid", fgColor="FFEAF0FA")   # cabecera categoría
-        GASTO_FILL = PatternFill("solid", fgColor="FFDCE6F4")  # TOTAL / TOTAL GASTOS
-        VENTA_FILL = PatternFill("solid", fgColor="FFDFF3E3")  # TOTAL VENTA (verde)
-        RED_FILL = PatternFill("solid", fgColor="FFF4CCCC")
-        RED_FONT = Font(color="FF9C0006")
+        CAT_FILL = PatternFill("solid", fgColor="FFF0F1EB")   # cabecera categoría
+        GASTO_FILL = PatternFill("solid", fgColor="FFD8F4E6")  # TOTAL / TOTAL GASTOS
+        VENTA_FILL = PatternFill("solid", fgColor="FFD8F4E6")  # TOTAL VENTA (verde)
+        RED_FILL = PatternFill("solid", fgColor="FFF8DCDE")
+        RED_FONT = Font(color="FF8E1F29")
         WK = "#,##0"
 
         # ---- columnas fijas: identidad + presupuesto (idénticas al app) ----
@@ -1501,7 +1501,7 @@ class ExcelExporter:
                     week_col[w] = col
                     col += 1
                 mc = ws.cell(hr, col, dt.date(yy, mm, 1).strftime("%b").upper())
-                mc.fill = PatternFill("solid", fgColor="FFA2C4C9")
+                mc.fill = PatternFill("solid", fgColor="FFB8E8D2")
                 mc.font = BOLD
                 mc.alignment = Alignment(horizontal="center")
                 ws.cell(3, col, qname)
@@ -1750,7 +1750,7 @@ class ExcelExporter:
         """
         ws = self.wb.create_sheet("Dashboard")
         PCT = "0.0%;[Red](0.0%)"
-        VENTA_FILL = PatternFill("solid", fgColor="FFDFF3E3")   # verde venta
+        VENTA_FILL = PatternFill("solid", fgColor="FFD8F4E6")   # verde venta
         VENTA_FONT = Font(bold=True, color="FF38761D")
         KPI_LBL = Font(size=9, color="FF808080")
         KPI_VAL = Font(bold=True, size=16)
@@ -2402,8 +2402,8 @@ class ExcelExporter:
                 CellIsRule(
                     operator="notEqual",
                     formula=["0"],
-                    fill=PatternFill("solid", fgColor="FFF4CCCC"),
-                    font=Font(color="FF9C0006"),
+                    fill=PatternFill("solid", fgColor="FFF8DCDE"),
+                    font=Font(color="FF8E1F29"),
                 ),
             )
             # --- Saldo final = último saldo corrido (fórmula viva) ---
@@ -2434,8 +2434,8 @@ class ExcelExporter:
                     f"{gc(COL_DIF)}{r}",
                     CellIsRule(
                         operator="notEqual", formula=["0"],
-                        fill=PatternFill("solid", fgColor="FFF4CCCC"),
-                        font=Font(bold=True, color="FF9C0006"),
+                        fill=PatternFill("solid", fgColor="FFF8DCDE"),
+                        font=Font(bold=True, color="FF8E1F29"),
                     ),
                 )
             self.cierre_banco[acc["name"]] = r
@@ -2465,12 +2465,12 @@ class ExcelExporter:
         ws = self.wb.create_sheet("US Wire Transfers")
 
         # --- estilos locales de esta hoja (colores del app) ---
-        NAVY = PatternFill("solid", fgColor="FF2D3A5C")        # cabecera de tabla (#2d3a5c)
-        BLOCK_FILL = PatternFill("solid", fgColor="FFEAF0FA")   # banda de bloque (#EAF0FA)
-        SUB_FILL = PatternFill("solid", fgColor="FFDCE6F4")     # fila subtotal (#DCE6F4)
+        NAVY = PatternFill("solid", fgColor="FF151916")        # cabecera de tabla (#151916)
+        BLOCK_FILL = PatternFill("solid", fgColor="FFF0F1EB")   # banda de bloque (#F0F1EB)
+        SUB_FILL = PatternFill("solid", fgColor="FFD8F4E6")     # fila subtotal (#D8F4E6)
         NOTE_FONT = Font(italic=True, color="FF808080", size=9)
         LBL_FONT = Font(bold=True, color="FF64748B", size=9)
-        GREEN = Font(bold=True, color="FF047857")               # "Recibido" en verde (emerald)
+        GREEN = Font(bold=True, color="FF005C40")               # "Recibido" en verde (emerald)
         DATEF = "yyyy-mm-dd"
         RIGHT = Alignment(horizontal="right")
 
@@ -2684,8 +2684,8 @@ class ExcelExporter:
                 f"I{r}",
                 CellIsRule(
                     operator="notEqual", formula=["0"],
-                    fill=PatternFill("solid", fgColor="FFF4CCCC"),
-                    font=Font(bold=True, color="FF9C0006"),
+                    fill=PatternFill("solid", fgColor="FFF8DCDE"),
+                    font=Font(bold=True, color="FF8E1F29"),
                 ),
             )
 
@@ -2711,7 +2711,7 @@ class ExcelExporter:
         DATEF = "yyyy-mm-dd"
         STRIKE = Font(strike=True)
         VOIDF = Font(strike=True, color="FF999999")
-        VOID_FILL = PatternFill("solid", fgColor="FFF4CCCC")
+        VOID_FILL = PatternFill("solid", fgColor="FFF8DCDE")
 
         ws["A1"] = "DASHBOARD VENTANAS — Invoices"
         ws["A1"].font = Font(bold=True, size=14)
@@ -2774,7 +2774,7 @@ class ExcelExporter:
             est = ws.cell(r, 5, "VOID" if voided else "Active")
             if voided:
                 est.fill = VOID_FILL
-                est.font = Font(bold=True, color="FF9C0006")
+                est.font = Font(bold=True, color="FF8E1F29")
             else:
                 for i in range(1, len(cols) + 1):
                     ws.cell(r, i).fill = SUBHDR
@@ -2844,8 +2844,8 @@ class ExcelExporter:
         """
         ws = self.wb.create_sheet("Invoice Receipts")
         DATEF = "yyyy-mm-dd"
-        ROJO = PatternFill("solid", fgColor="FFF4CCCC")
-        ROJO_F = Font(bold=True, color="FF9C0006")
+        ROJO = PatternFill("solid", fgColor="FFF8DCDE")
+        ROJO_F = Font(bold=True, color="FF8E1F29")
 
         ws["A1"] = "DASHBOARD VENTANAS — Invoice Receipts (Hacienda XML)"
         ws["A1"].font = Font(bold=True, size=14)
@@ -2934,7 +2934,7 @@ class ExcelExporter:
             # sin esto, una fila en negativo no tiene explicacion a la vista.
             dt = ws.cell(r, 16, e["doc_type"])
             if e["doc_type"] == "NC":
-                dt.font = Font(bold=True, color="FF9C0006")
+                dt.font = Font(bold=True, color="FF8E1F29")
             ws.cell(r, 15, ("XML" if e["tiene_xml"] else "")
                     + (" + PDF" if e["has_pdf"] else "")).alignment = Alignment(
                 horizontal="center"

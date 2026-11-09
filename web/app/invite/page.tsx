@@ -87,8 +87,7 @@ export default function InvitePage() {
           <div>
             <p className="text-lg font-semibold">Hi, {quien.full_name}</p>
             <p className="text-sm text-slate-500">
-              Choose your password. Nobody else will know it &mdash; not even the
-              administrator.
+              Choose your password. Nobody else will know it &mdash; not even the administrator.
             </p>
             {quien.email ? (
               <p className="mt-1 text-xs text-slate-400">You will sign in with {quien.email}</p>
@@ -131,7 +130,7 @@ export default function InvitePage() {
             type="button"
             onClick={() => void guardar()}
             disabled={!puede}
-            className="w-full rounded bg-[#2d3a5c] px-4 py-2 font-medium text-white hover:bg-[#3d4a6c] disabled:opacity-40"
+            className="w-full rounded bg-[#151916] px-4 py-2 font-medium text-white hover:bg-[#2F956E] disabled:opacity-40"
           >
             {guardando ? "Saving…" : "Sign in"}
           </button>

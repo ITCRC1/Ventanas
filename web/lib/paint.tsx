@@ -12,7 +12,7 @@ import { api } from "./api";
 import { useCategories, useMe, useTaskStates, useUpdateCategory } from "./hooks";
 import type { ScheduleCell } from "./types";
 
-const DEFAULT_BG = "#94a3b8"; // gris para categorías sin color elegido aún
+const DEFAULT_BG = "#99A49D"; // gris para categorías sin color elegido aún
 
 // Aclara un color hex mezclándolo hacia blanco (ratio 0..1). Se usa para bajarle
 // la intensidad al fondo de una celda que TIENE cifra, y así leer bien el número.

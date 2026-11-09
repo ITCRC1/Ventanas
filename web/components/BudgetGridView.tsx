@@ -576,7 +576,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
               await guardar.mutateAsync([...pend.values()]);
               setPend(new Map());
             }}
-            className="rounded bg-[#2d3a5c] px-3 py-1 text-xs font-semibold text-white hover:bg-[#3d4a6c] disabled:opacity-40"
+            className="rounded bg-[#151916] px-3 py-1 text-xs font-semibold text-white hover:bg-[#2F956E] disabled:opacity-40"
           >
             {guardar.isPending ? "Saving…" : "💾 Save"}
           </button>
@@ -825,13 +825,13 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
         >
           <table className="border-collapse text-xs">
             <thead className="sticky top-0 z-20">
-              <tr className="bg-[#0F5F59] text-white">
+              <tr className="bg-[#005C40] text-white">
                 {FIJAS.map((c, i) => (
                   <th
                     key={c.k}
                     rowSpan={2}
                     style={{ left: IZQ[i], width: c.w, minWidth: c.w }}
-                    className={`sticky z-30 bg-[#0F5F59] px-2 py-1 align-bottom ${
+                    className={`sticky z-30 bg-[#005C40] px-2 py-1 align-bottom ${
                       i < 2 ? "text-left" : "text-right"
                     }`}
                   >
@@ -850,18 +850,18 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                     {bloqueado(i + 1) ? " 🔒" : ""}
                   </th>
                 ))}
-                <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {anio}</th>
-                <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {base}</th>
-                <th className="bg-[#8A5A00] px-2 py-1 text-right">VAR</th>
+                <th className="bg-[#151916] px-2 py-1 text-right">TOTAL {anio}</th>
+                <th className="bg-[#151916] px-2 py-1 text-right">TOTAL {base}</th>
+                <th className="bg-[#151916] px-2 py-1 text-right">VAR</th>
               </tr>
-              <tr className="bg-[#1F4E79] text-white">
+              <tr className="bg-[#1161AA] text-white">
                 {MES.map((m) => (
                   <Fragment key={m}>
                     {/* El año que se EDITA, resaltado; el anterior, apagado. */}
                     <th
                       data-mes={MES.indexOf(m) + 1}
                       style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                      className="border-l-2 border-white/40 bg-[#2962FF] px-1 text-right text-xs font-bold"
+                      className="border-l-2 border-white/40 bg-[#1161AA] px-1 text-right text-xs font-bold"
                     >
                       {anio} ✎
                     </th>
@@ -873,13 +873,13 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                     </th>
                   </Fragment>
                 ))}
-                <th colSpan={3} className="bg-[#8A5A00]" />
+                <th colSpan={3} className="bg-[#151916]" />
               </tr>
             </thead>
             <tbody>
               {grupos.map(([sec, ls]) => (
                 <Fragment key={sec}>
-                  <tr className="bg-[#EAF0FA]">
+                  <tr className="bg-[#F0F1EB]">
                     <td
                       colSpan={FIJAS.length + 24 + 3}
                       className="px-2 py-1 font-semibold text-teal-900"
@@ -945,7 +945,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                                       ? "bg-amber-100 ring-1 ring-inset ring-amber-500"
                                       : enBloque
                                         ? "bg-blue-200 ring-1 ring-inset ring-blue-600"
-                                        : "bg-[#EEF4FF]"
+                                        : "bg-[#F0F1EB]"
                                 }`}
                               >
                                 {activa && buf !== null ? (
@@ -1007,7 +1007,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                                       anotarMes(l.id, mes, buf);
                                       setBuf(null);
                                     }}
-                                    className="w-full bg-white px-1 py-0.5 text-right text-xs outline-none ring-2 ring-inset ring-[#2962FF]"
+                                    className="w-full bg-white px-1 py-0.5 text-right text-xs outline-none ring-2 ring-inset ring-[#1161AA]"
                                   />
                                 ) : (
                                   <button
@@ -1068,18 +1068,18 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                       </tr>
                     );
                   })}
-                  <tr className="bg-[#DCE6F4] font-semibold">
-                    <Fija i={0} fondo="bg-[#DCE6F4]" />
-                    <Fija i={1} fondo="bg-[#DCE6F4]" cls="whitespace-nowrap">
+                  <tr className="bg-[#D8F4E6] font-semibold">
+                    <Fija i={0} fondo="bg-[#D8F4E6]" />
+                    <Fija i={1} fondo="bg-[#D8F4E6]" cls="whitespace-nowrap">
                       Subtotal {sec}
                     </Fija>
-                    <Fija i={2} fondo="bg-[#DCE6F4]">
+                    <Fija i={2} fondo="bg-[#D8F4E6]">
                       {usd(ls.reduce((a, l) => a + Number(l.budget_revised), 0))}
                     </Fija>
-                    <Fija i={3} fondo="bg-[#DCE6F4]">
+                    <Fija i={3} fondo="bg-[#D8F4E6]">
                       {usd(ls.reduce((a, l) => a + Number(l.spend), 0))}
                     </Fija>
-                    <Fija i={4} fondo="bg-[#DCE6F4]">
+                    <Fija i={4} fondo="bg-[#D8F4E6]">
                       {usd(ls.reduce((a, l) => a + Number(l.remaining), 0))}
                     </Fija>
                     {MES.map((m, i) => (
@@ -1107,18 +1107,18 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                   </tr>
                 </Fragment>
               ))}
-              <tr className="bg-[#0F5F59] font-bold text-white">
-                <Fija i={0} fondo="bg-[#0F5F59]" />
-                <Fija i={1} fondo="bg-[#0F5F59]" cls="whitespace-nowrap">
+              <tr className="bg-[#005C40] font-bold text-white">
+                <Fija i={0} fondo="bg-[#005C40]" />
+                <Fija i={1} fondo="bg-[#005C40]" cls="whitespace-nowrap">
                   PROJECT TOTAL
                 </Fija>
-                <Fija i={2} fondo="bg-[#0F5F59]">
+                <Fija i={2} fondo="bg-[#005C40]">
                   {usd(lineas.reduce((a, l) => a + Number(l.budget_revised), 0))}
                 </Fija>
-                <Fija i={3} fondo="bg-[#0F5F59]">
+                <Fija i={3} fondo="bg-[#005C40]">
                   {usd(lineas.reduce((a, l) => a + Number(l.spend), 0))}
                 </Fija>
-                <Fija i={4} fondo="bg-[#0F5F59]">
+                <Fija i={4} fondo="bg-[#005C40]">
                   {usd(lineas.reduce((a, l) => a + Number(l.remaining), 0))}
                 </Fija>
                 {MES.map((m, i) => (

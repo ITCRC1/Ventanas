@@ -179,7 +179,7 @@ export function BudgetProposalView() {
             "grid",
             `✎ Edit ${anio}`,
             `Edit ${anio} with ${anio - 1} beside it`,
-            "bg-[#2962FF] ring-[#1E53E5]",
+            "bg-[#1161AA] ring-[#0E5490]",
           ],
         ] as [Vista, string, string, string][])
       : []),
@@ -193,7 +193,7 @@ export function BudgetProposalView() {
       "anio",
       `Budget ${anio}`,
       "How the year is shaping up, by section",
-      "bg-[#1F4E79] ring-[#163C5E]",
+      "bg-[#1161AA] ring-[#163C5E]",
     ],
   ];
 
@@ -442,7 +442,7 @@ function Desglose({
                 </tr>
               ))}
             </tbody>
-            <tfoot className="sticky bottom-0 border-t-2 border-slate-700 bg-[#DCE6F4] font-bold">
+            <tfoot className="sticky bottom-0 border-t-2 border-slate-700 bg-[#D8F4E6] font-bold">
               <tr>
                 <td className="px-3 py-1" colSpan={3}>
                   SUM OF THE {aportes.length} LINE{aportes.length === 1 ? "" : "S"}
@@ -488,7 +488,7 @@ function TablaDatos({
   return (
     <table className="w-full border-collapse text-xs">
       <thead className="sticky top-0 z-10">
-        <tr className="bg-[#0F5F59] text-white">
+        <tr className="bg-[#005C40] text-white">
           <th className="px-2 py-1 text-left">WBS</th>
           <th className="px-2 py-1 text-left">Task</th>
           {COLS.map(([etq]) => (
@@ -503,7 +503,7 @@ function TablaDatos({
           const sum = (k: string) => ls.reduce((s, f) => s + (Number(f[k as never]) || 0), 0);
           return (
             <Fragment key={cat}>
-              <tr className="bg-[#EAF0FA]">
+              <tr className="bg-[#F0F1EB]">
                 <td colSpan={2 + COLS.length} className="px-2 py-1 font-semibold text-teal-900">
                   {cat.toUpperCase()}
                 </td>
@@ -537,7 +537,7 @@ function TablaDatos({
                   </tr>
                 );
               })}
-              <tr className="bg-[#DCE6F4] font-semibold">
+              <tr className="bg-[#D8F4E6] font-semibold">
                 <td className="px-2" />
                 <td className="px-2">Subtotal {cat}</td>
                 {COLS.map(([etq, k]) => (
@@ -549,7 +549,7 @@ function TablaDatos({
             </Fragment>
           );
         })}
-        <tr className="bg-[#0F5F59] font-bold text-white">
+        <tr className="bg-[#005C40] font-bold text-white">
           <td className="px-2" />
           <td className="px-2">TOTAL {d.anio}</td>
           {[
@@ -597,8 +597,8 @@ function TablaMeses({
   return (
     <table className="border-collapse text-xs">
       <thead className="sticky top-0 z-10">
-        <tr className="bg-[#0F5F59] text-white">
-          <th className="sticky left-0 z-20 bg-[#0F5F59] px-2 py-1 text-left">WBS</th>
+        <tr className="bg-[#005C40] text-white">
+          <th className="sticky left-0 z-20 bg-[#005C40] px-2 py-1 text-left">WBS</th>
           <th className="px-2 py-1 text-left">Task</th>
           {porSemana
             ? bandas.map((b) => (
@@ -615,13 +615,13 @@ function TablaMeses({
                   {m}
                 </th>
               ))}
-          <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL</th>
+          <th className="bg-[#151916] px-2 py-1 text-right">TOTAL</th>
         </tr>
       </thead>
       <tbody>
         {porCat.map(([cat, ls]) => (
           <Fragment key={cat}>
-            <tr className="bg-[#EAF0FA]">
+            <tr className="bg-[#F0F1EB]">
               <td colSpan={3 + ncols} className="px-2 py-1 font-semibold text-teal-900">
                 {cat.toUpperCase()}
               </td>
@@ -655,8 +655,8 @@ function TablaMeses({
                 </tr>
               );
             })}
-            <tr className="bg-[#DCE6F4] font-semibold">
-              <td className="sticky left-0 z-10 bg-[#DCE6F4] px-2" />
+            <tr className="bg-[#D8F4E6] font-semibold">
+              <td className="sticky left-0 z-10 bg-[#D8F4E6] px-2" />
               <td className="whitespace-nowrap px-2">Subtotal {cat}</td>
               {suma(ls).map((v, i) => (
                 <td key={i} className="tabular px-2 text-right">
@@ -669,8 +669,8 @@ function TablaMeses({
             </tr>
           </Fragment>
         ))}
-        <tr className="bg-[#0F5F59] font-bold text-white">
-          <td className="sticky left-0 z-10 bg-[#0F5F59] px-2" />
+        <tr className="bg-[#005C40] font-bold text-white">
+          <td className="sticky left-0 z-10 bg-[#005C40] px-2" />
           <td className="whitespace-nowrap px-2">TOTAL {d.anio}</td>
           {suma(porCat.flatMap(([, ls]) => ls)).map((v, i) => (
             <td key={i} className="tabular px-2 text-right">
@@ -711,7 +711,7 @@ function TablaAnio({
   return (
     <table className="w-full border-collapse text-xs">
       <thead className="sticky top-0 z-10">
-        <tr className="bg-[#1F4E79] text-white">
+        <tr className="bg-[#1161AA] text-white">
           <th className="px-2 py-1 text-left">Section</th>
           <th className="px-2 py-1 text-right">Lines</th>
           {MES.map((m) => (
@@ -719,7 +719,7 @@ function TablaAnio({
               {m}
             </th>
           ))}
-          <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {d.anio}</th>
+          <th className="bg-[#151916] px-2 py-1 text-right">TOTAL {d.anio}</th>
         </tr>
       </thead>
       <tbody>
@@ -735,7 +735,7 @@ function TablaAnio({
             <td className="tabular bg-amber-50 px-2 text-right font-bold">{usd(r.total)}</td>
           </tr>
         ))}
-        <tr className="bg-[#1F4E79] font-bold text-white">
+        <tr className="bg-[#1161AA] font-bold text-white">
           <td className="px-2 py-1">TOTAL {d.anio}</td>
           <td className="tabular px-2 text-right">{filas.reduce((s, r) => s + r.n, 0)}</td>
           {gran.map((v, i) => (

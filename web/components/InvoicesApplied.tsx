@@ -98,7 +98,7 @@ export function InvoicesApplied({ owner }: { owner?: string } = {}) {
   };
   const grand = sumsOf(groups.flatMap((g) => g.ls));
 
-  const TH = "border border-slate-600 bg-[#434343] px-2 py-2 text-xs font-semibold uppercase";
+  const TH = "border border-slate-600 bg-[#151916] px-2 py-2 text-xs font-semibold uppercase";
   const THR = `${TH} text-right`;
 
   return (
@@ -127,7 +127,7 @@ export function InvoicesApplied({ owner }: { owner?: string } = {}) {
 
       <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1120px] border-collapse text-xs">
-          <thead className="sticky top-0 z-10 bg-[#434343] text-left text-white">
+          <thead className="sticky top-0 z-10 bg-[#151916] text-left text-white">
             <tr>
               <th className={TH}>Project Category</th>
               <th className={TH}>Phase</th>
@@ -136,8 +136,8 @@ export function InvoicesApplied({ owner }: { owner?: string } = {}) {
               <th className={TH}>Owner</th>
               <th className={THR}>Budget Revised</th>
               <th className={THR}>YTD Expense</th>
-              <th className={`${THR} bg-[#8a5a00]`}>Invoices Applied</th>
-              <th className={`${THR} bg-[#8a5a00]`}>Diff (Exp−Inv)</th>
+              <th className={`${THR} bg-[#151916]`}>Invoices Applied</th>
+              <th className={`${THR} bg-[#151916]`}>Diff (Exp−Inv)</th>
               <th className={THR}>Remaining</th>
               <th className={THR}>Forecast</th>
               <th className={THR}>Funding Pending</th>
@@ -150,7 +150,7 @@ export function InvoicesApplied({ owner }: { owner?: string } = {}) {
             })}
           </tbody>
           <tfoot className="sticky bottom-0 z-10">
-            <tr className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
+            <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
               <td className="border border-slate-300 px-2 py-2" colSpan={5}>
                 PROJECT TOTAL
               </td>
@@ -206,7 +206,7 @@ function GroupRows({
 }) {
   return (
     <>
-      <tr className="border-t-2 border-slate-400 bg-[#EAF0FA]">
+      <tr className="border-t-2 border-slate-400 bg-[#F0F1EB]">
         <td
           className="border border-slate-300 px-2 py-1.5 text-[12px] font-bold uppercase text-slate-800"
           colSpan={12}
@@ -259,7 +259,7 @@ function GroupRows({
           </tr>
         );
       })}
-      <tr className="border-y-2 border-slate-500 bg-[#DCE6F4] text-[12px] font-bold">
+      <tr className="border-y-2 border-slate-500 bg-[#D8F4E6] text-[12px] font-bold">
         <td className="border border-slate-300 px-2 py-1.5 text-right" colSpan={5}>
           TOTAL {cat}
         </td>

@@ -480,7 +480,7 @@ export function PlanningDoc({
       {/* Tabla */}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[900px] text-xs">
-          <thead className="sticky top-0 bg-[#0d6b72] text-left uppercase text-white">
+          <thead className="sticky top-0 bg-[#2F956E] text-left uppercase text-white">
             <tr>
               {spSelectable ? (
                 <th className="w-8 px-2 py-2 text-center print:hidden">
@@ -506,9 +506,9 @@ export function PlanningDoc({
               <th className="bg-[#0a565b] px-2 py-2 text-right">
                 Plan {startLabel}→{endLabel}
               </th>
-              <th className="border-l-2 border-white/40 bg-[#8a5a00] px-2 py-2 text-left">Note</th>
-              <th className="bg-[#8a5a00] px-2 py-2 text-right">Suggested $</th>
-              <th className="bg-[#8a5a00] px-2 py-2 text-center">Move (from → to)</th>
+              <th className="border-l-2 border-white/40 bg-[#151916] px-2 py-2 text-left">Note</th>
+              <th className="bg-[#151916] px-2 py-2 text-right">Suggested $</th>
+              <th className="bg-[#151916] px-2 py-2 text-center">Move (from → to)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

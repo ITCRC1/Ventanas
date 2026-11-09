@@ -150,7 +150,7 @@ export function UsWiresView() {
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1100px] border-collapse text-sm">
-          <thead className="bg-[#2d3a5c] text-left text-xs uppercase text-white">
+          <thead className="bg-[#151916] text-left text-xs uppercase text-white">
             <tr>
               <th className="border border-slate-600 px-2 py-2">Trans #</th>
               <th className="border border-slate-600 px-2 py-2">Date</th>
@@ -186,7 +186,7 @@ export function UsWiresView() {
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
+            <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
               <td className="px-2 py-2" colSpan={6}>
                 TOTAL TRANSFER
               </td>
@@ -247,7 +247,7 @@ function BlockRows({
   const cols = canEdit ? 11 : 10;
   return (
     <>
-      <tr className="border-t-2 border-slate-400 bg-[#EAF0FA]">
+      <tr className="border-t-2 border-slate-400 bg-[#F0F1EB]">
         <td className="px-2 py-1.5 text-[12px] font-bold uppercase text-slate-800" colSpan={cols}>
           {block.label}{" "}
           <span className="ml-2 font-normal normal-case text-slate-500">· {block.note}</span>
@@ -343,7 +343,7 @@ function BlockRows({
           ) : null}
         </tr>
       ))}
-      <tr className="border-y border-slate-300 bg-[#DCE6F4] text-[12px] font-semibold">
+      <tr className="border-y border-slate-300 bg-[#D8F4E6] text-[12px] font-semibold">
         <td className="px-2 py-1.5 text-right" colSpan={7}>
           Subtotal {block.label} (received)
         </td>

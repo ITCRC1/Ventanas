@@ -13,7 +13,7 @@ import type { Category, Phase, WbsFinancials } from "@/lib/types";
 import { useMemo, useState } from "react";
 
 const STATE_COLOR: Record<string, string> = {
-  not_started: "#94a3b8",
+  not_started: "#99A49D",
   in_process: "#EAB308",
   approved: "#1155CC",
   attention: "#B85B22",
@@ -149,7 +149,7 @@ export function JobCostGrid() {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="w-full min-w-[1180px] border-collapse text-xs">
-        <thead className="sticky top-0 bg-[#434343] text-left text-white">
+        <thead className="sticky top-0 bg-[#151916] text-left text-white">
           <tr>
             <th className={TH}>Status</th>
             <th className={TH}>WBS</th>
@@ -179,7 +179,7 @@ export function JobCostGrid() {
           ))}
         </tbody>
         <tfoot>
-          <tr className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
+          <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
             <td className="px-2 py-2" colSpan={5}>
               PROJECT TOTAL
             </td>
@@ -226,7 +226,7 @@ function GroupBlock({
             <span className="flex items-center gap-1">
               <span
                 className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: STATE_COLOR[r.state] ?? "#94a3b8" }}
+                style={{ backgroundColor: STATE_COLOR[r.state] ?? "#99A49D" }}
                 title={STATE_LABEL[r.state] ?? r.state}
               />
             </span>

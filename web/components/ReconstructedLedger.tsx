@@ -38,7 +38,7 @@ function TotalRow({
   inv: number;
 }) {
   return (
-    <tr className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold text-slate-900">
+    <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold text-slate-900">
       <td className="border border-slate-300 px-2 py-1.5 normal-case" colSpan={5}>
         TOTAL ({n} lines)
       </td>
@@ -140,7 +140,7 @@ export function ReconstructedLedger() {
 
       <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1500px] border-collapse text-xs">
-          <thead className="sticky top-0 z-10 bg-[#434343] text-left uppercase text-white">
+          <thead className="sticky top-0 z-10 bg-[#151916] text-left uppercase text-white">
             <tr>
               <th className="border border-slate-600 px-2 py-1">Cost Code</th>
               <th className="border border-slate-600 px-2 py-1">Account</th>
@@ -150,13 +150,13 @@ export function ReconstructedLedger() {
               <th className="border border-slate-600 px-2 py-1 text-right">Amount</th>
               <th className="border border-slate-600 px-2 py-1 text-right">Amount Paid</th>
               <th className="border border-slate-600 px-2 py-1 text-right">Amount Due</th>
-              <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Type</th>
-              <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Invoice #</th>
-              <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Vendor</th>
-              <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1 text-right">
+              <th className="border border-slate-600 bg-[#151916] px-2 py-1">Type</th>
+              <th className="border border-slate-600 bg-[#151916] px-2 py-1">Invoice #</th>
+              <th className="border border-slate-600 bg-[#151916] px-2 py-1">Vendor</th>
+              <th className="border border-slate-600 bg-[#151916] px-2 py-1 text-right">
                 Invoice USD
               </th>
-              <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Note</th>
+              <th className="border border-slate-600 bg-[#151916] px-2 py-1">Note</th>
             </tr>
             {/* El total también arriba: no hay que bajar hasta el final para verlo. */}
             {rows.length > 0 ? <TotalRow {...totals} n={rows.length} /> : null}

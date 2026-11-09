@@ -56,12 +56,12 @@ import {
   YAxis,
 } from "recharts";
 
-const TEAL = "#0F5F59";
-const AZUL = "#2962FF";
-const GRIS = "#94a3b8";
-const ROJO = "#EF5350";
-const AMBAR = "#F59E0B";
-const VERDE = "#26A69A";
+const TEAL = "#005C40";
+const AZUL = "#1161AA";
+const GRIS = "#99A49D";
+const ROJO = "#C52A38";
+const AMBAR = "#FF7B2F";
+const VERDE = "#2F956E";
 
 const STATE_COLOR: Record<string, string> = {
   "Not Started": GRIS,
@@ -208,7 +208,7 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
                 <td className="px-3 py-1 text-slate-400">{nota}</td>
               </tr>
             ))}
-            <tr className="border-t-2 border-slate-700 bg-[#DCE6F4] font-bold">
+            <tr className="border-t-2 border-slate-700 bg-[#D8F4E6] font-bold">
               <td className="px-3 py-1">ANTICIPATED FINAL COST</td>
               <td className="tabular px-3 py-1 text-right">{moneyUsd(c.anticipated_final_cost)}</td>
               <td className="px-3 py-1" />
@@ -367,7 +367,7 @@ function Avance({ d }: { d: DashboardSummary }) {
           </div>
           <div className="mt-1 h-2 overflow-hidden rounded bg-slate-200">
             <div
-              className="h-full rounded bg-[#2962FF]"
+              className="h-full rounded bg-[#1161AA]"
               style={{ width: `${Math.min(d.avance.pct_por_costo, 100)}%` }}
             />
           </div>
@@ -502,7 +502,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
                 <td className="tabular px-3 py-1 text-right text-slate-500">{s.pct.toFixed(0)}%</td>
               </tr>
             ))}
-            <tr className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
+            <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
               <td className="px-3 py-2">TOTAL</td>
               <td className="tabular px-3 py-2 text-right">
                 {d.pendiente.secciones.reduce((a, s) => a + s.lineas, 0)}

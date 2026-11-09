@@ -53,7 +53,7 @@ function Tabla({ meta, filas }: { meta: ReportMeta; filas: Record<string, unknow
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="w-full border-collapse text-xs">
         <thead>
-          <tr className="bg-[#1F3864] text-left text-white">
+          <tr className="bg-[#0B3C2A] text-left text-white">
             {meta.columns.map((c) => (
               <th
                 key={c.key}
@@ -91,7 +91,7 @@ function Tabla({ meta, filas }: { meta: ReportMeta; filas: Record<string, unknow
         </tbody>
         {Object.keys(totales).length > 0 ? (
           <tfoot>
-            <tr className="border-t-2 border-[#1F3864] bg-slate-100 font-semibold">
+            <tr className="border-t-2 border-[#0B3C2A] bg-slate-100 font-semibold">
               {meta.columns.map((c, i) => (
                 <td
                   key={c.key}
@@ -142,7 +142,7 @@ export function ReportingView() {
                       onClick={() => setSel(r.name)}
                       className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs transition ${
                         activo === r.name
-                          ? "bg-[#1F3864] font-semibold text-white"
+                          ? "bg-[#0B3C2A] font-semibold text-white"
                           : "text-slate-700 hover:bg-slate-100"
                       }`}
                     >
@@ -184,7 +184,7 @@ export function ReportingView() {
             />
             <div className="mb-3 flex items-end justify-between gap-4 print:hidden">
               <div>
-                <h2 className="text-lg font-semibold text-[#1F3864]">{meta.title}</h2>
+                <h2 className="text-lg font-semibold text-[#0B3C2A]">{meta.title}</h2>
                 <p className="mt-0.5 max-w-3xl text-xs text-slate-500">{meta.blurb}</p>
                 <p className="mt-1 text-xs text-slate-400">
                   {meta.rows} {meta.rows === 1 ? "row" : "rows"}

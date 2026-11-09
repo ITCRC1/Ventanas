@@ -418,7 +418,7 @@ function StateCell({
   const dot = (
     <span
       className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-      style={{ backgroundColor: st ? (STATE_COLOR[st.code] ?? st.color_hex) : "#94a3b8" }}
+      style={{ backgroundColor: st ? (STATE_COLOR[st.code] ?? st.color_hex) : "#99A49D" }}
       title={st?.label ?? ""}
     />
   );
@@ -569,7 +569,7 @@ function AddWbsForm({
 const MONEYTH = "px-2 py-2 text-right text-xs font-semibold uppercase whitespace-nowrap";
 // Cada <th> de la cabecera se pega por su cuenta: un <thead> sticky NO sirve si
 // alguna celda ya es sticky (la celda abre su propio contexto y se va al bajar).
-const THH = "sticky top-0 z-30 bg-[#434343]";
+const THH = "sticky top-0 z-30 bg-[#151916]";
 
 // Bloque CONGELADO: St … Over/Under (17 columnas). Al scrollear el cronograma,
 // estas quedan fijas para ver el presupuesto mientras se asignan recursos.
@@ -1358,7 +1358,7 @@ export function JobCostFull() {
     venta = false,
   ): ReactNode => {
     // La VENTA se pinta en verde y con borde propio para AISLARLA de los totales de gasto.
-    const rowBg = venta ? "bg-[#DFF3E3]" : "bg-[#DCE6F4]";
+    const rowBg = venta ? "bg-[#D8F4E6]" : "bg-[#D8F4E6]";
     const rowBorder = venta ? "border-emerald-600" : "border-slate-500";
     return (
       <tr key={key} className={`border-y-2 ${rowBorder} ${rowBg} text-[12px] font-bold`}>
@@ -1409,7 +1409,7 @@ export function JobCostFull() {
           );
         })}
         <td className="tabular px-2 text-right text-emerald-800">{m(t.act)}</td>
-        <td className="tabular px-2 text-right text-[#856404]">{m(t.fcst)}</td>
+        <td className="tabular px-2 text-right text-[#8E4A10]">{m(t.fcst)}</td>
         {(() => {
           const gap = t.rev - t.tl;
           const ok = Math.abs(gap) < 1;
@@ -1438,7 +1438,7 @@ export function JobCostFull() {
             </td>
           );
         })()}
-        <td className="tabular px-2 text-right font-medium text-[#0d6b72]">
+        <td className="tabular px-2 text-right font-medium text-[#2F956E]">
           {m(ls.reduce((s, l) => s + columnTotal(index, l.id, viewWeeks), 0))}
         </td>
       </tr>
@@ -1810,70 +1810,70 @@ export function JobCostFull() {
         className="max-h-[72vh] overflow-auto rounded-lg border border-slate-200 bg-white"
       >
         <table className="border-collapse text-xs">
-          <thead className="bg-[#434343] text-left text-white">
+          <thead className="bg-[#151916] text-left text-white">
             <tr>
-              <th className={`${fhead("bg-[#434343]")} px-1 py-2 text-center`} style={fst(0)}>
+              <th className={`${fhead("bg-[#151916]")} px-1 py-2 text-center`} style={fst(0)}>
                 St
               </th>
-              <th className={`${fhead("bg-[#434343]")} px-1 py-2`} style={fst(1)}>
+              <th className={`${fhead("bg-[#151916]")} px-1 py-2`} style={fst(1)}>
                 WBS
               </th>
-              <th className={`${fhead("bg-[#434343]")} px-1 py-2`} style={fst(2)}>
+              <th className={`${fhead("bg-[#151916]")} px-1 py-2`} style={fst(2)}>
                 Task Title
               </th>
               <ColHead
                 label="Orig. Budget"
                 help={COL_HELP.orig}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(3)}
                 align="right"
               />
               <ColHead
                 label="Changes"
                 help={COL_HELP.changes}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(4)}
                 align="right"
               />
               <ColHead
                 label="Revised"
                 help={COL_HELP.revised}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(5)}
                 align="right"
               />
               <ColHead
                 label="Spend"
                 help={COL_HELP.spend}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(6)}
                 align="right"
               />
               <ColHead
                 label="Remaining"
                 help={COL_HELP.remaining}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(7)}
                 align="right"
               />
               <ColHead
                 label="% Compl"
                 help={COL_HELP.pct}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(8)}
                 align="right"
               />
               <ColHead
                 label="Forecast"
                 help={COL_HELP.forecast}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(9)}
                 align="right"
               />
               <ColHead
                 label="Over/Under"
                 help={COL_HELP.overunder}
-                className={`${fhead("bg-[#434343]")} ${MONEYTH}`}
+                className={`${fhead("bg-[#151916]")} ${MONEYTH}`}
                 style={fst(10)}
                 align="right"
               />
@@ -1913,14 +1913,14 @@ export function JobCostFull() {
                 </th>
               ))}
               <th
-                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-xs uppercase"
+                className="sticky top-0 z-30 bg-[#005C40] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 title="Actual = the timeline BEFORE the Forecast cut-off (executed / paid, from the ledger)"
               >
                 Actual
               </th>
               <th
-                className="sticky top-0 z-30 bg-[#856404] px-2 py-2 text-right text-xs uppercase"
+                className="sticky top-0 z-30 bg-[#8E4A10] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 title="Forecast = the timeline FROM the Forecast cut-off onward (the plan)"
               >
@@ -1929,19 +1929,19 @@ export function JobCostFull() {
               <ColHead
                 label="Timeline Total"
                 help={COL_HELP.tltotal}
-                className="sticky top-0 z-30 bg-[#2d3a5c] px-2 py-2 text-right text-xs uppercase"
+                className="sticky top-0 z-30 bg-[#151916] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 align="right"
               />
               <ColHead
                 label="Control"
                 help={COL_HELP.control}
-                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-xs uppercase"
+                className="sticky top-0 z-30 bg-[#005C40] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 80 }}
                 align="right"
               />
               <th
-                className="sticky top-0 z-30 bg-[#0d6b72] px-2 py-2 text-right text-xs uppercase"
+                className="sticky top-0 z-30 bg-[#2F956E] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 title={`Total of the selected year(s): ${activeYears.join(", ")}`}
               >
@@ -1954,30 +1954,30 @@ export function JobCostFull() {
             {displayRows.map((row) => {
               if (row.kind === "sec")
                 return (
-                  <tr key={`sec-${row.sec}`} className="border-t-2 border-slate-400 bg-[#EAF0FA]">
+                  <tr key={`sec-${row.sec}`} className="border-t-2 border-slate-400 bg-[#F0F1EB]">
                     <td
-                      className={`${fcls("bg-[#EAF0FA]")} px-1 text-center font-bold text-slate-700`}
+                      className={`${fcls("bg-[#F0F1EB]")} px-1 text-center font-bold text-slate-700`}
                       style={fst(0)}
                     >
                       {row.sec}
                     </td>
-                    <td className={fcls("bg-[#EAF0FA]")} style={fst(1)} />
+                    <td className={fcls("bg-[#F0F1EB]")} style={fst(1)} />
                     <td
-                      className={`${fcls("bg-[#EAF0FA]")} whitespace-nowrap px-1 py-1.5 text-[12px] font-bold uppercase text-slate-800`}
+                      className={`${fcls("bg-[#F0F1EB]")} whitespace-nowrap px-1 py-1.5 text-[12px] font-bold uppercase text-slate-800`}
                       style={fst(2)}
                     >
                       {row.title}
                     </td>
                     <td
                       colSpan={8}
-                      className={fcls("bg-[#EAF0FA]")}
+                      className={fcls("bg-[#F0F1EB]")}
                       style={{
                         left: LCX[3],
                         width: FROZEN_W - LCX[3],
                         minWidth: FROZEN_W - LCX[3],
                       }}
                     />
-                    <td colSpan={nTimeline + 13} className="bg-[#EAF0FA]" />
+                    <td colSpan={nTimeline + 13} className="bg-[#F0F1EB]" />
                   </tr>
                 );
               if (row.kind === "total") {
@@ -2353,10 +2353,10 @@ export function JobCostFull() {
                   <td className="tabular bg-[#eafaf0] px-2 text-right font-medium text-emerald-800">
                     {m(columnTotal(index, r.id, pastWeeks))}
                   </td>
-                  <td className="tabular bg-[#fbf6e7] px-2 text-right font-medium text-[#856404]">
+                  <td className="tabular bg-[#fbf6e7] px-2 text-right font-medium text-[#8E4A10]">
                     {m(columnTotal(index, r.id, futureWeeks))}
                   </td>
-                  <td className="tabular bg-[#eef2f9] px-2 text-right font-medium">{m(row.tl)}</td>
+                  <td className="tabular bg-[#FBFAF6] px-2 text-right font-medium">{m(row.tl)}</td>
                   {(() => {
                     const ctl = num(r.forecast) - row.tl;
                     return (
@@ -2368,7 +2368,7 @@ export function JobCostFull() {
                       </td>
                     );
                   })()}
-                  <td className="tabular bg-[#e6f4f5] px-2 text-right font-medium text-[#0d6b72]">
+                  <td className="tabular bg-[#e6f4f5] px-2 text-right font-medium text-[#2F956E]">
                     {m(columnTotal(index, r.id, viewWeeks))}
                   </td>
                 </tr>
@@ -2376,38 +2376,38 @@ export function JobCostFull() {
             })}
           </tbody>
           <tfoot className="sticky bottom-0 z-10">
-            <tr className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
-              <td className={`${fcls("bg-[#C8DCF0]", "z-30")}`} style={fst(0)} />
-              <td className={`${fcls("bg-[#C8DCF0]", "z-30")}`} style={fst(1)} />
-              <td className={`${fcls("bg-[#C8DCF0]", "z-30")} px-1 py-2`} style={fst(2)}>
+            <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
+              <td className={`${fcls("bg-[#B8E8D2]", "z-30")}`} style={fst(0)} />
+              <td className={`${fcls("bg-[#B8E8D2]", "z-30")}`} style={fst(1)} />
+              <td className={`${fcls("bg-[#B8E8D2]", "z-30")} px-1 py-2`} style={fst(2)}>
                 PROJECT TOTAL
               </td>
               <td
-                className={`${fcls("bg-[#C8DCF0]", "z-30")} tabular px-2 py-2 text-right`}
+                className={`${fcls("bg-[#B8E8D2]", "z-30")} tabular px-2 py-2 text-right`}
                 style={fst(3)}
               >
                 {m(grand.orig)}
               </td>
               <td
-                className={`${fcls("bg-[#C8DCF0]", "z-30")} tabular px-2 py-2 text-right`}
+                className={`${fcls("bg-[#B8E8D2]", "z-30")} tabular px-2 py-2 text-right`}
                 style={fst(4)}
               >
                 {m(grand.chg)}
               </td>
               <td
-                className={`${fcls("bg-[#C8DCF0]", "z-30")} tabular px-2 py-2 text-right`}
+                className={`${fcls("bg-[#B8E8D2]", "z-30")} tabular px-2 py-2 text-right`}
                 style={fst(5)}
               >
                 {m(grand.rev)}
               </td>
               <td
-                className={`${fcls("bg-[#C8DCF0]", "z-30")} tabular px-2 py-2 text-right`}
+                className={`${fcls("bg-[#B8E8D2]", "z-30")} tabular px-2 py-2 text-right`}
                 style={fst(6)}
               >
                 {m(grand.spend)}
               </td>
               <td
-                className={`${fcls("bg-[#C8DCF0]", "z-30")} tabular px-2 py-2 text-right`}
+                className={`${fcls("bg-[#B8E8D2]", "z-30")} tabular px-2 py-2 text-right`}
                 style={fst(7)}
               >
                 {m(grand.rem)}
@@ -2420,13 +2420,13 @@ export function JobCostFull() {
                 stickStyle={fst(8)}
               />
               <td
-                className={`${fcls("bg-[#C8DCF0]", "z-30")} tabular px-2 py-2 text-right`}
+                className={`${fcls("bg-[#B8E8D2]", "z-30")} tabular px-2 py-2 text-right`}
                 style={fst(9)}
               >
                 {m(grand.fc)}
               </td>
               <td
-                className={`${fcls("bg-[#C8DCF0]", "z-30")} tabular px-2 py-2 text-right ${grand.ou > 0 ? "text-red-700" : ""}`}
+                className={`${fcls("bg-[#B8E8D2]", "z-30")} tabular px-2 py-2 text-right ${grand.ou > 0 ? "text-red-700" : ""}`}
                 style={fst(10)}
               >
                 {m(grand.ou)}
@@ -2451,7 +2451,7 @@ export function JobCostFull() {
               <td className="tabular bg-[#eafaf0] px-2 py-2 text-right text-emerald-900">
                 {m(grand.act)}
               </td>
-              <td className="tabular bg-[#fbf6e7] px-2 py-2 text-right text-[#856404]">
+              <td className="tabular bg-[#fbf6e7] px-2 py-2 text-right text-[#8E4A10]">
                 {m(grand.fcst)}
               </td>
               {(() => {
@@ -2483,7 +2483,7 @@ export function JobCostFull() {
                   </td>
                 );
               })()}
-              <td className="tabular bg-[#0d6b72] px-2 py-2 text-right text-white">
+              <td className="tabular bg-[#2F956E] px-2 py-2 text-right text-white">
                 {m(allLines.reduce((s, l) => s + columnTotal(index, l.id, viewWeeks), 0))}
               </td>
             </tr>

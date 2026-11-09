@@ -236,7 +236,7 @@ export function BankReconciliation({ canView }: { canView: boolean }) {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="rounded bg-[#2d3a5c] px-3 py-2 text-sm font-medium text-white hover:bg-[#243049] disabled:opacity-50"
+          className="rounded bg-[#151916] px-3 py-2 text-sm font-medium text-white hover:bg-[#243049] disabled:opacity-50"
         >
           {uploading ? "Reading…" : "⬆ Upload LAFISE statement (PDF / CSV / xls)"}
         </button>
@@ -299,7 +299,7 @@ export function BankReconciliation({ canView }: { canView: boolean }) {
             onClick={() => setFilter(f)}
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               filter === f
-                ? "bg-[#2d3a5c] text-white"
+                ? "bg-[#151916] text-white"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
