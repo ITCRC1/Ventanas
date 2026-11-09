@@ -61,6 +61,9 @@ const IZQ: number[] = FIJAS.reduce<number[]>(
   (a, c, i) => [...a, i === 0 ? 0 : a[i - 1] + FIJAS[i - 1].w],
   [],
 );
+// Lo que ocupan las columnas congeladas. Un mes queda "a la vista" cuando su
+// borde izquierdo pasa de acá: antes de eso está tapado por las fijas.
+const ANCHO_FIJO = FIJAS.reduce((a, c) => a + c.w, 0);
 
 type Pend = { wbs_id: number; week_start: string; planned_amount: number | null; state_id?: number };
 
@@ -96,6 +99,11 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
   const [aviso, setAviso] = useState<string | null>(null);
   const [buf, setBuf] = useState<string | null>(null);
   const cajaRef = useRef<HTMLInputElement | null>(null);
+  // ⚠️ Callback ref, no `useRef`: el componente devuelve un "Loading…" antes de
+  // dibujar la tabla, y un `useRef` enganchado en ese render queda apuntando a
+  // null para siempre. En Job Cost eso dejó la rueda y las flechas sin hacer
+  // nada hasta que se cambió por esto.
+  const [caja, setCaja] = useState<HTMLDivElement | null>(null);
 
   const cutoff = corte.data?.cutoff_date ?? "";
   const primerEstado = estados.data?.[0]?.id ?? 1;
@@ -309,6 +317,27 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
     });
   }
 
+  /** Corre la grilla `delta` meses. Mide las posiciones REALES de los
+   *  encabezados en vez de asumir un ancho: si mañana cambia ANCHO_MES, o el
+   *  navegador redondea distinto, esto sigue cayendo en el mes correcto. */
+  const correrMes = (delta: number) => {
+    if (!caja) return;
+    const ths = [...caja.querySelectorAll<HTMLElement>("th[data-mes]")];
+    if (!ths.length) return;
+    const pos = ths.map((t) => t.offsetLeft - ANCHO_FIJO);
+    // El mes que hoy está pegado al borde de las columnas fijas.
+    let i = pos.findIndex((x) => x >= caja.scrollLeft - 2);
+    if (i < 0) i = ths.length - 1;
+    const destino = Math.min(Math.max(i + delta, 0), ths.length - 1);
+    caja.scrollTo({ left: Math.max(pos[destino], 0), behavior: "smooth" });
+  };
+
+  const irAMes = (mes: number) => {
+    if (!caja) return;
+    const th = caja.querySelector<HTMLElement>(`th[data-mes="${mes}"]`);
+    if (th) caja.scrollTo({ left: Math.max(th.offsetLeft - ANCHO_FIJO, 0), behavior: "smooth" });
+  };
+
   /** Una celda de la zona congelada. El `left` sale de IZQ, no a ojo. */
   const Fija = ({
     i,
@@ -490,10 +519,50 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
           franja de scroll de ocho puntos: inservible. El owner la marco en
           rojo. Ahora la grilla ocupa lo que queda y una sola barra —la suya—
           recorre las 104 filas. */}
-      <div
-        className="overflow-auto rounded-lg border border-slate-200 bg-white"
-        style={{ height: "calc(100vh - 300px)", minHeight: 320 }}
-      >
+      <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+        <span className="mr-1">Jump to month:</span>
+        {MES.map((m, i) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => irAMes(i + 1)}
+            className="rounded border border-slate-300 px-1.5 py-0.5 font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+
+      <div className="relative">
+        {/* ⚠️ Las flechas van FLOTANDO sobre el borde derecho, no al pie.
+            Pedido del owner: «para no ir hasta abajo a mover los meses». Con 24
+            columnas de mes, llegar a diciembre por la barra horizontal obliga a
+            bajar hasta el final de 104 filas y volver. */}
+        <div className="pointer-events-none absolute right-1 top-1/2 z-40 -translate-y-1/2">
+          <div className="pointer-events-auto flex flex-col gap-1 rounded border border-slate-300 bg-white/95 p-0.5 shadow">
+            {[
+              ["⏮", () => irAMes(1), "January"],
+              ["◀", () => correrMes(-1), "One month back"],
+              ["▶", () => correrMes(1), "One month forward"],
+              ["⏭", () => irAMes(12), "December"],
+            ].map(([etq, fn, ayuda]) => (
+              <button
+                key={String(etq)}
+                type="button"
+                title={String(ayuda)}
+                onClick={fn as () => void}
+                className="rounded px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-200"
+              >
+                {etq as string}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div
+          ref={setCaja}
+          className="overflow-auto rounded-lg border border-slate-200 bg-white"
+          style={{ height: "calc(100vh - 330px)", minHeight: 320 }}
+        >
         <table className="border-collapse text-[11px]">
           <thead className="sticky top-0 z-20">
             <tr className="bg-[#0F5F59] text-white">
@@ -530,6 +599,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                 <Fragment key={m}>
                   {/* El año que se EDITA, resaltado; el anterior, apagado. */}
                   <th
+                    data-mes={MES.indexOf(m) + 1}
                     style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
                     className="border-l-2 border-white/40 bg-[#2962FF] px-1 text-right text-[10px] font-bold"
                   >
@@ -768,7 +838,8 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
               <td className="tabular px-2 text-right">{usd(anioTot(anio) - anioTot(base))}</td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );
