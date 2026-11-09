@@ -42,10 +42,21 @@ const NAV: NavItem[] = [
     perm: "view.planning",
   },
   {
-    href: "/budget-proposal",
-    label: "Budget Proposal",
-    hint: "The year by week, from the schedule and the LEDGER",
+    label: "Budget",
     perm: "report.view",
+    items: [
+      {
+        href: "/budget-proposal",
+        label: "Budget Proposal",
+        hint: "The year by week, from the schedule and the LEDGER",
+      },
+      {
+        href: "/budget-grid",
+        label: "Budget Grid",
+        hint: "Edit next year with last year beside it",
+        perm: "schedule.edit",
+      },
+    ],
   },
   {
     label: "Payments",
@@ -106,6 +117,11 @@ const ROUTE_PERM = (
     ["/timeline", "view.timeline"],
     ["/dashboard", "report.view"],
     ["/planning", "view.planning"],
+    // ⚠️ `/budget-grid` va ANTES que `/budget-proposal`: el buscador usa
+    // startsWith y el primero que coincide gana. Al reves, la grilla caeria en
+    // la regla de la propuesta y se abriria con permiso de solo lectura —
+    // cuando es la unica pantalla de presupuesto que ESCRIBE.
+    ["/budget-grid", "schedule.edit"],
     ["/budget-proposal", "report.view"],
     ["/payments", "view.payments"],
     ["/disbursements", "view.payments"],
