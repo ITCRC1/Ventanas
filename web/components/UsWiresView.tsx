@@ -138,11 +138,11 @@ export function UsWiresView() {
         </div>
         <div className="flex gap-6 text-right">
           <div>
-            <div className="text-[11px] uppercase text-slate-500">Sent by owners</div>
+            <div className="text-xs uppercase text-slate-500">Sent by owners</div>
             <div className="tabular text-lg font-bold text-slate-700">{moneyUsd(totalSent)}</div>
           </div>
           <div>
-            <div className="text-[11px] uppercase text-slate-500">Received at LAFISE</div>
+            <div className="text-xs uppercase text-slate-500">Received at LAFISE</div>
             <div className="tabular text-2xl font-bold text-emerald-700">{moneyUsd(total)}</div>
           </div>
         </div>

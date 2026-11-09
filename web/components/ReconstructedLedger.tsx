@@ -139,7 +139,7 @@ export function ReconstructedLedger() {
       </div>
 
       <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full min-w-[1500px] border-collapse text-[11px]">
+        <table className="w-full min-w-[1500px] border-collapse text-xs">
           <thead className="sticky top-0 z-10 bg-[#434343] text-left uppercase text-white">
             <tr>
               <th className="border border-slate-600 px-2 py-1">Cost Code</th>
@@ -200,16 +200,14 @@ export function ReconstructedLedger() {
                   </td>
                   <td className="border border-slate-200 px-2">
                     {!r.has_invoice ? (
-                      <span className="rounded bg-amber-500 px-1 text-[10px] font-medium text-white">
+                      <span className="rounded bg-amber-500 px-1 text-xs font-medium text-white">
                         MISSING
                       </span>
                     ) : r.no_invoice ? (
-                      <span className="rounded bg-slate-700 px-1 text-[10px] text-white">
-                        NO INV
-                      </span>
+                      <span className="rounded bg-slate-700 px-1 text-xs text-white">NO INV</span>
                     ) : r.doc_type ? (
                       <span
-                        className={`rounded px-1 text-[10px] font-medium ${r.doc_type === "NC" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}
+                        className={`rounded px-1 text-xs font-medium ${r.doc_type === "NC" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}
                       >
                         {DOC_LABEL[r.doc_type] ?? r.doc_type}
                       </span>
@@ -234,14 +232,14 @@ export function ReconstructedLedger() {
                         key={`n-${r.receipt_id}-${r.note ?? ""}`}
                         defaultValue={r.note ?? ""}
                         placeholder="note…"
-                        className="w-36 rounded border border-slate-200 px-1 py-0.5 text-[11px]"
+                        className="w-36 rounded border border-slate-200 px-1 py-0.5 text-xs"
                         onBlur={(e) => {
                           if (r.receipt_id != null && e.target.value !== (r.note ?? ""))
                             upd.mutate({ id: r.receipt_id, notes: e.target.value || null });
                         }}
                       />
                     ) : (
-                      <span className="text-[10px] text-amber-600">needs invoice</span>
+                      <span className="text-xs text-amber-600">needs invoice</span>
                     )}
                   </td>
                 </tr>

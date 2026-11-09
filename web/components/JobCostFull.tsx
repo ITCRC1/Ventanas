@@ -304,11 +304,11 @@ function EditableDateCell({
   canEdit: boolean;
   onSave: (v: string | null) => void;
 }) {
-  if (!canEdit) return <span className="px-1 text-[10px] text-slate-500">{value ?? "—"}</span>;
+  if (!canEdit) return <span className="px-1 text-xs text-slate-500">{value ?? "—"}</span>;
   return (
     <input
       type="date"
-      className="w-[96px] rounded border border-slate-200 bg-transparent px-0.5 text-[10px] hover:border-slate-400"
+      className="w-[96px] rounded border border-slate-200 bg-transparent px-0.5 text-xs hover:border-slate-400"
       value={value ?? ""}
       onChange={(e) => onSave(e.target.value === "" ? null : e.target.value)}
     />
@@ -383,7 +383,7 @@ function SelectCell({
   }
   return (
     <select
-      className="w-full rounded border border-slate-200 bg-transparent px-0.5 py-0.5 text-[11px] hover:border-slate-400 disabled:opacity-40"
+      className="w-full rounded border border-slate-200 bg-transparent px-0.5 py-0.5 text-xs hover:border-slate-400 disabled:opacity-40"
       value={value === null ? "" : String(value)}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
@@ -427,7 +427,7 @@ function StateCell({
       <select
         // biome-ignore lint/a11y/noAutofocus: edición al hacer clic
         autoFocus
-        className="relative z-30 w-24 rounded border border-slate-400 bg-white text-[10px]"
+        className="relative z-30 w-24 rounded border border-slate-400 bg-white text-xs"
         value={stateId ?? ""}
         onChange={(e) => {
           onSave(Number(e.target.value));
@@ -566,7 +566,7 @@ function AddWbsForm({
   );
 }
 
-const MONEYTH = "px-2 py-2 text-right text-[10px] font-semibold uppercase whitespace-nowrap";
+const MONEYTH = "px-2 py-2 text-right text-xs font-semibold uppercase whitespace-nowrap";
 // Cada <th> de la cabecera se pega por su cuenta: un <thead> sticky NO sirve si
 // alguna celda ya es sticky (la celda abre su propio contexto y se va al bajar).
 const THH = "sticky top-0 z-30 bg-[#434343]";
@@ -1401,7 +1401,7 @@ export function JobCostFull() {
             <td
               key={c.key}
               data-print="hide"
-              className={`tabular px-1 text-center text-[10px]${cutBorder(i)}`}
+              className={`tabular px-1 text-center text-xs${cutBorder(i)}`}
               title={v ? full2(v) : undefined}
             >
               {compactNode(v)}
@@ -1513,9 +1513,9 @@ export function JobCostFull() {
           {/* Tambien en la barra de arriba. Esta es la mano que lo busca. */}
           <BotonMasterFile tono="pagina" />
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase text-slate-400">Statuses:</span>
+            <span className="text-xs uppercase text-slate-400">Statuses:</span>
             {(states.data ?? []).map((s) => (
-              <span key={s.id} className="flex items-center gap-1 text-[11px] text-slate-600">
+              <span key={s.id} className="flex items-center gap-1 text-xs text-slate-600">
                 <span
                   className="inline-block h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: STATE_COLOR[s.code] ?? s.color_hex }}
@@ -1770,7 +1770,7 @@ export function JobCostFull() {
               aria-label="One month left"
               title="One month back  ·  Alt+Shift+←"
               onClick={() => correr(-4)}
-              className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+              className="rounded px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
             >
               ⏮
             </button>
@@ -1797,7 +1797,7 @@ export function JobCostFull() {
               aria-label="One month right"
               title="One month forward  ·  Alt+Shift+→"
               onClick={() => correr(4)}
-              className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+              className="rounded px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
             >
               ⏭
             </button>
@@ -1809,7 +1809,7 @@ export function JobCostFull() {
         ref={fijarGrilla}
         className="max-h-[72vh] overflow-auto rounded-lg border border-slate-200 bg-white"
       >
-        <table className="border-collapse text-[11px]">
+        <table className="border-collapse text-xs">
           <thead className="bg-[#434343] text-left text-white">
             <tr>
               <th className={`${fhead("bg-[#434343]")} px-1 py-2 text-center`} style={fst(0)}>
@@ -1880,22 +1880,22 @@ export function JobCostFull() {
               <th className={`${THH} px-2 py-2`}>Owner</th>
               <th className={`${THH} px-2 py-2`}>Category</th>
               <th className={`${THH} px-2 py-2`}>Phase</th>
-              <th className={`${THH} px-2 py-2 text-[10px] uppercase whitespace-nowrap`}>Start</th>
-              <th className={`${THH} px-2 py-2 text-[10px] uppercase whitespace-nowrap`}>Due</th>
+              <th className={`${THH} px-2 py-2 text-xs uppercase whitespace-nowrap`}>Start</th>
+              <th className={`${THH} px-2 py-2 text-xs uppercase whitespace-nowrap`}>Due</th>
               <th
-                className={`${THH} px-2 py-2 text-center text-[10px] uppercase`}
+                className={`${THH} px-2 py-2 text-center text-xs uppercase`}
                 title="Duration in days (DAYS360 between Start and Due, like Excel)"
               >
                 Dur
               </th>
               <th
-                className={`${THH} px-2 py-2 text-center text-[10px] uppercase`}
+                className={`${THH} px-2 py-2 text-center text-xs uppercase`}
                 title="Current draw (last disbursement that touches the line)"
               >
                 Curr Draw
               </th>
               <th
-                className={`${THH} px-2 py-2 text-center text-[10px] uppercase`}
+                className={`${THH} px-2 py-2 text-center text-xs uppercase`}
                 title="First draw in which the line appears"
               >
                 Draw #
@@ -1905,22 +1905,22 @@ export function JobCostFull() {
                   key={c.key}
                   data-wk={String(c.weeks[0] ?? c.key)}
                   data-print="hide"
-                  className={`${THH} px-1 py-1 text-center text-[10px]${cutBorder(i)}`}
+                  className={`${THH} px-1 py-1 text-center text-xs${cutBorder(i)}`}
                   style={{ minWidth: 58 }}
                 >
                   <div>{c.label}</div>
-                  <div className="text-[9px] text-slate-300">{c.sub}</div>
+                  <div className="text-xs text-slate-300">{c.sub}</div>
                 </th>
               ))}
               <th
-                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 title="Actual = the timeline BEFORE the Forecast cut-off (executed / paid, from the ledger)"
               >
                 Actual
               </th>
               <th
-                className="sticky top-0 z-30 bg-[#856404] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#856404] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 title="Forecast = the timeline FROM the Forecast cut-off onward (the plan)"
               >
@@ -1929,24 +1929,24 @@ export function JobCostFull() {
               <ColHead
                 label="Timeline Total"
                 help={COL_HELP.tltotal}
-                className="sticky top-0 z-30 bg-[#2d3a5c] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#2d3a5c] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 align="right"
               />
               <ColHead
                 label="Control"
                 help={COL_HELP.control}
-                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 80 }}
                 align="right"
               />
               <th
-                className="sticky top-0 z-30 bg-[#0d6b72] px-2 py-2 text-right text-[10px] uppercase"
+                className="sticky top-0 z-30 bg-[#0d6b72] px-2 py-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 title={`Total of the selected year(s): ${activeYears.join(", ")}`}
               >
                 Year Total
-                <div className="text-[9px] font-normal text-teal-100">{activeYears.join(", ")}</div>
+                <div className="text-xs font-normal text-teal-100">{activeYears.join(", ")}</div>
               </th>
             </tr>
           </thead>
@@ -2026,7 +2026,7 @@ export function JobCostFull() {
                     />
                   </td>
                   <td
-                    className={`${fcls("bg-white")} whitespace-nowrap px-1 font-mono text-[10px] text-slate-500`}
+                    className={`${fcls("bg-white")} whitespace-nowrap px-1 font-mono text-xs text-slate-500`}
                     style={fst(1)}
                   >
                     {r.wbs_code}
@@ -2294,7 +2294,7 @@ export function JobCostFull() {
                               }
                             }}
                             onBlur={() => commitColumn(r.id, c, editBuf ?? "")}
-                            className="tabular block min-h-[16px] w-full bg-white px-1 text-[10px] text-slate-900 outline-none ring-2 ring-inset ring-blue-600"
+                            className="tabular block min-h-[16px] w-full bg-white px-1 text-xs text-slate-900 outline-none ring-2 ring-inset ring-blue-600"
                           />
                         ) : (
                           <button
@@ -2336,7 +2336,7 @@ export function JobCostFull() {
                               openCell(r.id, c.key, val ? String(val) : "");
                             }}
                             {...(canPaintHere && paint.paintOn ? paint.cellPaint(doPaint) : {})}
-                            className={`tabular block min-h-[16px] w-full px-1 text-[10px] ${colPast ? "cursor-default" : canSched && paint.paintOn ? "cursor-crosshair" : canDrag ? "cursor-grab hover:ring-1 hover:ring-inset hover:ring-blue-400" : canSched ? "cursor-pointer hover:ring-1 hover:ring-inset hover:ring-blue-400" : ""} ${isSel ? "ring-2 ring-inset ring-slate-900" : ""} ${isDropTarget ? "outline outline-2 outline-dashed outline-blue-500" : ""}`}
+                            className={`tabular block min-h-[16px] w-full px-1 text-xs ${colPast ? "cursor-default" : canSched && paint.paintOn ? "cursor-crosshair" : canDrag ? "cursor-grab hover:ring-1 hover:ring-inset hover:ring-blue-400" : canSched ? "cursor-pointer hover:ring-1 hover:ring-inset hover:ring-blue-400" : ""} ${isSel ? "ring-2 ring-inset ring-slate-900" : ""} ${isDropTarget ? "outline outline-2 outline-dashed outline-blue-500" : ""}`}
                             style={{
                               // Si la celda tiene cifra, se atenúa el color (50% hacia
                               // blanco) para leer bien el número; si no, color pleno.
@@ -2441,7 +2441,7 @@ export function JobCostFull() {
                   <td
                     key={c.key}
                     data-print="hide"
-                    className={`tabular px-1 py-2 text-center text-[10px]${cutBorder(i)}`}
+                    className={`tabular px-1 py-2 text-center text-xs${cutBorder(i)}`}
                     title={v ? full2(v) : undefined}
                   >
                     {compactNode(v)}
@@ -2491,7 +2491,7 @@ export function JobCostFull() {
             {proceedsLines.map((p) => (
               <tr
                 key={`ref-${p.id}`}
-                className="border-t border-emerald-400 bg-emerald-50 text-[11px] italic text-emerald-900"
+                className="border-t border-emerald-400 bg-emerald-50 text-xs italic text-emerald-900"
               >
                 <td className={fcls("bg-emerald-50", "z-30")} style={fst(0)} />
                 <td className={`${fcls("bg-emerald-50", "z-30")} px-1`} style={fst(1)}>
@@ -2567,7 +2567,7 @@ export function JobCostFull() {
                 ) : null}
 
                 <div className="overflow-x-auto rounded border border-slate-200">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-xs">
                     <thead className="bg-slate-100 text-left text-slate-600">
                       <tr>
                         <th className="px-2 py-1">WBS</th>

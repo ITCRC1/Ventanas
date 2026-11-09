@@ -90,7 +90,7 @@ function ShortPaymentCell({
   if (r.sp_line_no != null) {
     return (
       <span
-        className="rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] font-medium text-indigo-800"
+        className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-800"
         title={`Line ${r.sp_line_no} of Disbursement #${r.sp_disb_no}.${r.sp_disb_sub}${
           r.sp_amount ? ` — ${usd(Number(r.sp_amount))}` : ""
         }`}
@@ -132,7 +132,7 @@ function ShortPaymentCell({
               ? "The invoice has no amount"
               : `Add as the last line of Short Payment ${spTitle(open)} — amount = total incl. tax`
       }
-      className="rounded border border-indigo-500 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-40"
+      className="rounded border border-indigo-500 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-40"
     >
       {add.isPending ? "Adding…" : `＋ SP ${open ? `#${open.disb_no}` : ""}`}
     </button>
@@ -209,7 +209,7 @@ function AssociateModal({
               Link disbursements to this invoice
               {receipt.doc_type ? (
                 <span
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${isNC ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-700"}`}
+                  className={`rounded px-1.5 py-0.5 text-xs font-medium ${isNC ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-700"}`}
                 >
                   {DOC_LABEL[receipt.doc_type] ?? receipt.doc_type}
                 </span>
@@ -221,12 +221,12 @@ function AssociateModal({
               <b className={isNC ? "text-red-600" : undefined}>{fmt(invTotal, invCur)}</b>
             </div>
             {isNC ? (
-              <div className="mt-1 rounded bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">
+              <div className="mt-1 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
                 ⚠ Credit note — this <b>subtracts</b>. Link it to the same disbursement as its
                 invoice so the net effect is what you expect.
               </div>
             ) : (
-              <div className="mt-0.5 text-[11px] text-slate-400">
+              <div className="mt-0.5 text-xs text-slate-400">
                 Check every ledger entry (disbursement) this invoice covers — it can be several.
               </div>
             )}
@@ -248,7 +248,7 @@ function AssociateModal({
             placeholder="Filter: payee, description, amount, entry #…"
             className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs"
           />
-          <label className="flex items-center gap-1 text-[11px] text-slate-600">
+          <label className="flex items-center gap-1 text-xs text-slate-600">
             <input
               type="checkbox"
               checked={showAll}
@@ -294,7 +294,7 @@ function AssociateModal({
                       <span className="font-medium">#{c.id}</span> ·{" "}
                       {c.payee_name || c.description || "—"}
                       {busy ? (
-                        <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">
+                        <span className="ml-1 rounded bg-amber-100 px-1 text-xs text-amber-700">
                           invoiced
                         </span>
                       ) : null}
@@ -406,7 +406,7 @@ function AutoMatchModal({
       </td>
       <td className="px-2 py-1">
         <div className="font-medium text-slate-700">{s.issuer_name || "?"}</div>
-        <div className="text-[10px] text-slate-400">
+        <div className="text-xs text-slate-400">
           #{s.invoice_no || "—"} · {dt(s.invoice_date)} ·{" "}
           {s.invoice_usd != null ? usd(s.invoice_usd) : `${s.invoice_total} ${s.invoice_currency}`}
         </div>
@@ -416,7 +416,7 @@ function AutoMatchModal({
         <div className="text-slate-700">
           #{s.ledger_entry_id} {s.ledger_desc || ""}
         </div>
-        <div className="text-[10px] text-slate-400">
+        <div className="text-xs text-slate-400">
           {dt(s.ledger_date)} ·{" "}
           {s.ledger_amount_usd ? `$${Number(s.ledger_amount_usd).toLocaleString()}` : "—"}
         </div>
@@ -425,7 +425,7 @@ function AutoMatchModal({
         {s.reasons.map((r) => (
           <span
             key={r}
-            className="mr-1 inline-block rounded bg-slate-100 px-1 text-[10px] text-slate-600"
+            className="mr-1 inline-block rounded bg-slate-100 px-1 text-xs text-slate-600"
           >
             {r}
           </span>
@@ -491,7 +491,7 @@ function AutoMatchModal({
                       <tr>
                         <td
                           colSpan={5}
-                          className="bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-800"
+                          className="bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800"
                         >
                           ✓ Clear matches — will apply
                         </td>
@@ -504,7 +504,7 @@ function AutoMatchModal({
                       <tr>
                         <td
                           colSpan={5}
-                          className="bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800"
+                          className="bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800"
                         >
                           ⚠ To review — check any you want to apply
                         </td>
@@ -903,7 +903,7 @@ export function InvoiceReceipts() {
           title="Saved for everyone (it lives in the database)"
           className="w-28 rounded border border-amber-300 px-2 py-1 text-sm"
         />
-        {ref.save.isPending ? <span className="text-[11px] text-amber-700">saving…</span> : null}
+        {ref.save.isPending ? <span className="text-xs text-amber-700">saving…</span> : null}
         <span className="text-xs text-amber-700">
           Colón invoices are shown in USD at this rate (the ledger is in USD). Shared with the
           Invoices Applied tab.
@@ -925,7 +925,7 @@ export function InvoiceReceipts() {
           />
           Show ignored ({ignoredCount})
         </label>
-        <span className="text-[11px] text-amber-600">
+        <span className="text-xs text-amber-600">
           Associated and ignored invoices are hidden from this queue.
         </span>
       </div>
@@ -964,7 +964,7 @@ export function InvoiceReceipts() {
                 </td>
                 <td className="px-2 py-1 text-slate-700">
                   {r.no_invoice ? (
-                    <span className="mr-1 rounded bg-slate-700 px-1 text-[10px] font-medium text-white">
+                    <span className="mr-1 rounded bg-slate-700 px-1 text-xs font-medium text-white">
                       NO INVOICE
                     </span>
                   ) : null}
@@ -977,7 +977,7 @@ export function InvoiceReceipts() {
                 <td className="px-2 py-1">
                   {r.doc_type ? (
                     <span
-                      className={`rounded px-1 text-[10px] font-medium ${r.doc_type === "NC" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}
+                      className={`rounded px-1 text-xs font-medium ${r.doc_type === "NC" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}
                     >
                       {DOC_LABEL[r.doc_type] ?? r.doc_type}
                     </span>
@@ -1046,14 +1046,14 @@ export function InvoiceReceipts() {
                     <button
                       type="button"
                       onClick={() => void api.abrir(`/invoice-receipts/${r.id}/file/pdf`)}
-                      className="mr-1 rounded bg-red-100 px-1 text-[10px] font-medium text-red-700 hover:bg-red-200"
+                      className="mr-1 rounded bg-red-100 px-1 text-xs font-medium text-red-700 hover:bg-red-200"
                       title={r.pdf_filename ?? "Open PDF"}
                     >
                       PDF
                     </button>
                   ) : r.has_pdf ? (
                     <span
-                      className="mr-1 rounded bg-red-50 px-1 text-[10px] text-red-400"
+                      className="mr-1 rounded bg-red-50 px-1 text-xs text-red-400"
                       title="PDF not stored"
                     >
                       PDF
@@ -1063,14 +1063,14 @@ export function InvoiceReceipts() {
                     <button
                       type="button"
                       onClick={() => void api.abrir(`/invoice-receipts/${r.id}/file/xml`, true)}
-                      className="rounded bg-slate-200 px-1 text-[10px] font-medium text-slate-700 hover:bg-slate-300"
+                      className="rounded bg-slate-200 px-1 text-xs font-medium text-slate-700 hover:bg-slate-300"
                       title={r.xml_filename ?? "Download XML"}
                     >
                       XML
                     </button>
                   ) : r.xml_filename ? (
                     <span
-                      className="rounded bg-slate-100 px-1 text-[10px] text-slate-400"
+                      className="rounded bg-slate-100 px-1 text-xs text-slate-400"
                       title="XML not stored"
                     >
                       XML
@@ -1083,25 +1083,25 @@ export function InvoiceReceipts() {
                 <td className="px-2 py-1">
                   {r.links.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-1">
-                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">
+                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800">
                         {r.links.length} disb. · Σ ${r.linked_total_usd.toLocaleString()}
                       </span>
                       {r.links.slice(0, 2).map((l) => (
                         <span
                           key={l.ledger_entry_id}
-                          className="rounded bg-slate-100 px-1 text-[10px] text-slate-600"
+                          className="rounded bg-slate-100 px-1 text-xs text-slate-600"
                           title={l.description ?? ""}
                         >
                           #{l.ledger_entry_id} {l.payee_name || ""}
                         </span>
                       ))}
                       {r.links.length > 2 ? (
-                        <span className="text-[10px] text-slate-400">+{r.links.length - 2}</span>
+                        <span className="text-xs text-slate-400">+{r.links.length - 2}</span>
                       ) : null}
                       <button
                         type="button"
                         onClick={() => setEditing(r)}
-                        className="text-[11px] text-teal-700 underline hover:text-teal-900"
+                        className="text-xs text-teal-700 underline hover:text-teal-900"
                       >
                         Edit
                       </button>
@@ -1110,7 +1110,7 @@ export function InvoiceReceipts() {
                     <button
                       type="button"
                       onClick={() => setEditing(r)}
-                      className="rounded border border-teal-500 px-2 py-0.5 text-[11px] font-medium text-teal-700 hover:bg-teal-50"
+                      className="rounded border border-teal-500 px-2 py-0.5 text-xs font-medium text-teal-700 hover:bg-teal-50"
                     >
                       Associate…
                     </button>
@@ -1120,7 +1120,7 @@ export function InvoiceReceipts() {
                   <select
                     value={r.status}
                     onChange={(e) => update.mutate({ id: r.id, status: e.target.value })}
-                    className="rounded border border-slate-200 px-1 py-0.5 text-[11px]"
+                    className="rounded border border-slate-200 px-1 py-0.5 text-xs"
                   >
                     <option value="new">New</option>
                     <option value="linked">Linked</option>
@@ -1153,13 +1153,13 @@ export function InvoiceReceipts() {
           {/* Alta manual */}
           <tfoot>
             <tr className="border-t-2 border-slate-300 bg-slate-50">
-              <td className="px-2 py-1.5 text-[11px] text-slate-500">Add manually →</td>
+              <td className="px-2 py-1.5 text-xs text-slate-500">Add manually →</td>
               <td className="px-2 py-1.5">
                 <input
                   value={mIssuer}
                   onChange={(e) => setMIssuer(e.target.value)}
                   placeholder="Issuer"
-                  className="w-40 rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                  className="w-40 rounded border border-slate-300 px-1 py-0.5 text-xs"
                 />
               </td>
               <td className="px-2 py-1.5">
@@ -1167,7 +1167,7 @@ export function InvoiceReceipts() {
                   value={mNo}
                   onChange={(e) => setMNo(e.target.value)}
                   placeholder="Invoice #"
-                  className="w-32 rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                  className="w-32 rounded border border-slate-300 px-1 py-0.5 text-xs"
                 />
               </td>
               <td />
@@ -1183,7 +1183,7 @@ export function InvoiceReceipts() {
                   onChange={(e) => setMTotal(e.target.value)}
                   placeholder="0.00"
                   type="number"
-                  className="w-24 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]"
+                  className="w-24 rounded border border-slate-300 px-1 py-0.5 text-right text-xs"
                 />
               </td>
               <td colSpan={6} className="px-2 py-1.5">
@@ -1206,7 +1206,7 @@ export function InvoiceReceipts() {
                       },
                     )
                   }
-                  className="rounded bg-slate-700 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="rounded bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
                 >
                   ＋ Add
                 </button>

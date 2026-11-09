@@ -331,7 +331,7 @@ function EditCell({
       <input
         // El tooltip muestra el contenido completo aunque el ancho no alcance.
         title={v || undefined}
-        className={`${CELL_W[size]} rounded border border-slate-200 bg-white px-1 py-0.5 text-[11px] text-slate-600`}
+        className={`${CELL_W[size]} rounded border border-slate-200 bg-white px-1 py-0.5 text-xs text-slate-600`}
         value={v}
         onChange={(e) => setV(e.target.value)}
         onBlur={() => v !== (value ?? "") && onSave(v)}
@@ -417,7 +417,7 @@ function LedgerRow({
       <td className="px-1 py-0.5">
         <input
           list="wbs-codes"
-          className="w-16 rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] font-medium text-blue-700"
+          className="w-16 rounded border border-slate-300 bg-white px-1 py-0.5 text-xs font-medium text-blue-700"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           onBlur={saveCode}
@@ -440,7 +440,7 @@ function LedgerRow({
           key={r.amount_paid ?? ""}
           type="text"
           inputMode="decimal"
-          className="tabular w-20 rounded border border-emerald-400 bg-white px-1 py-0.5 text-right text-[11px] text-emerald-800"
+          className="tabular w-20 rounded border border-emerald-400 bg-white px-1 py-0.5 text-right text-xs text-emerald-800"
           defaultValue={usd2(paid)}
           onFocus={(e) => {
             e.currentTarget.value = e.currentTarget.value.replace(/[^0-9.-]/g, "");
@@ -478,7 +478,7 @@ function LedgerRow({
       <td className="px-1 py-0.5">
         <input
           list="payment-labels"
-          className="w-24 rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px]"
+          className="w-24 rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
           placeholder="—"
           value={pay}
           onChange={(e) => setPay(e.target.value)}
@@ -714,7 +714,7 @@ export function LedgerView() {
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         {/* Ancho mínimo acorde a las columnas anchas (Payee/Descripción/# factura). */}
-        <table className="w-full min-w-[2350px] border-collapse text-[11px]">
+        <table className="w-full min-w-[2350px] border-collapse text-xs">
           <thead className="sticky top-0 bg-slate-100 text-left uppercase text-slate-500">
             <tr>
               <th className="whitespace-nowrap px-2 py-1">Cost Code</th>

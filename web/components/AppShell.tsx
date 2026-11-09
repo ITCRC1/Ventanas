@@ -378,7 +378,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               title="My account — change password"
               className="flex items-center gap-2 rounded-md px-1 py-0.5 transition hover:bg-white/10"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-[11px] font-semibold">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-xs font-semibold">
                 {initials}
               </span>
               <span className="hidden leading-tight text-left sm:block">

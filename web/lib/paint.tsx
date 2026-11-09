@@ -212,7 +212,7 @@ export function CategoryHead({ tool, category }: { tool: PaintTool; category: st
   return (
     <span className="inline-flex items-center gap-2 align-middle">
       <span
-        className="flex h-5 min-w-[22px] items-center justify-center rounded px-1 text-[11px] font-bold text-white"
+        className="flex h-5 min-w-[22px] items-center justify-center rounded px-1 text-xs font-bold text-white"
         style={{ backgroundColor: color }}
       >
         {num ?? "·"}

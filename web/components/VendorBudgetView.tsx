@@ -51,24 +51,18 @@ export function VendorBudgetView({ owner }: { owner: string }) {
 
       {/* ── 2. El detalle: cada asiento que compone ese gasto ──────────── */}
       <div>
-        <h2 className="mb-2 text-base font-semibold">
-          The ledger detail, entry by entry
-        </h2>
+        <h2 className="mb-2 text-base font-semibold">The ledger detail, entry by entry</h2>
         {q.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
         {q.isError && (
-          <p className="text-sm text-red-600">
-            No se pudo cargar: {(q.error as Error).message}
-          </p>
+          <p className="text-sm text-red-600">No se pudo cargar: {(q.error as Error).message}</p>
         )}
         {!q.isLoading && !lineas.length && (
-          <p className="text-sm text-slate-500">
-            No WBS line has &quot;{owner}&quot; as owner.
-          </p>
+          <p className="text-sm text-slate-500">No WBS line has &quot;{owner}&quot; as owner.</p>
         )}
 
         {lineas.length > 0 && (
           <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
-            <table className="w-full min-w-[1000px] border-collapse text-[11px]">
+            <table className="w-full min-w-[1000px] border-collapse text-xs">
               <thead className="sticky top-0 z-10 bg-[#434343] text-left text-white">
                 <tr>
                   <th className={TH}>WBS</th>
@@ -94,9 +88,7 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                           cada línea; con un gris suave, cuarenta asientos
                           seguidos se leen como una sola lista. */}
                       <tr className="border-t-2 border-slate-400 bg-[#EAF0FA]">
-                        <td
-                          className="border border-slate-300 px-2 py-1.5 font-mono text-[12px] font-bold text-slate-800"
-                        >
+                        <td className="border border-slate-300 px-2 py-1.5 font-mono text-[12px] font-bold text-slate-800">
                           {l.wbs_code}
                         </td>
                         <td
@@ -108,9 +100,7 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                         <td className={TDR + " border-slate-300 font-bold"}>
                           {money(l.budget_revised)}
                         </td>
-                        <td className={TDR + " border-slate-300 font-bold"}>
-                          {money(l.spend)}
-                        </td>
+                        <td className={TDR + " border-slate-300 font-bold"}>{money(l.spend)}</td>
                         <td className={TDR + " border-slate-300 font-bold"}>
                           {money(l.remaining)}
                         </td>
@@ -128,9 +118,7 @@ export function VendorBudgetView({ owner }: { owner: string }) {
                           <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                             <td className={TD + " bg-slate-50/60"} />
                             <td className={TD + " whitespace-nowrap text-slate-500"}>
-                              {p.entry_date ?? (
-                                <span className="text-amber-700">no date</span>
-                              )}
+                              {p.entry_date ?? <span className="text-amber-700">no date</span>}
                             </td>
                             <td className={TD}>{p.description || p.payee || "—"}</td>
                             <td className={TD + " font-mono text-slate-500"}>
@@ -177,10 +165,10 @@ export function VendorBudgetView({ owner }: { owner: string }) {
       </div>
 
       <p className="text-xs text-slate-500">
-        The table above mirrors the ledger with the invoices applied, narrowed to the lines
-        that have <strong>{owner}</strong> as owner. The one below is the detail behind it: every
-        ledger entry, grouped by line. That owner field is hand-typed text — it tells you who to
-        chase, not how to reconcile money against the payee on the payment.
+        The table above mirrors the ledger with the invoices applied, narrowed to the lines that
+        have <strong>{owner}</strong> as owner. The one below is the detail behind it: every ledger
+        entry, grouped by line. That owner field is hand-typed text — it tells you who to chase, not
+        how to reconcile money against the payee on the payment.
       </p>
     </div>
   );

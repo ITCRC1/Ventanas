@@ -51,13 +51,13 @@ function Tabla({ meta, filas }: { meta: ReportMeta; filas: Record<string, unknow
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-      <table className="w-full border-collapse text-[11px]">
+      <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="bg-[#1F3864] text-left text-white">
             {meta.columns.map((c) => (
               <th
                 key={c.key}
-                className={`whitespace-nowrap px-2 py-2 text-[10px] font-semibold uppercase ${
+                className={`whitespace-nowrap px-2 py-2 text-xs font-semibold uppercase ${
                   alineaDerecha(c.kind) ? "text-right" : "text-left"
                 }`}
               >
@@ -131,7 +131,7 @@ export function ReportingView() {
           if (items.length === 0) return null;
           return (
             <div key={g}>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
                 {g}
               </p>
               <ul className="space-y-0.5">
@@ -148,7 +148,7 @@ export function ReportingView() {
                     >
                       <span>{r.title}</span>
                       <span
-                        className={`shrink-0 tabular text-[10px] ${
+                        className={`shrink-0 tabular text-xs ${
                           activo === r.name
                             ? "text-slate-300"
                             : r.rows === 0
@@ -166,7 +166,7 @@ export function ReportingView() {
           );
         })}
         {catalogo.data && catalogo.data.hidden_empty > 0 ? (
-          <p className="border-t border-slate-200 pt-2 text-[10px] leading-snug text-slate-400">
+          <p className="border-t border-slate-200 pt-2 text-xs leading-snug text-slate-400">
             {catalogo.data.hidden_empty} report
             {catalogo.data.hidden_empty === 1 ? "" : "s"} not listed — no data at the moment. They
             appear on their own once there is something to show.
@@ -186,7 +186,7 @@ export function ReportingView() {
               <div>
                 <h2 className="text-lg font-semibold text-[#1F3864]">{meta.title}</h2>
                 <p className="mt-0.5 max-w-3xl text-xs text-slate-500">{meta.blurb}</p>
-                <p className="mt-1 text-[11px] text-slate-400">
+                <p className="mt-1 text-xs text-slate-400">
                   {meta.rows} {meta.rows === 1 ? "row" : "rows"}
                   {corte ? ` · cut-off ${corte}` : ""}
                 </p>
@@ -202,7 +202,7 @@ export function ReportingView() {
             </div>
 
             {truncado ? (
-              <p className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900 print:hidden">
+              <p className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 print:hidden">
                 Showing the first {filas.length} of {meta.rows} rows. The Excel download has all of
                 them.
               </p>

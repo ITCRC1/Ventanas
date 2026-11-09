@@ -138,7 +138,7 @@ export function ColHead({
         title="Click: how it is calculated"
       >
         <span>{label}</span>
-        <span className="text-[9px] opacity-60">ⓘ</span>
+        <span className="text-xs opacity-60">ⓘ</span>
       </button>
       {pos &&
         createPortal(
@@ -150,7 +150,7 @@ export function ColHead({
               onClick={() => setPos(null)}
             />
             <div
-              className="fixed z-[9999] w-62 rounded-md border border-slate-200 bg-white p-2.5 text-left font-normal text-[11px] leading-snug text-slate-700 normal-case shadow-xl"
+              className="fixed z-[9999] w-62 rounded-md border border-slate-200 bg-white p-2.5 text-left font-normal text-xs leading-snug text-slate-700 normal-case shadow-xl"
               style={{ left: pos.x, top: pos.y, width: 248 }}
             >
               {help}

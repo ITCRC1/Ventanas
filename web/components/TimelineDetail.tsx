@@ -116,7 +116,7 @@ function add(s: Sums, r: WbsFinancials): void {
   s.funding += num(r.forecast) - num(r.spend);
 }
 
-const MONEYTH = "px-2 py-2 text-right text-[10px] font-semibold uppercase whitespace-nowrap";
+const MONEYTH = "px-2 py-2 text-right text-xs font-semibold uppercase whitespace-nowrap";
 
 /** El mismo cuadro, acotado a lo que un proveedor tiene a cargo.
  *
@@ -264,7 +264,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
 
       <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
         <table
-          className="border-collapse text-[11px]"
+          className="border-collapse text-xs"
           style={{ userSelect: tool.paintOn ? "none" : "auto" }}
         >
           <thead className="sticky top-0 z-30 bg-[#434343] text-left text-white">
@@ -296,7 +296,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
                 <th
                   key={q.key}
                   colSpan={q.span}
-                  className="border border-slate-500 bg-[#2f2f2f] px-1 py-1 text-center text-[11px] font-bold"
+                  className="border border-slate-500 bg-[#2f2f2f] px-1 py-1 text-center text-xs font-bold"
                 >
                   {q.label}
                 </th>
@@ -304,7 +304,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
               <ColHead
                 label="Full Year"
                 help={COL_HELP.fullyear}
-                className="border border-slate-600 bg-[#2d3a5c] px-2 text-right text-[10px] uppercase"
+                className="border border-slate-600 bg-[#2d3a5c] px-2 text-right text-xs uppercase"
                 style={{ minWidth: 90 }}
                 align="right"
                 rowSpan={nHeaderRows}
@@ -318,7 +318,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
                       <th
                         key={mo.key}
                         colSpan={mo.span}
-                        className="border border-slate-500 px-1 py-1 text-center text-[10px] font-semibold"
+                        className="border border-slate-500 px-1 py-1 text-center text-xs font-semibold"
                       >
                         {mo.label}
                       </th>
@@ -326,7 +326,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
                   : columns.map((c) => (
                       <th
                         key={c.key}
-                        className="border border-slate-500 px-1 py-1 text-center text-[10px] font-semibold"
+                        className="border border-slate-500 px-1 py-1 text-center text-xs font-semibold"
                         style={{ minWidth: 44 }}
                       >
                         {c.label}
@@ -340,7 +340,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
                 {columns.map((c) => (
                   <th
                     key={c.key}
-                    className="border border-slate-500 px-1 py-1 text-center text-[9px] font-normal text-slate-200"
+                    className="border border-slate-500 px-1 py-1 text-center text-xs font-normal text-slate-200"
                     style={{ minWidth: 34 }}
                   >
                     {weekDay(c)}
@@ -411,7 +411,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
               {columns.map((c) => (
                 <td
                   key={c.key}
-                  className="tabular border border-slate-200 px-1 py-2 text-center text-[10px]"
+                  className="tabular border border-slate-200 px-1 py-2 text-center text-xs"
                 >
                   {gridCell(colSum(allLines, c.weeks))}
                 </td>
@@ -422,7 +422,7 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
             </tr>
             {/* VENTA como referencia — FUERA de los totales de arriba */}
             {proceedsLines.map((p) => (
-              <tr key={`ref-${p.id}`} className="bg-emerald-50 text-[11px] italic text-emerald-900">
+              <tr key={`ref-${p.id}`} className="bg-emerald-50 text-xs italic text-emerald-900">
                 <td
                   className="border border-emerald-200 bg-emerald-50 px-2 py-1.5"
                   colSpan={6}
@@ -519,7 +519,7 @@ function TimelineDetailGroup({
           {moneyCell(s.funding)}
         </td>
         {columns.map((c) => (
-          <td key={c.key} className="tabular border border-slate-200 px-1 text-center text-[10px]">
+          <td key={c.key} className="tabular border border-slate-200 px-1 text-center text-xs">
             {gridCell(colSum(ls, c.weeks))}
           </td>
         ))}
@@ -566,7 +566,7 @@ function TimelineDetailGroup({
               —
             </td>
             <td
-              className="whitespace-nowrap border border-slate-200 bg-white px-2 font-mono text-[10px] text-slate-500"
+              className="whitespace-nowrap border border-slate-200 bg-white px-2 font-mono text-xs text-slate-500"
               style={leftStyle(3)}
             >
               {r.wbs_code}
@@ -622,7 +622,7 @@ function TimelineDetailGroup({
               return (
                 <td
                   key={c.key}
-                  className={`tabular border border-slate-200 px-1 text-center text-[10px] ${tool.paintOn ? "cursor-crosshair" : ""}`}
+                  className={`tabular border border-slate-200 px-1 text-center text-xs ${tool.paintOn ? "cursor-crosshair" : ""}`}
                   // Con cifra, se atenúa el color (50% hacia blanco) para leer el número.
                   style={{ backgroundColor: bg ? (amt ? softenHex(bg) : bg) : undefined }}
                   {...(week

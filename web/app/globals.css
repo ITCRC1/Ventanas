@@ -4,16 +4,40 @@
 
 :root {
   color-scheme: light;
-  /* Tipografía del sistema: sin descargas, y con las variantes que hacen falta
-     para que las columnas de dinero queden alineadas. */
-  --fuente: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
+  /* Manrope, la de glif.app. La pila de respaldo queda entera: si la fuente no
+     carga, la app se ve con la del sistema y no con Times. */
+  --fuente: var(--fuente-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* ⚠️ Peso mínimo 500, no 400. Es la decisión más distintiva de glif: en esa
+     pantalla no hay nada liviano. Acá importa más todavía —son tablas de
+     números a 12px— y es la queja que el owner ya hizo dos veces: «letras mas
+     grandes», «estan como escondidos por el color».
+
+     `font-normal` (400) sigue sirviendo: se usa en 14 lugares para bajarle el
+     tono a un paréntesis al lado de una etiqueta fuerte, y contra una base de
+     500 sigue leyéndose como lo secundario que es. */
+  --peso-base: 500;
+
+  /* Los dos colores de estado de glif. Entran solo donde algo AVISA; los
+     teal/navy/ámbar de la marca no se tocan porque son los que imprime el
+     Excel y la paridad entre pantalla y libro vale más. */
+  --alerta: #ff7b2f;
+  --peligro: #c52a38;
 }
 
 html {
   font-family: var(--fuente);
-  /* Los ceros con barra y las mayúsculas más angostas ayudan en tablas densas. */
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  /* ⚠️ Acá había `font-feature-settings: "cv02","cv03","cv04","cv11"`, que son
+     variantes PROPIAS DE INTER. La app nunca cargó Inter —usaba la pila del
+     sistema— así que esa línea no hacía nada desde el día que se escribió.
+     Manrope sí trae `ss01` (la «l» con cola, que la distingue del «1» y de la
+     «I») y `ss03`, que es justo lo que ayuda en una tabla de números. */
+  font-feature-settings: "ss01", "ss03";
+}
+
+body {
+  font-weight: var(--peso-base);
 }
 
 body {

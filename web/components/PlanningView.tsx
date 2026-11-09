@@ -55,7 +55,12 @@ export type SpTarget = {
   sending: boolean;
 };
 
-const spTitle = (b: { disb_no: number; disb_sub: number; send_date?: string | null; period_month: string }) => {
+const spTitle = (b: {
+  disb_no: number;
+  disb_sub: number;
+  send_date?: string | null;
+  period_month: string;
+}) => {
   const d = new Date(`${b.send_date ?? b.period_month}T00:00:00`);
   const m = d.toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" });
   return `#${b.disb_no}.${b.disb_sub} · ${m}`;
@@ -266,7 +271,7 @@ export function PlanningDoc({
           <input
             readOnly
             value={shareUrl}
-            className="min-w-0 flex-1 rounded border border-amber-300 bg-white px-2 py-0.5 font-mono text-[11px]"
+            className="min-w-0 flex-1 rounded border border-amber-300 bg-white px-2 py-0.5 font-mono text-xs"
             onFocus={(e) => e.currentTarget.select()}
           />
           <button
@@ -276,7 +281,7 @@ export function PlanningDoc({
           >
             Copy
           </button>
-          <span className="hidden shrink-0 text-[11px] text-amber-700 xl:inline">
+          <span className="hidden shrink-0 text-xs text-amber-700 xl:inline">
             no login · view &amp; comment
           </span>
         </div>
@@ -286,11 +291,11 @@ export function PlanningDoc({
       <div className="overflow-hidden rounded-lg border border-teal-200 bg-teal-50">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3 py-2">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-[11px] uppercase tracking-wide text-teal-700">
+            <span className="text-xs uppercase tracking-wide text-teal-700">
               Planned to pay · {startLabel} → {endLabel}
             </span>
             <span className="text-xl font-bold text-teal-900 tabular">{moneyUsd(grandWindow)}</span>
-            <span className="text-[11px] text-teal-700">
+            <span className="text-xs text-teal-700">
               · {rows.length} project #s — prepare the Short Payment from here
             </span>
           </div>
@@ -377,7 +382,7 @@ export function PlanningDoc({
         {/* Mandar al Short Payment — solo en la vista con login */}
         {sp ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t-2 border-teal-500 bg-teal-100 px-3 py-2 text-xs print:hidden">
-            <span className="rounded bg-teal-700 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+            <span className="rounded bg-teal-700 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white">
               Send to Short Payment
             </span>
             {selRows.length === 0 ? (
@@ -654,8 +659,8 @@ function SendToSpModal({
             Add {rows.length} project #{rows.length === 1 ? "" : "s"} to {spTitle(batch)}
           </div>
           <div className="text-xs text-slate-500">
-            {monthName} plan · they go in as new lines at the end of the batch. Amounts are
-            editable — check them before sending.
+            {monthName} plan · they go in as new lines at the end of the batch. Amounts are editable
+            — check them before sending.
           </div>
         </div>
 
@@ -698,9 +703,7 @@ function SendToSpModal({
                         type="number"
                         step="0.01"
                         value={amounts[r.id] ?? ""}
-                        onChange={(e) =>
-                          setAmounts((a) => ({ ...a, [r.id]: e.target.value }))
-                        }
+                        onChange={(e) => setAmounts((a) => ({ ...a, [r.id]: e.target.value }))}
                         className="w-28 rounded border border-slate-300 px-1 py-0.5 text-right"
                       />
                     </td>
@@ -717,7 +720,7 @@ function SendToSpModal({
               </tfoot>
             </table>
             {zeros ? (
-              <div className="mt-1 text-[11px] text-amber-700">
+              <div className="mt-1 text-xs text-amber-700">
                 ⚠ {zeros} in zero — those are reported as skipped, they do not enter the batch.
               </div>
             ) : null}
@@ -841,7 +844,7 @@ function GroupRows({
                 key={`n-${r.id}-${n?.note ?? ""}`}
                 defaultValue={n?.note ?? ""}
                 placeholder="…"
-                className="w-44 rounded border border-slate-200 px-1 py-0.5 text-[11px]"
+                className="w-44 rounded border border-slate-200 px-1 py-0.5 text-xs"
                 onBlur={(e) => saveNote(r.id, { note: e.target.value })}
               />
             </td>
@@ -851,7 +854,7 @@ function GroupRows({
                 type="number"
                 defaultValue={n?.suggested_amount ?? ""}
                 placeholder="—"
-                className="w-24 rounded border border-slate-200 px-1 py-0.5 text-right text-[11px]"
+                className="w-24 rounded border border-slate-200 px-1 py-0.5 text-right text-xs"
                 onBlur={(e) =>
                   saveNote(r.id, {
                     suggested_amount: e.target.value === "" ? null : Number(e.target.value),
@@ -862,7 +865,7 @@ function GroupRows({
             <td className="px-1 py-0.5 text-center">
               <span className="inline-flex items-center gap-1 whitespace-nowrap">
                 <span
-                  className="text-[11px] font-medium text-slate-500"
+                  className="text-xs font-medium text-slate-500"
                   title="Month(s) this project is currently planned in (within the window)"
                 >
                   {(() => {
@@ -874,7 +877,7 @@ function GroupRows({
                 </span>
                 <span className="text-slate-400">→</span>
                 <select
-                  className="rounded border border-slate-200 px-1 py-0.5 text-[11px]"
+                  className="rounded border border-slate-200 px-1 py-0.5 text-xs"
                   value={n?.move_to_month ?? ""}
                   onChange={(e) => saveNote(r.id, { move_to_month: e.target.value })}
                 >
@@ -978,7 +981,7 @@ function PackagesPanel() {
           >
             {create.isPending ? "Creating…" : "＋ Create package"}
           </button>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-xs text-slate-400">
             Freezes this month's planned amounts into its own link + notes.
           </span>
         </div>
@@ -1152,7 +1155,7 @@ function SubmissionCards({
               <p className="mt-1 whitespace-pre-wrap text-xs text-slate-700">{s.comments}</p>
             )}
             {withNotes.length > 0 && (
-              <ul className="mt-1 space-y-0.5 text-[11px] text-slate-600">
+              <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
                 {withNotes.map((n) => (
                   <li key={n.wbs_id} className="flex items-center gap-1">
                     <span>
@@ -1168,7 +1171,7 @@ function SubmissionCards({
                         type="button"
                         disabled={apply.isPending}
                         onClick={() => applyNote(n)}
-                        className="rounded border border-teal-500 px-1.5 py-0.5 text-[10px] font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+                        className="rounded border border-teal-500 px-1.5 py-0.5 text-xs font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
                         title="Apply this change to the Job Cost schedule"
                       >
                         Apply
@@ -1179,7 +1182,7 @@ function SubmissionCards({
               </ul>
             )}
             {!s.comments && withNotes.length === 0 && (
-              <p className="mt-1 text-[11px] text-slate-400">(No comments or notes)</p>
+              <p className="mt-1 text-xs text-slate-400">(No comments or notes)</p>
             )}
           </div>
         );

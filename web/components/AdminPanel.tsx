@@ -136,9 +136,9 @@ function Profiles() {
             >
               <span>
                 {r.name}
-                <span className="ml-1 text-[11px] text-slate-400">({r.code})</span>
+                <span className="ml-1 text-xs text-slate-400">({r.code})</span>
               </span>
-              <span className="text-[11px] text-slate-400">{r.user_count}👤</span>
+              <span className="text-xs text-slate-400">{r.user_count}👤</span>
             </button>
           ))}
         </div>
@@ -298,12 +298,10 @@ function Users() {
           en la base vive hasheado, asi que no hay de donde recuperarlo. */}
       {link ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3">
-          <p className="text-sm font-semibold text-emerald-900">
-            Invite link for {link.nombre}
-          </p>
+          <p className="text-sm font-semibold text-emerald-900">Invite link for {link.nombre}</p>
           <p className="mb-2 text-xs text-emerald-800">
-            Send this link to the person: they open it and create their own password. It works
-            once and expires in {link.dias} days. You won&apos;t see it again.
+            Send this link to the person: they open it and create their own password. It works once
+            and expires in {link.dias} days. You won&apos;t see it again.
           </p>
           <div className="flex gap-2">
             <input
@@ -368,10 +366,7 @@ function Users() {
         <div className="mt-2 flex items-center gap-2">
           <button
             onClick={() => createUser.mutate(nf)}
-            disabled={
-              createUser.isPending ||
-              !nf.full_name || !nf.email || !nf.role_id
-            }
+            disabled={createUser.isPending || !nf.full_name || !nf.email || !nf.role_id}
             className="rounded bg-[#2d3a5c] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
             Create user
@@ -380,8 +375,8 @@ function Users() {
             <span className="text-xs text-red-600">{createUser.error.problem.title}</span>
           )}
           <span className="text-xs text-slate-400">
-            No password here: creating the user produces a one-time invite link.
-            Send it to the person &mdash; they open it and choose their own password.
+            No password here: creating the user produces a one-time invite link. Send it to the
+            person &mdash; they open it and choose their own password.
           </span>
         </div>
       </div>

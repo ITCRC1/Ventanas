@@ -98,7 +98,7 @@ export function InvoicesApplied({ owner }: { owner?: string } = {}) {
   };
   const grand = sumsOf(groups.flatMap((g) => g.ls));
 
-  const TH = "border border-slate-600 bg-[#434343] px-2 py-2 text-[10px] font-semibold uppercase";
+  const TH = "border border-slate-600 bg-[#434343] px-2 py-2 text-xs font-semibold uppercase";
   const THR = `${TH} text-right`;
 
   return (
@@ -126,7 +126,7 @@ export function InvoicesApplied({ owner }: { owner?: string } = {}) {
       </div>
 
       <div className="max-h-[74vh] overflow-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full min-w-[1120px] border-collapse text-[11px]">
+        <table className="w-full min-w-[1120px] border-collapse text-xs">
           <thead className="sticky top-0 z-10 bg-[#434343] text-left text-white">
             <tr>
               <th className={TH}>Project Category</th>
@@ -222,7 +222,7 @@ function GroupRows({
           <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
             <td className="border border-slate-200 px-2 text-slate-500">{r.category ?? ""}</td>
             <td className="border border-slate-200 px-2 text-slate-500">{r.phase ?? ""}</td>
-            <td className="whitespace-nowrap border border-slate-200 px-2 font-mono text-[10px] text-slate-500">
+            <td className="whitespace-nowrap border border-slate-200 px-2 font-mono text-xs text-slate-500">
               {r.wbs_code}
             </td>
             <td className="border border-slate-200 px-2" title={r.title}>

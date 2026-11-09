@@ -115,7 +115,7 @@ function AssignCell({
   );
 }
 
-const TH = "px-2 py-2 text-[10px] font-semibold uppercase tracking-tight";
+const TH = "px-2 py-2 text-xs font-semibold uppercase tracking-tight";
 
 export function JobCostGrid() {
   const me = useMe();
@@ -231,7 +231,7 @@ function GroupBlock({
               />
             </span>
           </td>
-          <td className="whitespace-nowrap px-2 py-1 font-mono text-[11px] text-slate-500">
+          <td className="whitespace-nowrap px-2 py-1 font-mono text-xs text-slate-500">
             {r.wbs_code}
           </td>
           <td className="px-2 py-1">{r.title}</td>

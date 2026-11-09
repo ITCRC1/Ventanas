@@ -560,12 +560,12 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
             </select>
           </label>
         ) : null}
-        <span className="text-[11px] text-teal-800">
+        <span className="text-xs text-teal-800">
           editing <b>{anio}</b> · <b>{base}</b> read-only beside it
         </span>
         <span className="ml-auto flex items-center gap-2">
           {pendientes ? (
-            <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
               {pendientes} unsaved cell{pendientes === 1 ? "" : "s"}
             </span>
           ) : null}
@@ -618,7 +618,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
       {panel ? (
         <div className="space-y-2 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
           <p className="text-xs font-semibold text-emerald-900">Paste back from Excel</p>
-          <ol className="ml-4 list-decimal space-y-0.5 text-[11px] text-emerald-800">
+          <ol className="ml-4 list-decimal space-y-0.5 text-xs text-emerald-800">
             <li>
               In Excel, edit the <b>{anio}</b> months &mdash; columns <b>C to N</b>.
             </li>
@@ -628,7 +628,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
             </li>
             <li>Paste here and press «Read the block».</li>
           </ol>
-          <p className="text-[11px] text-emerald-800">
+          <p className="text-xs text-emerald-800">
             Rows are matched by <b>WBS code</b>, not by position &mdash; sorting or filtering in
             Excel will not land the numbers on the wrong line. What comes back stays amber until you
             press <b>Save</b>, so you can check it first.
@@ -638,7 +638,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
             onChange={(e) => setTexto(e.target.value)}
             rows={5}
             placeholder={"0.4\t3750\t3750\t3750\t…"}
-            className="w-full rounded border border-emerald-300 bg-white px-2 py-1 font-mono text-[11px]"
+            className="w-full rounded border border-emerald-300 bg-white px-2 py-1 font-mono text-xs"
           />
           <div className="flex items-center gap-2">
             <button
@@ -740,7 +740,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
       ) : null}
 
       {aviso ? (
-        <div className="flex items-center gap-2 rounded border border-slate-300 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-700">
+        <div className="flex items-center gap-2 rounded border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700">
           {aviso}
           <button
             type="button"
@@ -752,7 +752,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
         </div>
       ) : null}
 
-      <div className="space-y-1 text-[11px] text-slate-500">
+      <div className="space-y-1 text-xs text-slate-500">
         <p>
           Type a monthly total and it spreads across that month&apos;s weeks, the same rule the Job
           Cost uses. Math works (<code>1000+500</code>, <code>=46500/3</code>). Enter, Tab and
@@ -779,7 +779,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
           franja de scroll de ocho puntos: inservible. El owner la marco en
           rojo. Ahora la grilla ocupa lo que queda y una sola barra —la suya—
           recorre las 104 filas. */}
-      <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+      <div className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
         <span className="mr-1">Jump to month:</span>
         {MES.map((m, i) => (
           <button
@@ -811,7 +811,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                 type="button"
                 title={String(ayuda)}
                 onClick={fn as () => void}
-                className="rounded px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-200"
+                className="rounded px-1.5 py-0.5 text-xs text-slate-600 hover:bg-slate-200"
               >
                 {etq as string}
               </button>
@@ -823,7 +823,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
           className="overflow-auto rounded-lg border border-slate-200 bg-white"
           style={{ height: "calc(100vh - 330px)", minHeight: 320 }}
         >
-          <table className="border-collapse text-[11px]">
+          <table className="border-collapse text-xs">
             <thead className="sticky top-0 z-20">
               <tr className="bg-[#0F5F59] text-white">
                 {FIJAS.map((c, i) => (
@@ -861,13 +861,13 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                     <th
                       data-mes={MES.indexOf(m) + 1}
                       style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                      className="border-l-2 border-white/40 bg-[#2962FF] px-1 text-right text-[10px] font-bold"
+                      className="border-l-2 border-white/40 bg-[#2962FF] px-1 text-right text-xs font-bold"
                     >
                       {anio} ✎
                     </th>
                     <th
                       style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                      className="px-1 text-right text-[10px] font-normal text-white/50"
+                      className="px-1 text-right text-xs font-normal text-white/50"
                     >
                       {base}
                     </th>
@@ -892,7 +892,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                     const tb = anual(l.id, base);
                     return (
                       <tr key={l.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Fija i={0} fondo="bg-white" cls="font-mono text-[10px]">
+                        <Fija i={0} fondo="bg-white" cls="font-mono text-xs">
                           {l.wbs_code}
                         </Fija>
                         <Fija i={1} fondo="bg-white" cls="truncate">
@@ -1007,7 +1007,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                                       anotarMes(l.id, mes, buf);
                                       setBuf(null);
                                     }}
-                                    className="w-full bg-white px-1 py-0.5 text-right text-[11px] outline-none ring-2 ring-inset ring-[#2962FF]"
+                                    className="w-full bg-white px-1 py-0.5 text-right text-xs outline-none ring-2 ring-inset ring-[#2962FF]"
                                   />
                                 ) : (
                                   <button
@@ -1047,7 +1047,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                               </td>
                               <td
                                 style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
-                                className="tabular bg-slate-50 px-1 text-right text-[10px] text-slate-400"
+                                className="tabular bg-slate-50 px-1 text-right text-xs text-slate-400"
                               >
                                 {usd(vb)}
                               </td>
@@ -1090,7 +1090,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                         >
                           {usd(ls.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
                         </td>
-                        <td className="tabular px-1 text-right text-[10px] text-slate-500">
+                        <td className="tabular px-1 text-right text-xs text-slate-500">
                           {usd(ls.reduce((s, l) => s + total(l.id, base, i + 1), 0))}
                         </td>
                       </Fragment>
@@ -1129,7 +1129,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                     >
                       {usd(lineas.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
                     </td>
-                    <td className="tabular px-1 text-right text-[10px] text-white/70">
+                    <td className="tabular px-1 text-right text-xs text-white/70">
                       {usd(lineas.reduce((s, l) => s + total(l.id, base, i + 1), 0))}
                     </td>
                   </Fragment>

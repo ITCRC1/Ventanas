@@ -125,9 +125,7 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
                   <td className={td + " whitespace-nowrap font-mono text-xs"}>{r.oferta ?? ""}</td>
                   <td className={td + " whitespace-nowrap text-xs"}>{r.proyecto ?? ""}</td>
                   <td className={td}>
-                    {lineas.length > 1 && (
-                      <span className="mr-1 text-slate-400">{ln.n}.</span>
-                    )}
+                    {lineas.length > 1 && <span className="mr-1 text-slate-400">{ln.n}.</span>}
                     {ln.detalle}
                   </td>
                   <td className={tdN}>{money(ln.monto)}</td>
@@ -176,7 +174,9 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
                           <button
                             type="button"
                             className="text-slate-500 underline"
-                            onClick={() => void api.abrir(`/invoice-receipts/${r.id}/file/xml`, true)}
+                            onClick={() =>
+                              void api.abrir(`/invoice-receipts/${r.id}/file/xml`, true)
+                            }
                           >
                             XML
                           </button>
@@ -203,14 +203,14 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
       </div>
 
       <p className="text-xs text-slate-500">
-        The <strong>line amount</strong> is the net, before tax — the same as the DEBE column
-        in the PDF. <strong>Offer</strong> is the vendor&apos;s own contract number and{" "}
+        The <strong>line amount</strong> is the net, before tax — the same as the DEBE column in the
+        PDF. <strong>Offer</strong> is the vendor&apos;s own contract number and{" "}
         <strong>Project</strong> is what the vendor calls it, which does not always match the WBS.
-        <strong>&quot;Not linked to a payment&quot;</strong> does not mean the invoice is unpaid, nor
-        that the expense has no project: the ledger carries one on every row. It means nobody has
-        said yet WHICH payment covers this invoice. The <em>likely</em> project comes from the
-        already-linked invoices on the same offer all pointing at one WBS — it is a lead for
-        tying it down, not the project it was charged to.
+        <strong>&quot;Not linked to a payment&quot;</strong> does not mean the invoice is unpaid,
+        nor that the expense has no project: the ledger carries one on every row. It means nobody
+        has said yet WHICH payment covers this invoice. The <em>likely</em> project comes from the
+        already-linked invoices on the same offer all pointing at one WBS — it is a lead for tying
+        it down, not the project it was charged to.
       </p>
     </div>
   );

@@ -61,7 +61,7 @@ function TransferBadge({ t }: { t: string | null }) {
   if (!t) return null;
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+      className={`rounded px-1.5 py-0.5 text-xs font-medium ${
         t.toUpperCase() === "SEND"
           ? "bg-emerald-100 text-emerald-700"
           : "bg-amber-100 text-amber-700"
@@ -78,7 +78,7 @@ const CELL_INPUT = "w-full rounded border border-slate-300 bg-white px-1 py-0.5 
 function WbsCell({ line }: { line: ShortPaymentLine }) {
   if (!line.wbs_code) return <span className="text-slate-300">—</span>;
   return (
-    <span className="font-mono text-[11px] text-slate-600" title={line.wbs_title ?? undefined}>
+    <span className="font-mono text-xs text-slate-600" title={line.wbs_title ?? undefined}>
       {line.wbs_code}
     </span>
   );
@@ -120,7 +120,7 @@ function WbsEdit({
           }
           save({ wbs_id: w.id });
         }}
-        className={`w-16 rounded border px-1 py-0.5 font-mono text-[11px] ${
+        className={`w-16 rounded border px-1 py-0.5 font-mono text-xs ${
           code && !match ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
         }`}
       />
@@ -132,7 +132,7 @@ function WbsEdit({
             setCode(suggestion.wbs_code);
             save({ wbs_id: suggestion.wbs_id });
           }}
-          className="w-16 rounded bg-amber-100 px-1 font-mono text-[10px] text-amber-800 hover:bg-amber-200"
+          className="w-16 rounded bg-amber-100 px-1 font-mono text-xs text-amber-800 hover:bg-amber-200"
         >
           ≈ {suggestion.wbs_code}
         </button>
@@ -147,7 +147,7 @@ function CatTypeCell({ line }: { line: ShortPaymentLine }) {
   return (
     <div className="leading-tight">
       <div className="text-slate-600">{line.category ?? "—"}</div>
-      {line.type ? <div className="text-[10px] text-slate-400">{line.type}</div> : null}
+      {line.type ? <div className="text-xs text-slate-400">{line.type}</div> : null}
     </div>
   );
 }
@@ -167,7 +167,7 @@ function CatTypeEdit({
 }) {
   const catId = line.category_id ?? "";
   const catPhases = phases.filter((p) => p.category_id === line.category_id);
-  const SEL = "w-full rounded border border-slate-300 bg-white px-1 py-0.5 text-[10px]";
+  const SEL = "w-full rounded border border-slate-300 bg-white px-1 py-0.5 text-xs";
   return (
     <div className="space-y-0.5 leading-tight">
       <select
@@ -422,7 +422,7 @@ function LineRow({
       </td>
       <td className="px-1 py-0.5 text-center">
         <select
-          className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[10px]"
+          className="rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
           value={line.transfer ?? ""}
           onChange={(e) => save({ transfer: e.target.value })}
         >
@@ -504,7 +504,7 @@ function AddLineRow({ disbId, preCols }: { disbId: number; preCols: number }) {
       <td className="px-1 py-1 text-center">
         <div className="flex items-center gap-1">
           <select
-            className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[10px]"
+            className="rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
             value={transfer}
             onChange={(e) => setTransfer(e.target.value)}
           >
@@ -516,7 +516,7 @@ function AddLineRow({ disbId, preCols }: { disbId: number; preCols: number }) {
             type="button"
             disabled={!desc.trim() || !amt || add.isPending}
             onClick={submit}
-            className="rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             Add
           </button>
@@ -593,9 +593,7 @@ function NewBatchBar({ batches }: { batches: ShortPaymentBatch[] }) {
   const proximoSub = valid
     ? Math.max(
         -1,
-        ...(batches ?? [])
-          .filter((b) => b.disb_no === disbNoFor(month))
-          .map((b) => b.disb_sub),
+        ...(batches ?? []).filter((b) => b.disb_no === disbNoFor(month)).map((b) => b.disb_sub),
       ) + 1
     : 0;
 
@@ -633,10 +631,14 @@ function NewBatchBar({ batches }: { batches: ShortPaymentBatch[] }) {
         {busy ? "Creating…" : `Create #${valid ? `${disbNoFor(month)}.${proximoSub}` : ""}`}
       </button>
       {taken ? (
-        <span className="w-full text-[11px] text-amber-700">
+        <span className="w-full text-xs text-amber-700">
           {monthName(month)} already has batch #{taken.disb_no}.{taken.disb_sub}. This one is
-          created as <b>#{disbNoFor(month)}.{proximoSub}</b> — a month can have several (a
-          directly-paid line apart from the Short Payment, for instance).
+          created as{" "}
+          <b>
+            #{disbNoFor(month)}.{proximoSub}
+          </b>{" "}
+          — a month can have several (a directly-paid line apart from the Short Payment, for
+          instance).
         </span>
       ) : null}
     </div>
@@ -657,7 +659,7 @@ function Step({
         : "bg-slate-50 text-slate-500 ring-slate-200";
   const icon = state === "ok" ? "✓" : state === "warn" ? "●" : "○";
   return (
-    <div className={`rounded-md px-2 py-1 text-[11px] ring-1 ${style}`} title={detail}>
+    <div className={`rounded-md px-2 py-1 text-xs ring-1 ${style}`} title={detail}>
       <span className="font-semibold">
         {icon} {label}
       </span>
@@ -702,7 +704,7 @@ function RunMonthButton({ disbNo, lines }: { disbNo: number; lines: number }) {
             ),
         });
       }}
-      className="rounded bg-[#2d3a5c] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#3d4a6c] disabled:opacity-40"
+      className="rounded bg-[#2d3a5c] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#3d4a6c] disabled:opacity-40"
     >
       {run.isPending ? "Running…" : "▶ Run the month"}
     </button>
@@ -744,7 +746,7 @@ function MonthClose() {
                     timeZone: "UTC",
                   })}
                 </span>
-                <span className="block tabular text-[11px] text-slate-400">
+                <span className="block tabular text-xs text-slate-400">
                   {money(r.total_amount)}
                 </span>
               </span>
@@ -926,7 +928,7 @@ export function ShortPaymentsView() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1000px] text-xs">
-                <thead className="bg-slate-100 text-left text-[10px] uppercase text-slate-500">
+                <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
                   <tr>
                     <th className="px-2 py-1.5">#</th>
                     <th className="px-2 py-1.5">WBS</th>

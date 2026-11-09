@@ -5,6 +5,12 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Los dos colores de estado de glif.app (owner, 2026-11-09). Entran
+        // SOLO donde algo avisa. Los teal/navy/ambar de la marca no se tocan:
+        // son los que imprime el Excel y la paridad pantalla-libro vale mas
+        // que la moda.
+        alerta: "#ff7b2f",
+        peligro: "#c52a38",
         // Azul de marca. El 700 es el #2d3a5c que ya usaban la cabecera, los
         // encabezados de tabla y el export a Excel: acá deja de ser un hex suelto
         // repetido en 13 archivos y pasa a ser un token.
@@ -32,7 +38,7 @@ export default {
         },
       },
       fontSize: {
-        // Escala corta para tablas densas. Reemplaza a los text-[9px]…text-[12px]
+        // Escala corta para tablas densas. Reemplaza a los text-xs…text-[12px]
         // sueltos (172 usos), que no tenían interlineado y apretaban las filas.
         micro: ["0.625rem", { lineHeight: "0.875rem" }], // 10px — etiquetas, sufijos
         mini: ["0.6875rem", { lineHeight: "1rem" }], // 11px — celdas densas

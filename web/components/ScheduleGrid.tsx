@@ -166,7 +166,7 @@ function CellEditor({
 function MoneyHead({ children }: { children: ReactNode }) {
   return (
     <div
-      className="flex items-end justify-end border-r border-slate-200 px-1 pb-1 text-right text-[9px] font-semibold uppercase leading-tight text-slate-500"
+      className="flex items-end justify-end border-r border-slate-200 px-1 pb-1 text-right text-xs font-semibold uppercase leading-tight text-slate-500"
       style={{ width: W_MONEY }}
     >
       {children}
@@ -178,7 +178,7 @@ function MoneyHead({ children }: { children: ReactNode }) {
 function MoneyCell({ v, bold }: { v: number; bold?: boolean }) {
   return (
     <div
-      className={`tabular flex items-center justify-end border-r border-slate-100 px-1 text-right text-[11px] ${
+      className={`tabular flex items-center justify-end border-r border-slate-100 px-1 text-right text-xs ${
         bold ? "font-semibold" : ""
       }`}
       style={{ width: W_MONEY }}
@@ -303,19 +303,19 @@ export function ScheduleGrid() {
             style={{ height: HDR_H }}
           >
             <div
-              className="flex items-end px-3 pb-1 text-[10px] font-medium uppercase tracking-wide text-slate-500"
+              className="flex items-end px-3 pb-1 text-xs font-medium uppercase tracking-wide text-slate-500"
               style={{ width: W_ID }}
             >
               WBS · Description
             </div>
             <div
-              className="flex items-end px-1 pb-1 text-[9px] font-semibold uppercase text-slate-500"
+              className="flex items-end px-1 pb-1 text-xs font-semibold uppercase text-slate-500"
               style={{ width: W_TXT }}
             >
               Category
             </div>
             <div
-              className="flex items-end px-1 pb-1 text-[9px] font-semibold uppercase text-slate-500"
+              className="flex items-end px-1 pb-1 text-xs font-semibold uppercase text-slate-500"
               style={{ width: W_TXT }}
             >
               Phase
@@ -391,17 +391,17 @@ export function ScheduleGrid() {
                   style={{ width: W_ID }}
                   title={r.title}
                 >
-                  <span className="font-mono text-[10px] text-slate-400">{r.wbs_code}</span>
+                  <span className="font-mono text-xs text-slate-400">{r.wbs_code}</span>
                   <span className="truncate text-sm">{r.title}</span>
                 </div>
                 <div
-                  className="flex items-center px-1 text-[10px] text-slate-500"
+                  className="flex items-center px-1 text-xs text-slate-500"
                   style={{ width: W_TXT }}
                 >
                   <span className="truncate">{r.category ?? ""}</span>
                 </div>
                 <div
-                  className="flex items-center px-1 text-[10px] text-slate-500"
+                  className="flex items-center px-1 text-xs text-slate-500"
                   style={{ width: W_TXT }}
                 >
                   <span className="truncate">{r.phase ?? ""}</span>
@@ -428,7 +428,7 @@ export function ScheduleGrid() {
               {tops.map((g) => (
                 <div
                   key={g.key}
-                  className="absolute top-0 flex items-center justify-center border-r border-slate-200 text-[10px] font-semibold text-slate-600"
+                  className="absolute top-0 flex items-center justify-center border-r border-slate-200 text-xs font-semibold text-slate-600"
                   style={{
                     left: g.startIndex * colW,
                     width: g.span * colW,
@@ -446,7 +446,7 @@ export function ScheduleGrid() {
                 return (
                   <div
                     key={col.key}
-                    className="absolute flex items-center justify-center border-r border-t border-slate-200 text-center text-[11px] font-medium text-slate-600"
+                    className="absolute flex items-center justify-center border-r border-t border-slate-200 text-center text-xs font-medium text-slate-600"
                     style={{
                       left: vc.start,
                       width: vc.size,
@@ -490,7 +490,7 @@ export function ScheduleGrid() {
                       return (
                         <div
                           key={col.key}
-                          className="tabular absolute top-0 flex h-full items-center justify-center border-r border-slate-200 text-center text-[10px] font-semibold"
+                          className="tabular absolute top-0 flex h-full items-center justify-center border-r border-slate-200 text-center text-xs font-semibold"
                           style={{ left: vc.start, width: vc.size }}
                         >
                           {compact(v)}
@@ -525,7 +525,7 @@ export function ScheduleGrid() {
                         onClick={() =>
                           isWeek && canEdit && setSelected({ wbsId: r.id, week: col.key })
                         }
-                        className={`tabular absolute top-0 h-full border-r border-slate-100 text-center text-[11px] ${
+                        className={`tabular absolute top-0 h-full border-r border-slate-100 text-center text-xs ${
                           isWeek && canEdit
                             ? "cursor-pointer hover:ring-1 hover:ring-slate-400"
                             : ""
@@ -550,7 +550,7 @@ export function ScheduleGrid() {
         {/* Columna fija FULL Year (suma de todo el horizonte por línea) */}
         <div className="shrink-0 border-l border-slate-200" style={{ width: YEAR_W }}>
           <div
-            className="sticky top-0 z-20 flex items-end justify-end border-b border-slate-200 bg-[#1a7f4b] px-2 pb-1 text-right text-[10px] font-semibold uppercase text-white"
+            className="sticky top-0 z-20 flex items-end justify-end border-b border-slate-200 bg-[#1a7f4b] px-2 pb-1 text-right text-xs font-semibold uppercase text-white"
             style={{ height: HDR_H }}
           >
             FULL Year
@@ -585,7 +585,7 @@ export function ScheduleGrid() {
             return (
               <div
                 key={key}
-                className={`tabular flex items-center justify-end px-2 text-right text-[11px] ${cls}`}
+                className={`tabular flex items-center justify-end px-2 text-right text-xs ${cls}`}
                 style={{ height: h }}
               >
                 {compact(total)}

@@ -103,11 +103,15 @@ function Kpi({
   tono?: "ok" | "warn" | "bad";
   grande?: boolean;
 }) {
+  // Los dos colores de estado de glif: el borde lleva el color exacto y el
+  // fondo queda en el tinte suave de Tailwind. Pintar el fondo con el naranja
+  // entero deja el numero ilegible, que es justo lo contrario de lo que una
+  // senal de alerta tiene que hacer.
   const borde =
     tono === "bad"
-      ? "border-red-300 bg-red-50"
+      ? "border-peligro bg-red-50"
       : tono === "warn"
-        ? "border-amber-300 bg-amber-50"
+        ? "border-alerta bg-amber-50"
         : tono === "ok"
           ? "border-emerald-300 bg-emerald-50"
           : "border-slate-200 bg-white";
@@ -121,11 +125,9 @@ function Kpi({
           : "text-slate-900";
   return (
     <div className={`rounded-lg border p-3 ${borde}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className={`tabular font-bold ${grande ? "text-2xl" : "text-xl"} ${color}`}>{value}</div>
-      {sub ? <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div> : null}
+      {sub ? <div className="mt-0.5 text-xs text-slate-500">{sub}</div> : null}
     </div>
   );
 }
@@ -181,7 +183,7 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
 
       {/* La cascada del presupuesto: de dónde salió el número revisado. */}
       <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full text-[11px]">
+        <table className="w-full text-xs">
           <tbody>
             {(
               [
@@ -284,7 +286,7 @@ function Adelantados({ d }: { d: DashboardSummary }) {
       </div>
 
       {!ct.existe ? (
-        <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+        <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           ⚠ No line is marked as contingency, so the classic early warning —
           <b> reserve used against work completed</b> — cannot be built. The industry carries 5–10%
           of hard costs on ground-up work. Mark a line as contingency in Job Cost and this card
@@ -314,7 +316,7 @@ function Avance({ d }: { d: DashboardSummary }) {
             coinciden por construcción en el pasado: comparar ahí es comparar un
             número contra sí mismo. Lo que esta curva muestra es la FORMA de lo
             que viene. */}
-        <p className="mb-2 text-[11px] text-slate-400">
+        <p className="mb-2 text-xs text-slate-400">
           The planned line before the Forecast cut-off was rebuilt from the LEDGER, so the two agree
           in the past by construction — what this shows is the shape of what is still ahead.
         </p>
@@ -353,11 +355,11 @@ function Avance({ d }: { d: DashboardSummary }) {
 
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <p className="mb-1 text-sm font-semibold text-slate-600">Progress</p>
-        <p className="mb-3 text-[11px] text-slate-400">
+        <p className="mb-3 text-xs text-slate-400">
           By cost is a proxy: money does not move at the same pace as the work.
         </p>
         <div className="mb-3">
-          <div className="flex items-baseline justify-between text-[11px] text-slate-500">
+          <div className="flex items-baseline justify-between text-xs text-slate-500">
             <span>By cost</span>
             <span className="tabular font-bold text-slate-800">
               {d.avance.pct_por_costo.toFixed(1)}%
@@ -370,7 +372,7 @@ function Avance({ d }: { d: DashboardSummary }) {
             />
           </div>
         </div>
-        <table className="w-full text-[11px]">
+        <table className="w-full text-xs">
           <thead className="text-left text-slate-400">
             <tr>
               <th className="py-1">Status</th>
@@ -397,7 +399,7 @@ function Avance({ d }: { d: DashboardSummary }) {
         {/* ⚠️ Honestidad sobre el dato: con una sola línea en Completed, el
             porcentaje por hito no mide avance de obra. Decirlo vale más que
             mostrar un 3.9% que nadie puede usar. */}
-        <p className="mt-2 text-[10px] text-slate-400">
+        <p className="mt-2 text-xs text-slate-400">
           Milestone progress reads {d.avance.pct_por_hito.toFixed(1)}%, well below the cost figure,
           because the status field tracks budget approval rather than work finished. Treat the cost
           figure as the live one until statuses are maintained.
@@ -443,7 +445,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="mb-2 text-sm font-semibold text-slate-600">Cash calls ahead</p>
-          <table className="w-full text-[11px]">
+          <table className="w-full text-xs">
             <tbody>
               {d.pendiente.llamados.map((l) => (
                 <tr key={l.desde} className="border-b border-slate-50">
@@ -459,7 +461,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
               </tr>
             </tbody>
           </table>
-          <p className="mt-2 text-[10px] text-slate-400">
+          <p className="mt-2 text-xs text-slate-400">
             What the schedule asks for, by quarter. Owners have wired {moneyUsd(d.aporte_duenos)}{" "}
             into the project so far.
           </p>
@@ -468,7 +470,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
 
       {/* El detalle por sección, con el porcentaje ejecutado. */}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full text-[11px]">
+        <table className="w-full text-xs">
           <thead className="bg-slate-100 text-left text-slate-500">
             <tr>
               <th className="px-3 py-2">Section</th>
@@ -526,11 +528,11 @@ function Pendiente({ d }: { d: DashboardSummary }) {
             </span>
           </p>
           <div className="max-h-56 overflow-auto">
-            <table className="w-full text-[11px]">
+            <table className="w-full text-xs">
               <tbody>
                 {d.pendiente.permisos.map((p) => (
                   <tr key={p.wbs_code} className="border-b border-slate-50">
-                    <td className="px-3 py-1 font-mono text-[10px] text-blue-700">{p.wbs_code}</td>
+                    <td className="px-3 py-1 font-mono text-xs text-blue-700">{p.wbs_code}</td>
                     <td className="px-3 py-1">{p.title}</td>
                     <td className="px-3 py-1 text-slate-400">{p.state ?? "—"}</td>
                     <td className="tabular px-3 py-1 text-right">{moneyUsd(p.budget_revised)}</td>
@@ -547,7 +549,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
             <span className="ml-2 font-normal text-amber-700">— the team already marked these</span>
           </p>
           <div className="max-h-56 overflow-auto">
-            <table className="w-full text-[11px]">
+            <table className="w-full text-xs">
               <tbody>
                 {d.pendiente.atencion.length === 0 ? (
                   <tr>
@@ -556,9 +558,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
                 ) : (
                   d.pendiente.atencion.map((l) => (
                     <tr key={l.wbs_code} className="border-b border-slate-50">
-                      <td className="px-3 py-1 font-mono text-[10px] text-blue-700">
-                        {l.wbs_code}
-                      </td>
+                      <td className="px-3 py-1 font-mono text-xs text-blue-700">{l.wbs_code}</td>
                       <td className="px-3 py-1">{l.title}</td>
                       <td className="tabular px-3 py-1 text-right font-semibold">
                         {moneyUsd(l.remaining)}
@@ -600,7 +600,7 @@ export function DashboardView() {
       </div>
       <Pendiente d={d} />
 
-      <p className="text-[11px] text-slate-400">
+      <p className="text-xs text-slate-400">
         Figures as of {d.fecha}, from the LEDGER and the Job Cost schedule.{" "}
         <b>Profit on cost, yield on cost and IRR are not shown</b> because the system does not hold
         the project&apos;s expected value (GDV): there is {moneyUsd(d.costo.budget_revised)} of cost

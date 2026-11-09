@@ -558,7 +558,7 @@ export function InvoicesView() {
                   >
                     {inv.invoice_no}
                     {inv.status === "void" ? (
-                      <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 no-underline">
+                      <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 no-underline">
                         VOIDED
                       </span>
                     ) : null}

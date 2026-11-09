@@ -98,7 +98,11 @@ type Tramo = keyof typeof TRAMOS;
 
 function usd(n: number | null | undefined): string {
   if (!n) return "—";
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  return n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
 }
 
 /** Los doce meses de una línea, sumando sus semanas. */
@@ -213,12 +217,12 @@ export function BudgetProposalView() {
               </select>
             </label>
             <span className="text-xl font-bold text-teal-900 tabular">{usd(t.propuesta)}</span>
-            <span className="text-[11px] text-teal-700">
+            <span className="text-xs text-teal-700">
               {anio} proposal · {mostradas} of {t.lineas} Job Cost lines
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-[11px] text-teal-800">
+            <label className="flex items-center gap-1 text-xs text-teal-800">
               <input
                 type="checkbox"
                 checked={soloConMonto}
@@ -238,7 +242,7 @@ export function BudgetProposalView() {
 
         {/* Los cuatro tramos del remanente, y el control de que cierren.
             Cada uno se abre: muestra de dónde sale y qué líneas lo componen. */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-teal-200 bg-white/60 px-3 py-2 text-[11px] sm:grid-cols-6">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-teal-200 bg-white/60 px-3 py-2 text-xs sm:grid-cols-6">
           {(
             [
               ["remanente", t.remanente],
@@ -258,8 +262,7 @@ export function BudgetProposalView() {
                     // son todos los años que hay en el medio. Se dice asi.
                     `Pending before ${anio}`
                   : tr.etq;
-            const cls =
-              k === "sin_ubicar" && Math.abs(v) > 5 ? "text-red-700" : tr.cls;
+            const cls = k === "sin_ubicar" && Math.abs(v) > 5 ? "text-red-700" : tr.cls;
             return (
               <button
                 key={k}
@@ -282,7 +285,7 @@ export function BudgetProposalView() {
             arma la PROPUESTA, no como se escribe la grilla —que tiene su propia
             ayuda arriba de la tabla—. */}
         <p
-          className={`border-t border-teal-200 px-3 py-1.5 text-[11px] text-slate-600 ${
+          className={`border-t border-teal-200 px-3 py-1.5 text-xs text-slate-600 ${
             vista === "grid" ? "hidden" : ""
           }`}
         >
@@ -396,7 +399,7 @@ function Desglose({
               : tr.etq}
         </span>
         <span className="tabular text-sm font-bold text-teal-900">{usd(total)}</span>
-        <span className="text-[11px] text-teal-700">
+        <span className="text-xs text-teal-700">
           {aportes.length} line{aportes.length === 1 ? "" : "s"}
         </span>
         <button
@@ -407,16 +410,16 @@ function Desglose({
           ✕ Close
         </button>
       </div>
-      <p className="border-b border-slate-100 px-3 py-2 text-[11px] text-slate-600">
+      <p className="border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
         <b>Where it comes from:</b> {tr.de}
       </p>
       {aportes.length === 0 ? (
-        <p className="px-3 py-3 text-[11px] text-slate-500">
+        <p className="px-3 py-3 text-xs text-slate-500">
           No line contributes to this tranche — that is why it reads {usd(total)}.
         </p>
       ) : (
         <div className="max-h-[42vh] overflow-auto">
-          <table className="w-full text-[11px]">
+          <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-100 text-left text-slate-500">
               <tr>
                 <th className="px-3 py-1">WBS</th>
@@ -429,7 +432,7 @@ function Desglose({
             <tbody>
               {aportes.map(({ f, v }) => (
                 <tr key={f.wbs_code} className="border-b border-slate-50">
-                  <td className="px-3 py-0.5 font-mono text-[10px]">{f.wbs_code}</td>
+                  <td className="px-3 py-0.5 font-mono text-xs">{f.wbs_code}</td>
                   <td className="px-3 py-0.5">{f.title}</td>
                   <td className="px-3 py-0.5 text-slate-400">{f.category}</td>
                   <td className="tabular px-3 py-0.5 text-right font-semibold">{usd(v)}</td>
@@ -446,7 +449,7 @@ function Desglose({
                 </td>
                 <td className="tabular px-3 py-1 text-right">{usd(suma)}</td>
                 <td
-                  className={`px-3 py-1 text-right text-[10px] ${
+                  className={`px-3 py-1 text-right text-xs ${
                     cuadra ? "text-emerald-700" : "text-red-700"
                   }`}
                 >
@@ -483,7 +486,7 @@ function TablaDatos({
   ] as const;
 
   return (
-    <table className="w-full border-collapse text-[11px]">
+    <table className="w-full border-collapse text-xs">
       <thead className="sticky top-0 z-10">
         <tr className="bg-[#0F5F59] text-white">
           <th className="px-2 py-1 text-left">WBS</th>
@@ -514,12 +517,12 @@ function TablaDatos({
                       cerrada ? "text-slate-400" : ""
                     }`}
                   >
-                    <td className="px-2 font-mono text-[10px]">{f.wbs_code}</td>
+                    <td className="px-2 font-mono text-xs">{f.wbs_code}</td>
                     <td className="px-2">
                       {f.title}
                       {f.ritmo_ledger ? (
                         <span
-                          className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800"
+                          className="ml-1 rounded bg-amber-100 px-1 text-xs font-medium text-amber-800"
                           title={`The LEDGER pays ${usd(f.ritmo_ledger)} a month on this line. Informative: it does not move the budget.`}
                         >
                           ledger {usd(f.ritmo_ledger)}/mo
@@ -592,28 +595,26 @@ function TablaMeses({
     );
 
   return (
-    <table className="border-collapse text-[11px]">
+    <table className="border-collapse text-xs">
       <thead className="sticky top-0 z-10">
         <tr className="bg-[#0F5F59] text-white">
           <th className="sticky left-0 z-20 bg-[#0F5F59] px-2 py-1 text-left">WBS</th>
           <th className="px-2 py-1 text-left">Task</th>
-          {porSemana ? (
-            bandas.map((b) => (
-              <th
-                key={`${b.mes}-${b.desde}`}
-                colSpan={b.hasta - b.desde + 1}
-                className="border-l border-white/30 px-1 py-1 text-center text-[10px]"
-              >
-                {MES[b.mes]}
-              </th>
-            ))
-          ) : (
-            MES.map((m) => (
-              <th key={m} className="border-l border-white/20 px-2 py-1 text-right">
-                {m}
-              </th>
-            ))
-          )}
+          {porSemana
+            ? bandas.map((b) => (
+                <th
+                  key={`${b.mes}-${b.desde}`}
+                  colSpan={b.hasta - b.desde + 1}
+                  className="border-l border-white/30 px-1 py-1 text-center text-xs"
+                >
+                  {MES[b.mes]}
+                </th>
+              ))
+            : MES.map((m) => (
+                <th key={m} className="border-l border-white/20 px-2 py-1 text-right">
+                  {m}
+                </th>
+              ))}
           <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL</th>
         </tr>
       </thead>
@@ -636,7 +637,7 @@ function TablaMeses({
                   }`}
                 >
                   <td
-                    className={`sticky left-0 z-10 px-2 font-mono text-[10px] ${
+                    className={`sticky left-0 z-10 px-2 font-mono text-xs ${
                       cerrada ? "bg-slate-50" : "bg-white"
                     }`}
                   >
@@ -644,10 +645,7 @@ function TablaMeses({
                   </td>
                   <td className="whitespace-nowrap px-2">{f.title}</td>
                   {vs.map((v, i) => (
-                    <td
-                      key={i}
-                      className={`tabular px-2 text-right ${porSemana ? "text-[10px]" : ""}`}
-                    >
+                    <td key={i} className={`tabular px-2 text-right ${porSemana ? "text-xs" : ""}`}>
                       {v ? usd(v) : ""}
                     </td>
                   ))}
@@ -711,7 +709,7 @@ function TablaAnio({
   );
 
   return (
-    <table className="w-full border-collapse text-[11px]">
+    <table className="w-full border-collapse text-xs">
       <thead className="sticky top-0 z-10">
         <tr className="bg-[#1F4E79] text-white">
           <th className="px-2 py-1 text-left">Section</th>

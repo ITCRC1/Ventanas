@@ -50,7 +50,7 @@ const STATUS_STYLE: Record<string, string> = {
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
         STATUS_STYLE[status] ?? STATUS_STYLE.draft
       }`}
     >
@@ -60,7 +60,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 const BTN = "rounded-md border px-3 py-1.5 text-xs font-medium transition";
-const TH = "px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
+const TH = "px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500";
 
 function monthLabel(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
