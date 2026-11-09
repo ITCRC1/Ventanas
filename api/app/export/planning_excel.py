@@ -140,10 +140,14 @@ def planning_to_xlsx(
         ws.column_dimensions[gc(col)].width = ancho
     ws.row_dimensions[hr].height = 30
 
-    # ── Agrupar por categoría, ordenando el código como número ──────────────
+    # ── Agrupar por SECCION del WBS, ordenando el código como número ───────
+    # Las once del Job Cost. El titulo llega en `seccion_titulo` si la fuente lo
+    # manda; si no, queda el numero solo, que igual agrupa bien.
     por_cat: dict[str, list[dict[str, Any]]] = {}
     for f in filas:
-        por_cat.setdefault(f.get("category") or "Sin categoría", []).append(f)
+        s = str(f.get("wbs_code") or "").split(".")[0]
+        t = f.get("seccion_titulo") or ""
+        por_cat.setdefault((f"{s} {t}".strip()).upper(), []).append(f)
     grupos = [
         (cat, sorted(ls, key=lambda r: _clave_codigo(r["wbs_code"])))
         for cat, ls in por_cat.items()

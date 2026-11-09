@@ -58,6 +58,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core import seccion as sec
+
 # Cuántos días hacia adelante cuenta el «llamado de capital». 90 es el horizonte
 # con el que se mueve una obra: lo que hay que girar antes del próximo trimestre.
 DIAS_CAJA = 90
@@ -87,7 +89,10 @@ def construir(db: Session, dias: int = DIAS_CAJA) -> dict[str, Any]:
               LEFT JOIN wbs_item w ON w.wbs_code = f.wbs_code
               LEFT JOIN task_state ts ON ts.id = w.state_id
              WHERE f.kind <> 'section_header'
-             ORDER BY COALESCE(f.category, 'zzz'), w.sort_order, f.wbs_code
+             -- El MISMO orden del Job Cost: por seccion del WBS.
+             ORDER BY (CASE WHEN split_part(f.wbs_code, '.', 1) ~ '^[0-9]+$'
+                            THEN split_part(f.wbs_code, '.', 1)::int END)
+                      NULLS LAST, w.sort_order, f.wbs_code
             """
         )
     ).mappings().all()
@@ -261,9 +266,12 @@ def construir(db: Session, dias: int = DIAS_CAJA) -> dict[str, Any]:
     ]
 
     # ── Pendiente por sección, partido en comprometido y sin comprometer ──
+    # ⚠️ Por SECCION del WBS, no por `category`. El tablero mostraba ocho
+    # grupos con otros nombres que los del Job Cost.
+    tit = sec.titulos(db)
     secciones: dict[str, dict[str, Any]] = {}
     for r in costo:
-        k = r["category"] or "—"
+        k = sec.rotulo(sec.seccion_de(r["wbs_code"]), tit)
         s = secciones.setdefault(
             k,
             {
@@ -277,6 +285,10 @@ def construir(db: Session, dias: int = DIAS_CAJA) -> dict[str, Any]:
             ("committed", "committed"), ("remaining", "remaining"),
         ):
             s[campo] = round(s[campo] + _f(r[col]), 2)
+    # Las secciones en su orden, no en el de llegada.
+    secciones = dict(
+        sorted(secciones.items(), key=lambda kv: sec.orden(kv[0].split(" ", 1)[0]))
+    )
     for s in secciones.values():
         s["por_pagar"] = round(max(s["committed"] - s["spend"], 0.0), 2)
         s["sin_comprometer"] = round(s["remaining"] - s["por_pagar"], 2)
@@ -337,7 +349,12 @@ def construir(db: Session, dias: int = DIAS_CAJA) -> dict[str, Any]:
         },
         # ── 4 · Pendiente ─────────────────────────────────────────────────
         "pendiente": {
-            "secciones": sorted(secciones.values(), key=lambda s: -s["remaining"]),
+            # En el orden de la SECCION, no por remanente descendente.
+            # ⚠️ Ordenarlas por plata hacia que el tablero mostrara 8, 1, 6, 9,
+            # 10... y obligaba a buscar la misma seccion en un lugar distinto
+            # que en el Job Cost. El orden del WBS es el mismo en todas las
+            # pantallas, y eso es justo lo que se pidio estandarizar.
+            "secciones": list(secciones.values()),
             "llamados": llamados,
             "permisos": permisos,
             "atencion": atencion,

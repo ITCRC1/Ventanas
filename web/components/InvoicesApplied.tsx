@@ -4,6 +4,7 @@ import { PrintBar } from "@/components/PrintBar";
 import { moneyUsd, num } from "@/lib/format";
 import { useFinancials, useInvoicesByWbs, useRefFx } from "@/lib/hooks";
 import type { WbsFinancials } from "@/lib/types";
+import { agruparPorSeccion, rotuloSeccion, titulosDeSeccion } from "@/lib/seccion";
 import { useEffect, useMemo, useState } from "react";
 
 const cell = (n: number, opts?: { red?: boolean }) => (
@@ -65,11 +66,11 @@ export function InvoicesApplied({ owner }: { owner?: string } = {}) {
         r.kind !== "proceeds" &&
         (!buscado || (r.owner ?? "").toUpperCase().includes(buscado)),
     );
-    const map = new Map<string, WbsFinancials[]>();
-    for (const r of lines) {
-      const k = r.category ?? "Uncategorized";
-      (map.get(k) ?? map.set(k, []).get(k))?.push(r);
-    }
+    // Por SECCION del WBS -- las once del Job Cost.
+    const titulos = titulosDeSeccion(fin.data);
+    const map = new Map<string, WbsFinancials[]>(
+      agruparPorSeccion(lines).map(([sec, ls]) => [rotuloSeccion(sec, titulos), ls]),
+    );
     const codeKey = (c: string) => c.split(".").map((p) => Number(p) || 0);
     const cmp = (a: WbsFinancials, b: WbsFinancials) => {
       const ka = codeKey(a.wbs_code);

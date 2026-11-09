@@ -22,6 +22,13 @@ import {
   yearsOf,
 } from "@/lib/schedule";
 import type { WbsFinancials } from "@/lib/types";
+import {
+  agruparPorSeccion,
+  compararSeccion,
+  rotuloSeccion,
+  seccionDe,
+  titulosDeSeccion,
+} from "@/lib/seccion";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 
 // Columnas fijas de la izquierda (identidad + presupuesto) con su ancho, para
@@ -171,13 +178,11 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
         r.kind !== "proceeds" &&
         (!buscado || (r.owner ?? "").toUpperCase().includes(buscado)),
     );
-    const map = new Map<string, WbsFinancials[]>();
-    for (const r of lines) {
-      const key = r.category ?? "Uncategorized";
-      const arr = map.get(key);
-      if (arr) arr.push(r);
-      else map.set(key, [r]);
-    }
+    // Por SECCION del WBS -- las once del Job Cost.
+    const titulos = titulosDeSeccion(financials.data);
+    const map = new Map<string, WbsFinancials[]>(
+      agruparPorSeccion(lines).map(([sec, ls]) => [rotuloSeccion(sec, titulos), ls]),
+    );
     // Mostrar TODAS las categorías (incluidas las vacías, ej. Construction) en el
     // orden del Excel (sort_order), aunque aún no tengan tareas cargadas.
     //
@@ -185,14 +190,16 @@ export function TimelineDetail({ owner }: { owner?: string } = {}) {
     // «todavía no hay tareas» sino «este proveedor no tiene ninguna acá», y
     // llenar el cuadro de bandas vacías esconde las seis que sí importan.
     if (!buscado) {
-      for (const name of tool.catOrder.keys()) {
-        if (!map.has(name)) map.set(name, []);
+      for (const sec of [...titulos.keys()].sort(compararSeccion)) {
+        const r = rotuloSeccion(sec, titulos);
+        if (!map.has(r)) map.set(r, []);
       }
     }
-    return [...map.entries()].sort(
-      (a, b) => (tool.catOrder.get(a[0]) ?? 99) - (tool.catOrder.get(b[0]) ?? 99),
+    const orden = new Map(
+      [...titulos.keys()].sort(compararSeccion).map((sec, i) => [rotuloSeccion(sec, titulos), i]),
     );
-  }, [financials.data, tool.catOrder, owner]);
+    return [...map.entries()].sort((a, b) => (orden.get(a[0]) ?? 99) - (orden.get(b[0]) ?? 99));
+  }, [financials.data, owner]);
 
   const allLines = useMemo(() => groups.flatMap(([, ls]) => ls), [groups]);
   const proceedsLines = useMemo(

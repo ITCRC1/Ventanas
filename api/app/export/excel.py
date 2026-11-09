@@ -31,6 +31,7 @@ from sqlalchemy import text
 from sqlalchemy.engine.row import RowMapping
 from sqlalchemy.orm import Session
 
+from app.core import seccion as sec
 from app.core.holding import HOLDING_BANK
 
 # La divisoria entre bloques de columnas. Owner, 2026-11-09, marcandolas a mano
@@ -1267,17 +1268,18 @@ class ExcelExporter:
         ).mappings():
             # Guardamos TODAS las celdas (presencia = pintada), monto 0 si es sólo color.
             sched[(s["wbs_id"], s["week_start"])] = float(s["planned_amount"] or 0)
-        # orden de categorías = category.sort_order (como tool.catOrder del front),
-        # incluyendo las vacías (aparecen con su TOTAL en 0, igual que el app).
-        cat_order = self.db.execute(
-            text("SELECT name FROM category WHERE is_active ORDER BY sort_order, name")
-        ).scalars().all()
+        # ⚠️ Por SECCION del WBS, igual que el Job Cost y que el app. Antes
+        # ordenaba por `category.sort_order` y numeraba las categorias 1..8, lo
+        # que las hacia PARECER secciones sin serlo: «6 OVERHEAD» no era la
+        # seccion 6, que es Property Sale.
+        _tit = sec.titulos(self.db)
+        cat_order = [sec.rotulo(s, _tit) for s in sorted(_tit, key=sec.orden)]
 
-        # agrupar categoría -> fase (costos) + ventas (proceeds), preservando el
+        # agrupar seccion -> fase (costos) + ventas (proceeds), preservando el
         # orden de wbs_code para las fases (idéntico al Map del front).
         groups: dict[str, dict[str, Any]] = {}
         for e in lines:
-            cat = e["category"] or "No category"
+            cat = sec.rotulo(sec.seccion_de(e["wbs_code"]), _tit)
             g = groups.setdefault(cat, {"phases": {}, "sales": []})
             code = (e["wbs_code"] or "").strip()
             if e["kind"] == "proceeds":
@@ -1571,16 +1573,14 @@ class ExcelExporter:
                 s["planned_amount"] or 0
             )
 
-        # Agrupar por categoría en el orden del Excel; sembrar TODAS las categorías
-        # activas (incluidas las vacías, ej. Construction) como hace el app.
-        groups: dict[str, list[RowMapping]] = {}
-        for name in self.db.execute(
-            text("SELECT name FROM category WHERE is_active ORDER BY sort_order, code")
-        ).scalars():
-            groups[(name or "").strip()] = []
+        # Agrupar por SECCION del WBS; sembrar las ONCE (incluidas las vacías,
+        # ej. Construction) como hace el app.
+        _tit = sec.titulos(self.db)
+        groups: dict[str, list[RowMapping]] = {
+            sec.rotulo(s, _tit): [] for s in sorted(_tit, key=sec.orden)
+        }
         for e in rows:
-            cat = (e["category"] or "No category").strip()
-            groups.setdefault(cat, []).append(e)
+            groups.setdefault(sec.rotulo(sec.seccion_de(e["wbs_code"]), _tit), []).append(e)
 
         # ---- helpers de escritura ----
         def _cost_row(row: int, e: RowMapping) -> None:
@@ -1774,22 +1774,22 @@ class ExcelExporter:
                 FROM v_wbs_financials f
                 LEFT JOIN wbs_item w ON w.wbs_code = f.wbs_code
                 WHERE f.kind <> 'section_header'
-                ORDER BY COALESCE(f.category, 'zzz'), w.sort_order, f.wbs_code
+                ORDER BY (CASE WHEN split_part(f.wbs_code, '.', 1) ~ '^[0-9]+$'
+                               THEN split_part(f.wbs_code, '.', 1)::int END)
+                         NULLS LAST, w.sort_order, f.wbs_code
                 """
             )
         ).mappings().all()
 
-        # agrupar por categoría preservando el orden de llegada de las líneas
+        # agrupar por SECCION del WBS preservando el orden de llegada
+        _tit = sec.titulos(self.db)
         groups: dict[str, list[RowMapping]] = defaultdict(list)
         for e in rows:
-            groups[(e["category"] or "No category").strip()].append(e)
-        # el app ordena las categorías por presupuesto revisado descendente
-        def cat_budget(lines: list[RowMapping]) -> float:
-            return sum(
-                float(ln["budget_original"] or 0) + float(ln["budget_change"] or 0)
-                for ln in lines
-            )
-        ordered = sorted(groups.items(), key=lambda kv: cat_budget(kv[1]), reverse=True)
+            groups[sec.rotulo(sec.seccion_de(e["wbs_code"]), _tit)].append(e)
+        # ⚠️ Por NUMERO de seccion, no por presupuesto descendente: el app ya no
+        # ordena por plata, y una hoja que ordena distinto que la pantalla
+        # obliga a buscar la misma seccion en dos lugares distintos.
+        ordered = sorted(groups.items(), key=lambda kv: sec.orden(kv[0].split(" ", 1)[0]))
 
         # --- cabecera de la tabla ------------------------------------------
         hr = 7

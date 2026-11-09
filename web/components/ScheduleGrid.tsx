@@ -19,6 +19,7 @@ import {
   topGroups,
 } from "@/lib/schedule";
 import type { TaskState, WbsFinancials } from "@/lib/types";
+import { agruparPorSeccion, rotuloSeccion, titulosDeSeccion } from "@/lib/seccion";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 
@@ -209,17 +210,15 @@ export function ScheduleGrid() {
     [states.data],
   );
 
-  // Agrupa las líneas por categoría (mismo criterio que Timeline / Job Cost):
-  // encabezado de sección + líneas + subtotal TOTAL Category, y un gran total.
+  // Agrupa por SECCION del WBS -- las once del Job Cost: encabezado de
+  // seccion + lineas + subtotal, y un gran total. Antes agrupaba por
+  // `category`, que daba ocho grupos con otros nombres.
   const { displayRows, lineCount } = useMemo(() => {
+    const titulos = titulosDeSeccion(financials.data);
     const lines = (financials.data ?? []).filter((r) => r.kind !== "section_header");
-    const byCat = new Map<string, WbsFinancials[]>();
-    for (const r of lines) {
-      const c = r.category ?? "Uncategorized";
-      const arr = byCat.get(c);
-      if (arr) arr.push(r);
-      else byCat.set(c, [r]);
-    }
+    const byCat = new Map<string, WbsFinancials[]>(
+      agruparPorSeccion(lines).map(([sec, ls]) => [rotuloSeccion(sec, titulos), ls]),
+    );
     const out: DRow[] = [];
     const grandLines: WbsFinancials[] = [];
     const grandSums = zeroSums();

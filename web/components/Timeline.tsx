@@ -22,6 +22,13 @@ import {
   yearsOf,
 } from "@/lib/schedule";
 import type { WbsFinancials } from "@/lib/types";
+import {
+  agruparPorSeccion,
+  compararSeccion,
+  rotuloSeccion,
+  seccionDe,
+  titulosDeSeccion,
+} from "@/lib/seccion";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 
 // Columnas fijas de la izquierda (identidad + presupuesto), congeladas (sticky).
@@ -165,9 +172,14 @@ export function Timeline() {
     const lines = (financials.data ?? []).filter(
       (r) => r.kind !== "section_header" && r.kind !== "proceeds",
     );
+    // ⚠️ El primer nivel es la SECCION del WBS, no la categoria. Antes el
+    // Timeline numeraba sus categorias 1..8, lo que las hacia PARECER secciones
+    // sin serlo: «6 OVERHEAD» en el Timeline no era la seccion 6, que es
+    // Property Sale. Dos numeraciones que se pisaban.
+    const titulos = titulosDeSeccion(financials.data);
     const byCat = new Map<string, Map<string, WbsFinancials[]>>();
     for (const r of lines) {
-      const cat = r.category ?? "Uncategorized";
+      const cat = rotuloSeccion(seccionDe(r.wbs_code), titulos);
       const ph = r.phase ?? "No phase";
       let phases = byCat.get(cat);
       if (!phases) {
@@ -197,17 +209,24 @@ export function Timeline() {
     });
   }, [financials.data]);
 
-  // Orden del Excel + mostrar TODAS las categorías (incluidas las vacías, ej.
-  // Construction) para que aparezcan en su lugar aunque aún no tengan tareas.
+  // Las ONCE secciones, incluidas las vacías (Construction tiene 3 líneas en
+  // cero): una sección que desaparece cuando no tiene plata es una sección que
+  // nadie se acuerda de presupuestar. El orden sale del número, no de
+  // `sort_order` de categoría.
   const orderedGroups = useMemo(() => {
+    const titulos = titulosDeSeccion(financials.data);
     const present = new Set(groups.map((g) => g.category));
-    const empties: CategoryGroup[] = [...tool.catOrder.keys()]
-      .filter((name) => !present.has(name))
+    const todas = [...titulos.keys()]
+      .sort(compararSeccion)
+      .map((sec) => rotuloSeccion(sec, titulos));
+    const empties: CategoryGroup[] = todas
+      .filter((r) => !present.has(r))
       .map((category) => ({ category, phases: [], lines: [], sums: zero() }));
+    const orden = new Map(todas.map((r, i) => [r, i]));
     return [...groups, ...empties].sort(
-      (a, b) => (tool.catOrder.get(a.category) ?? 99) - (tool.catOrder.get(b.category) ?? 99),
+      (a, b) => (orden.get(a.category) ?? 99) - (orden.get(b.category) ?? 99),
     );
-  }, [groups, tool.catOrder]);
+  }, [groups, financials.data]);
 
   const allLines = useMemo(() => groups.flatMap((g) => g.lines), [groups]);
   const proceedsLines = useMemo(

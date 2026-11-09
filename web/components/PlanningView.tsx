@@ -29,6 +29,7 @@ import {
 } from "@/lib/hooks";
 import type { PlanningToSpResult } from "@/lib/hooks";
 import type { Disbursement, WbsFinancials } from "@/lib/types";
+import { agruparPorSeccion, rotuloSeccion, titulosDeSeccion } from "@/lib/seccion";
 import { useMemo, useState } from "react";
 
 const MON = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -168,14 +169,15 @@ export function PlanningDoc({
     return true;
   });
 
+  // ⚠️ Acá `financials` llega por prop y YA es el arreglo, no un query.
+  const titulos = useMemo(() => titulosDeSeccion(financials), [financials]);
+
   const groups = useMemo(() => {
-    const byCat = new Map<string, WbsFinancials[]>();
-    for (const r of rows) {
-      const c = r.category ?? "No category";
-      const arr = byCat.get(c);
-      if (arr) arr.push(r);
-      else byCat.set(c, [r]);
-    }
+    // Por SECCION del WBS -- las once del Job Cost. Antes agrupaba por
+    // `category`, que daba ocho grupos con otros nombres.
+    const byCat = new Map<string, WbsFinancials[]>(
+      agruparPorSeccion(rows).map(([sec, ls]) => [rotuloSeccion(sec, titulos), ls]),
+    );
     const codeKey = (c: string) => c.split(".").map((p) => Number(p) || 0);
     const cmp = (a: WbsFinancials, b: WbsFinancials) => {
       const ka = codeKey(a.wbs_code);
