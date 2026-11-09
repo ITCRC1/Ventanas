@@ -7,9 +7,8 @@ export default function BudgetProposalPage() {
   return (
     <AppShell>
       <p className="mb-2 text-xs text-slate-500">
-        Propuesta de presupuesto por semana: lo que el cronograma ya tiene para los hitos, y lo que
-        el LEDGER dice que cuestan las líneas que se pagan todos los meses. Cambiá el año y se
-        recalcula.
+        Weekly budget proposal: what the schedule already holds for the milestones, and what the
+        LEDGER says the lines paid every month actually cost. Change the year and it recalculates.
       </p>
       <BudgetProposalView />
     </AppShell>

@@ -35,7 +35,7 @@ export default function InvitePage() {
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("t");
     if (!t) {
-      setError("El link está incompleto. Pedí uno nuevo al administrador.");
+      setError("The link is incomplete. Ask the administrator for a new one.");
       return;
     }
     setToken(t);
@@ -46,7 +46,7 @@ export default function InvitePage() {
         setError(
           e instanceof ApiError
             ? (e.problem.detail ?? e.problem.title)
-            : "No se pudo abrir la invitación.",
+            : "Could not open the invitation.",
         ),
       );
   }, []);
@@ -69,7 +69,7 @@ export default function InvitePage() {
       setError(
         e instanceof ApiError
           ? (e.problem.detail ?? e.problem.title)
-          : "No se pudo guardar la contraseña.",
+          : "Could not save the password.",
       );
       setGuardando(false);
     }
@@ -85,17 +85,18 @@ export default function InvitePage() {
       {quien ? (
         <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
           <div>
-            <p className="text-lg font-semibold">Hola, {quien.full_name}</p>
+            <p className="text-lg font-semibold">Hi, {quien.full_name}</p>
             <p className="text-sm text-slate-500">
-              Elegí tu contraseña. Nadie más la va a saber — ni el administrador.
+              Choose your password. Nobody else will know it &mdash; not even the
+              administrator.
             </p>
             {quien.email ? (
-              <p className="mt-1 text-xs text-slate-400">Vas a entrar con {quien.email}</p>
+              <p className="mt-1 text-xs text-slate-400">You will sign in with {quien.email}</p>
             ) : null}
           </div>
 
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-slate-400">Contraseña</span>
+            <span className="text-xs uppercase tracking-wide text-slate-400">Password</span>
             <input
               type="password"
               value={pw}
@@ -105,7 +106,7 @@ export default function InvitePage() {
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-slate-400">Repetila</span>
+            <span className="text-xs uppercase tracking-wide text-slate-400">Repeat it</span>
             <input
               type="password"
               value={pw2}
@@ -116,14 +117,14 @@ export default function InvitePage() {
           </label>
 
           <p className="text-xs text-slate-500">
-            Al menos 10 caracteres, con letras y números.
+            At least 10 characters, with letters and numbers.
             {pw.length > 0 && corta ? (
-              <span className="text-amber-700"> Te faltan {10 - pw.length}.</span>
+              <span className="text-amber-700"> {10 - pw.length} to go.</span>
             ) : null}
             {pw.length > 0 && !corta && sinMezcla ? (
-              <span className="text-amber-700"> Falta mezclar letras y números.</span>
+              <span className="text-amber-700"> Mix letters and numbers.</span>
             ) : null}
-            {distintas ? <span className="text-red-600"> Las dos no coinciden.</span> : null}
+            {distintas ? <span className="text-red-600"> They do not match.</span> : null}
           </p>
 
           <button
@@ -132,19 +133,19 @@ export default function InvitePage() {
             disabled={!puede}
             className="w-full rounded bg-[#2d3a5c] px-4 py-2 font-medium text-white hover:bg-[#3d4a6c] disabled:opacity-40"
           >
-            {guardando ? "Guardando…" : "Entrar"}
+            {guardando ? "Saving…" : "Sign in"}
           </button>
         </div>
       ) : error ? (
         <div className="rounded-lg border border-red-300 bg-red-50 p-5">
-          <p className="font-semibold text-red-800">No se pudo abrir la invitación</p>
+          <p className="font-semibold text-red-800">Could not open the invitation</p>
           <p className="mt-1 text-sm text-red-700">{error}</p>
           <p className="mt-3 text-xs text-red-600">
-            Los links sirven una sola vez y vencen. Pedile otro al administrador.
+            Links work once and expire. Ask the administrator for another one.
           </p>
         </div>
       ) : (
-        <p className="text-sm text-slate-500">Abriendo la invitación…</p>
+        <p className="text-sm text-slate-500">Opening the invitation…</p>
       )}
 
       {quien && error ? <p className="text-sm text-red-600">{error}</p> : null}

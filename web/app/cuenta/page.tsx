@@ -49,7 +49,7 @@ export default function CuentaPage() {
       setError(
         e instanceof ApiError
           ? (e.problem.detail ?? e.problem.title)
-          : "No se pudo cambiar la contraseña.",
+          : "Could not change the password.",
       );
       setGuardando(false);
     }
@@ -65,12 +65,12 @@ export default function CuentaPage() {
           onClick={() => router.push("/job-cost")}
           className="text-sm text-slate-500 hover:underline"
         >
-          &larr; Volver
+          &larr; Back
         </button>
       )}
 
       <div>
-        <h1 className="text-xl font-semibold">Mi cuenta</h1>
+        <h1 className="text-xl font-semibold">My account</h1>
         {me.data ? (
           <p className="text-sm text-slate-500">
             {me.data.full_name} · {me.data.email}
@@ -80,14 +80,14 @@ export default function CuentaPage() {
 
       {obligada ? (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Es tu primer ingreso con una contraseña temporal. Poné la tuya para continuar.
+          This is your first sign-in with a temporary password. Set your own to continue.
         </div>
       ) : null}
 
       <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
         <label className="block">
           <span className="text-xs uppercase tracking-wide text-slate-400">
-            Contraseña actual {obligada ? "(la temporal)" : ""}
+            Current password {obligada ? "(the temporary one)" : ""}
           </span>
           <input
             type="password"
@@ -98,7 +98,7 @@ export default function CuentaPage() {
           />
         </label>
         <label className="block">
-          <span className="text-xs uppercase tracking-wide text-slate-400">Nueva</span>
+          <span className="text-xs uppercase tracking-wide text-slate-400">New</span>
           <input
             type="password"
             value={nueva}
@@ -107,7 +107,7 @@ export default function CuentaPage() {
           />
         </label>
         <label className="block">
-          <span className="text-xs uppercase tracking-wide text-slate-400">Repetila</span>
+          <span className="text-xs uppercase tracking-wide text-slate-400">Repeat it</span>
           <input
             type="password"
             value={repetida}
@@ -118,14 +118,14 @@ export default function CuentaPage() {
         </label>
 
         <p className="text-xs text-slate-500">
-          Al menos 10 caracteres, con letras y números.
+          At least 10 characters, with letters and numbers.
           {nueva.length > 0 && corta ? (
-            <span className="text-amber-700"> Te faltan {10 - nueva.length}.</span>
+            <span className="text-amber-700"> {10 - nueva.length} to go.</span>
           ) : null}
           {nueva.length > 0 && !corta && sinMezcla ? (
-            <span className="text-amber-700"> Falta mezclar letras y números.</span>
+            <span className="text-amber-700"> Mix letters and numbers.</span>
           ) : null}
-          {distintas ? <span className="text-red-600"> Las dos no coinciden.</span> : null}
+          {distintas ? <span className="text-red-600"> They do not match.</span> : null}
         </p>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
@@ -136,7 +136,7 @@ export default function CuentaPage() {
           disabled={!puede}
           className="w-full rounded bg-[#2d3a5c] px-4 py-2 font-medium text-white hover:bg-[#3d4a6c] disabled:opacity-40"
         >
-          {guardando ? "Guardando…" : "Cambiar contraseña"}
+          {guardando ? "Saving…" : "Change password"}
         </button>
       </div>
     </main>

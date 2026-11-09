@@ -33,7 +33,7 @@ import { Fragment, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { type BudgetProposalRow, useBudgetProposal } from "@/lib/hooks";
 
-const MES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SET", "OCT", "NOV", "DIC"];
+const MES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 type Vista = "datos" | "meses" | "anio";
 
@@ -83,16 +83,16 @@ export function BudgetProposalView() {
     return [...m.entries()];
   }, [d?.filas, soloConMonto]);
 
-  if (q.isLoading) return <p className="text-sm text-slate-500">Calculando el presupuesto…</p>;
+  if (q.isLoading) return <p className="text-sm text-slate-500">Calculating the budget…</p>;
   if (q.isError || !d)
-    return <p className="text-sm text-red-700">No se pudo calcular el presupuesto.</p>;
+    return <p className="text-sm text-red-700">Could not calculate the budget.</p>;
 
   const t = d.totales;
   const mostradas = porCat.reduce((s, [, ls]) => s + ls.length, 0);
   const TABS: [Vista, string, string][] = [
-    ["datos", "Datos", "Presupuesto, gastado y cómo se reparte el remanente"],
-    ["meses", "Mes a mes", `La propuesta ${anio}, de enero a diciembre`],
-    ["anio", `Budget ${anio}`, "Cómo va quedando el año, por sección"],
+    ["datos", "Line Data", "Budget, spent, and how the remaining splits"],
+    ["meses", "Month by Month", `The ${anio} proposal, January to December`],
+    ["anio", `Budget ${anio}`, "How the year is shaping up, by section"],
   ];
 
   return (
@@ -101,7 +101,7 @@ export function BudgetProposalView() {
         <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-xs font-semibold text-teal-900">
-              Año
+              Year
               <select
                 value={anio}
                 onChange={(e) => setAnio(Number(e.target.value))}
@@ -116,7 +116,7 @@ export function BudgetProposalView() {
             </label>
             <span className="text-xl font-bold text-teal-900 tabular">{usd(t.propuesta)}</span>
             <span className="text-[11px] text-teal-700">
-              propuesta {anio} · {mostradas} de {t.lineas} líneas del Job Cost
+              {anio} proposal · {mostradas} of {t.lineas} Job Cost lines
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export function BudgetProposalView() {
                 checked={soloConMonto}
                 onChange={(e) => setSoloConMonto(e.target.checked)}
               />
-              Esconder las líneas cerradas
+              Hide closed lines
             </label>
             <button
               type="button"
@@ -141,13 +141,13 @@ export function BudgetProposalView() {
         {/* Los cuatro tramos del remanente, y el control de que cierren. */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-teal-200 bg-white/60 px-3 py-2 text-[11px] sm:grid-cols-6">
           {[
-            ["Remanente del Job Cost", t.remanente, "text-slate-900"],
-            ["Vencido (semana ya pasó)", t.vencido, "text-red-700"],
-            ["Arrastre de este año", t.arrastre, "text-amber-700"],
+            ["Job Cost remaining", t.remanente, "text-slate-900"],
+            ["Overdue (week already passed)", t.vencido, "text-red-700"],
+            ["Carry-over from this year", t.arrastre, "text-amber-700"],
             [`Plan ${anio}`, t.plan, "text-slate-900"],
-            [`Posterior a ${anio}`, t.posterior, "text-slate-500"],
+            [`After ${anio}`, t.posterior, "text-slate-500"],
             [
-              "Sin ubicar",
+              "Unplaced",
               t.sin_ubicar,
               Math.abs(t.sin_ubicar) > 5 ? "text-red-700" : "text-emerald-700",
             ],
@@ -159,10 +159,11 @@ export function BudgetProposalView() {
           ))}
         </div>
         <p className="border-t border-teal-200 px-3 py-1.5 text-[11px] text-slate-600">
-          El <b>Job Cost es el estándar</b>: el remanente de cada línea se reparte entre los cuatro
-          tramos y tienen que sumarlo — por eso está el control <b>Sin ubicar</b>. La propuesta es{" "}
-          <b>vencido + arrastre + plan</b>, y lo que no pasó se coloca en la primera semana del año
-          para que se vea y alguien lo mueva a sabiendas. Esta pantalla no cambia nada.
+          The <b>Job Cost is the standard</b>: each line&apos;s remaining splits across the four
+          tranches and they have to add up to it &mdash; that is what <b>Unplaced</b> checks. The
+          proposal is <b>overdue + carry-over + plan</b>, and whatever did not happen is parked in
+          the first week of the year so it is visible and someone moves it knowingly. This screen
+          changes nothing.
         </p>
       </div>
 
@@ -190,7 +191,7 @@ export function BudgetProposalView() {
               checked={porSemana}
               onChange={(e) => setPorSemana(e.target.checked)}
             />
-            Ver por semana
+            By week
           </label>
         ) : null}
       </div>
@@ -219,14 +220,14 @@ function TablaDatos({
 }) {
   const t = d.totales;
   const COLS = [
-    ["Presup.", "budget_revised", "text-slate-500"],
-    ["Gastado", "spend", "text-slate-500"],
-    ["Remanente", "remaining", "font-semibold"],
-    ["Vencido", "vencido", "bg-red-50 font-semibold text-red-700"],
-    ["Arrastre", "arrastre", "bg-amber-50 text-amber-800"],
+    ["Budget", "budget_revised", "text-slate-500"],
+    ["Spent", "spend", "text-slate-500"],
+    ["Remaining", "remaining", "font-semibold"],
+    ["Overdue", "vencido", "bg-red-50 font-semibold text-red-700"],
+    ["Carry-over", "arrastre", "bg-amber-50 text-amber-800"],
     [`Plan ${d.anio}`, "plan_total", ""],
-    ["Posterior", "posterior", "text-slate-500"],
-    ["PROPUESTA", "propuesta_total", "bg-emerald-50 font-bold text-emerald-900"],
+    [`After ${d.anio}`, "posterior", "text-slate-500"],
+    ["PROPOSAL", "propuesta_total", "bg-emerald-50 font-bold text-emerald-900"],
   ] as const;
 
   return (
@@ -234,7 +235,7 @@ function TablaDatos({
       <thead className="sticky top-0 z-10">
         <tr className="bg-[#0F5F59] text-white">
           <th className="px-2 py-1 text-left">WBS</th>
-          <th className="px-2 py-1 text-left">Tarea</th>
+          <th className="px-2 py-1 text-left">Task</th>
           {COLS.map(([etq]) => (
             <th key={etq} className="px-2 py-1 text-right">
               {etq}
@@ -267,9 +268,9 @@ function TablaDatos({
                       {f.ritmo_ledger ? (
                         <span
                           className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800"
-                          title={`El LEDGER paga ${usd(f.ritmo_ledger)} por mes en esta línea. Informativo: no mueve el presupuesto.`}
+                          title={`The LEDGER pays ${usd(f.ritmo_ledger)} a month on this line. Informative: it does not move the budget.`}
                         >
-                          ledger {usd(f.ritmo_ledger)}/mes
+                          ledger {usd(f.ritmo_ledger)}/mo
                         </span>
                       ) : null}
                     </td>
@@ -343,7 +344,7 @@ function TablaMeses({
       <thead className="sticky top-0 z-10">
         <tr className="bg-[#0F5F59] text-white">
           <th className="sticky left-0 z-20 bg-[#0F5F59] px-2 py-1 text-left">WBS</th>
-          <th className="px-2 py-1 text-left">Tarea</th>
+          <th className="px-2 py-1 text-left">Task</th>
           {porSemana ? (
             bandas.map((b) => (
               <th
@@ -461,8 +462,8 @@ function TablaAnio({
     <table className="w-full border-collapse text-[11px]">
       <thead className="sticky top-0 z-10">
         <tr className="bg-[#1F4E79] text-white">
-          <th className="px-2 py-1 text-left">Sección</th>
-          <th className="px-2 py-1 text-right">Líneas</th>
+          <th className="px-2 py-1 text-left">Section</th>
+          <th className="px-2 py-1 text-right">Lines</th>
           {MES.map((m) => (
             <th key={m} className="border-l border-white/20 px-2 py-1 text-right">
               {m}

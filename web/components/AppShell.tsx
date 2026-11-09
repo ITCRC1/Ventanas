@@ -43,8 +43,8 @@ const NAV: NavItem[] = [
   },
   {
     href: "/budget-proposal",
-    label: "Propuesta Budget",
-    hint: "Presupuesto del año por semana, del cronograma y del LEDGER",
+    label: "Budget Proposal",
+    hint: "The year by week, from the schedule and the LEDGER",
     perm: "report.view",
   },
   {

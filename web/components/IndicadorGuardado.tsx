@@ -35,7 +35,7 @@ export function IndicadorGuardado() {
         >
           {/* Sin cola no hay nada pendiente: la API lo rechazó y la pantalla
               ya revirtió. Decir «sin guardar» ahí asusta de gratis. */}
-          ● {n ? `Sin guardar (${n})` : "Rechazado"}
+          ● {n ? `Unsaved (${n})` : "Rejected"}
         </span>
         {n > 0 && (
           <button
@@ -43,13 +43,13 @@ export function IndicadorGuardado() {
             onClick={() => void reintentarTodo()}
             className="rounded border border-red-600 px-2 py-0.5 text-xs font-semibold text-red-700 hover:bg-red-50"
           >
-            Reintentar
+            Retry
           </button>
         )}
         <button
           type="button"
           onClick={limpiarError}
-          title="Quitar el aviso"
+          title="Dismiss"
           className="rounded px-1.5 py-0.5 text-xs font-bold text-red-700 hover:bg-red-100"
         >
           ✕
@@ -61,14 +61,14 @@ export function IndicadorGuardado() {
   if (s.estado === "guardando") {
     return (
       <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-        Guardando…
+        Saving…
       </span>
     );
   }
 
   return (
     <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
-      ✓ Guardado{s.ultimo ? ` ${hora(s.ultimo)}` : ""}
+      ✓ Saved{s.ultimo ? ` ${hora(s.ultimo)}` : ""}
     </span>
   );
 }
