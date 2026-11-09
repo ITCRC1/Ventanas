@@ -2487,24 +2487,49 @@ export function JobCostFull() {
                 {m(allLines.reduce((s, l) => s + columnTotal(index, l.id, viewWeeks), 0))}
               </td>
             </tr>
-            {/* VENTA como referencia — FUERA de los totales de arriba */}
-            {proceedsLines.map((p) => (
-              <tr
-                key={`ref-${p.id}`}
-                className="border-t border-emerald-400 bg-emerald-50 text-xs italic text-emerald-900"
-              >
-                <td className={fcls("bg-emerald-50", "z-30")} style={fst(0)} />
-                <td className={`${fcls("bg-emerald-50", "z-30")} px-1`} style={fst(1)}>
-                  {p.wbs_code}
-                </td>
-                <td className={`${fcls("bg-emerald-50", "z-30")} px-1 py-1.5`} style={fst(2)}>
-                  ↓ Reference — {p.title} (sale, NOT in totals)
-                </td>
-                <td colSpan={99} className="px-2 py-1.5 text-right font-semibold">
-                  Revised {m(num(p.budget_revised))} · Forecast {m(num(p.forecast))}
-                </td>
-              </tr>
-            ))}
+            {/* VENTA como referencia — FUERA de los totales de arriba.
+                ⚠️ Cada cifra va BAJO SU COLUMNA, igual que en PROJECT TOTAL.
+                Antes era un texto suelto («Revised $X · Forecast $Y») estirado
+                sobre colSpan={99} y pegado a la derecha, a 99 columnas de la
+                columna «Budget Revised» que le corresponde. Que la fila exista
+                no es lo mismo que la fila se lea: en la linea de la venta —que
+                esta FUERA de los totales a proposito— el monto tiene que verse
+                al lado del presupuesto, porque si no nadie puede comprobar que
+                quedo afuera. */}
+            {proceedsLines.map((p) => {
+              const cel = `${fcls("bg-emerald-50", "z-30")} tabular px-2 py-1.5 text-right font-semibold`;
+              return (
+                <tr
+                  key={`ref-${p.id}`}
+                  className="border-t border-emerald-400 bg-emerald-50 text-xs italic text-emerald-900"
+                >
+                  <td className={fcls("bg-emerald-50", "z-30")} style={fst(0)} />
+                  <td className={`${fcls("bg-emerald-50", "z-30")} px-1`} style={fst(1)}>
+                    {p.wbs_code}
+                  </td>
+                  <td className={`${fcls("bg-emerald-50", "z-30")} px-1 py-1.5`} style={fst(2)}>
+                    ↓ Reference — {p.title} (sale, NOT in totals)
+                  </td>
+                  {/* Original y Change van en blanco a proposito: lo que importa
+                      de la venta es el revisado, y rellenar las cinco columnas
+                      invita a sumarlas con el resto. */}
+                  <td className={fcls("bg-emerald-50", "z-30")} style={fst(3)} />
+                  <td className={fcls("bg-emerald-50", "z-30")} style={fst(4)} />
+                  <td className={cel} style={fst(5)}>
+                    {m(num(p.budget_revised))}
+                  </td>
+                  <td className={fcls("bg-emerald-50", "z-30")} style={fst(6)} />
+                  <td className={fcls("bg-emerald-50", "z-30")} style={fst(7)} />
+                  <td className={fcls("bg-emerald-50", "z-30")} style={fst(8)} />
+                  <td className={cel} style={fst(9)}>
+                    {m(num(p.forecast))}
+                  </td>
+                  <td className={fcls("bg-emerald-50", "z-30")} style={fst(10)} />
+                  <td colSpan={8} className="bg-emerald-50" />
+                  <td colSpan={columns.length + 1} className="bg-emerald-50" />
+                </tr>
+              );
+            })}
           </tfoot>
         </table>
       </div>
