@@ -72,6 +72,11 @@ VERDE = "FFE8F5E9"
 ROJO = "FFF4CCCC"
 MONEDA = '"$"#,##0;[Red]-"$"#,##0;"—"'
 MEDIO = Side(style="medium", color="FF9AA4B2")
+# La divisoria entre bloques. Owner, 2026-11-09, marcandolas a mano sobre la
+# hoja: con 24 columnas de mes pegadas una a otra, el ojo pierde cual par
+# pertenece a que mes. Mas oscura que MEDIO porque tiene que leerse como una
+# separacion y no como el borde de una celda cualquiera.
+DIVISORIA = Side(style="medium", color="FF1F4E79")
 BLANCO = Font(bold=True, color="FFFFFFFF", size=9)
 APAGADA = Font(size=9, color="FFAAB2BE")
 MESES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
@@ -120,6 +125,8 @@ def _cabecera(ws: Any, hr: int, cols: list[tuple[str, int]], fondo: str) -> None
         c.font = BLANCO
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         ws.column_dimensions[gc(i)].width = w
+        # El encabezado cerrado arriba y abajo: la otra raya que marco el owner.
+        c.border = Border(top=DIVISORIA, bottom=DIVISORIA)
     ws.row_dimensions[hr].height = 30
 
 
@@ -153,6 +160,30 @@ def _pintar_total(ws: Any, r: int, hasta: int, sub: bool) -> Font:
         if sub:
             cc.border = Border(top=MEDIO, bottom=MEDIO)
     return Font(bold=True) if sub else Font(bold=True, size=11, color="FFFFFFFF")
+
+
+def _divisorias(ws: Any, cols: list[int], hr: int, ultima: int) -> None:
+    """Pinta una raya vertical a la IZQUIERDA de cada columna de `cols`.
+
+    ⚠️ Se corre AL FINAL, cuando la hoja ya esta escrita, y conserva los bordes
+    que cada celda ya tenia: las filas de subtotal llevan top/bottom y pisarlos
+    con un Border nuevo borraria la linea que separa el subtotal de su tramo.
+
+    ⚠️ Las bandas de categoria estan combinadas. openpyxl deja estilar una
+    MergedCell, pero no en todas las versiones; si tira, se salta esa celda y la
+    raya simplemente no cruza la banda —que igual se lee, porque la banda ya es
+    una franja de color de lado a lado—.
+    """
+    for c in cols:
+        for r in range(hr, ultima + 1):
+            cel = ws.cell(r, c)
+            b = cel.border
+            try:
+                cel.border = Border(
+                    left=DIVISORIA, right=b.right, top=b.top, bottom=b.bottom
+                )
+            except AttributeError:
+                continue
 
 
 def _suma(p: dict[str, Any], c: int) -> str:
@@ -292,6 +323,8 @@ def _hoja_datos(
             cc = ws.cell(r, c, _suma(p, c))
             cc.number_format = MONEDA
             cc.font = tipo
+    # Identidad | presupuesto y gasto | los cuatro tramos | propuesta | ledger.
+    _divisorias(ws, [6, 9, 13, 14], hr, ultima)
     _cerrar(ws, hr, N, ultima, 6)
 
 
@@ -380,6 +413,9 @@ def _hoja_edit(
                 cc = ws.cell(r, c, ref)
                 cc.number_format = MONEDA
                 cc.font = Font(bold=True)
+    # Una raya por MES: al inicio de cada par {anio}/{anio-1}, mas las fijas y
+    # el bloque de totales. Es justo lo que el owner marco a mano.
+    _divisorias(ws, [3, 6, *[6 + i * 2 for i in range(1, 12)], N - 2], hr, ultima)
     _cerrar(ws, hr, N, ultima, 6)
 
 
@@ -451,6 +487,7 @@ def _hoja_meses(
             ck = ws.cell(r, 18, f"={LD}!M{r}-Q{r}")
             ck.number_format = '#,##0.00;[Red]-#,##0.00;"ok"'
             ck.font = Font(size=9, color=GRIS)
+    _divisorias(ws, [5, *range(6, 17), 17, 18], hr, ultima)
     ws.conditional_formatting.add(
         f"R{hr + 1}:R{ultima}",
         CellIsRule(operator="notBetween", formula=["-0.5", "0.5"],
@@ -514,6 +551,7 @@ def _hoja_anio(
         cc = ws.cell(r, c, "=" + "+".join(f"{gc(c)}{x}" for x in primeras))
         cc.number_format = MONEDA
         cc.font = Font(bold=True, size=11, color="FFFFFFFF")
+    _divisorias(ws, [3, *range(4, 15), 15], hr, r)
     _cerrar(ws, hr, 15, r, 3)
     # Dónde quedó la columna LINES, para que Control cuente desde acá.
     return (primeras[0] if primeras else hr + 1, primeras[-1] if primeras else hr + 1)
@@ -582,6 +620,13 @@ def _hoja_semanas(
             tt = ws.cell(r, N, f"=SUM(C{r}:{gc(N - 1)}{r})")
             tt.number_format = MONEDA
             tt.font = Font(bold=True)
+    # ⚠️ Una raya por MES, no por semana: con 52 columnas, una linea en cada una
+    # no separa nada —solo ensucia—. El mes es la unidad con la que se lee.
+    corte_mes = [3]
+    for i, w in enumerate(semanas):
+        if i and str(w)[5:7] != str(semanas[i - 1])[5:7]:
+            corte_mes.append(3 + i)
+    _divisorias(ws, [*corte_mes, N], hr, ultima)
     _cerrar(ws, hr, N, ultima, 3)
 
 
