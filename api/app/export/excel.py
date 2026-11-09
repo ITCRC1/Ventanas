@@ -789,18 +789,20 @@ class ExcelExporter:
         ws["A1"].font = Font(bold=True, size=16, color="FF0F5F59")
         ws["A2"] = (
             f"Las mismas líneas del Job Cost, en el mismo orden. Cada mes muestra {A} "
-            f"al lado de {B}; al final, el {A} de corrido. Variance = Over/Under del "
-            f"Job Cost (Forecast − Revised: positivo = por encima del presupuesto). "
+            f"al lado de {B}; al final, el {A} de corrido. Las columnas G..M son "
+            f"las mismas del Job Cost (Over/Under = Forecast − Revised: positivo = "
+            f"por encima del presupuesto). "
             f"Todo es fórmula: sale de «Job Cost Report» y se mueve con él."
         )
         ws["A2"].font = Font(size=10, color="FF787B86")
 
         # --- columnas fijas: la identidad de la línea, igual que el Job Cost ---
-        # Las mismas columnas de plata que el Job Cost, apuntadas a sus celdas:
-        # Budget Revised (I), Total Spend (J) y Variance = Over/Under (M).
+        # ⚠️ El bloque fijo es el MISMO del Job Cost, columna por columna y con
+        # los mismos rotulos: A..M alla, A..M aca. Asi se puede saltar de una
+        # hoja a la otra sin volver a buscar donde quedo cada cosa.
         FIJ = ["Status", "WBS", "Task Title", "Owner", "Category", "Phase",
-               "Budget Revised", "Total Spend", "Variance"]
-        FIJ_JC = {7: "I", 8: "J", 9: "M"}   # columna de esta hoja -> columna del Job Cost
+               "Budget Original", "Budget Change", "Budget Revised",
+               "Spend", "Remaining", "Forecast", "Over/Under"]
         hr = 5
         for i, h in enumerate(FIJ, 1):
             c = ws.cell(hr, i, h)
@@ -877,13 +879,23 @@ class ExcelExporter:
         ws.row_dimensions[hr].height = 26
         ult = solo_tot
 
-        def _meses(rr: int, jc_fila: int) -> None:
-            """Los 24 montos de la fila, apuntados a la celda del Job Cost."""
+        def _meses(rr: int, jc_fila: int, tramo: tuple[int, int] | None = None,
+                   filas: list[int] | None = None) -> None:
+            """Los 24 montos de la fila.
+
+            En una línea, cada mes apunta a ese mes en el Job Cost. En una fila
+            de total, SUMA las filas que tiene arriba —igual que el Job Cost—,
+            así el papel se puede auditar sin salir de la hoja.
+            """
             for m, (ca, cb) in mescol.items():
                 for cc, anio in ((ca, A), (cb, B)):
-                    jc_col = self.month_col[(anio, m)][0]
-                    cel = ws.cell(rr, cc, f"={JC}!{gc(jc_col)}{jc_fila}")
-                    cel.number_format = MONEY
+                    if tramo:
+                        f = f"=SUM({gc(cc)}{tramo[0]}:{gc(cc)}{tramo[1]})"
+                    elif filas:
+                        f = _suma(f"{gc(cc)}{x}" for x in filas)
+                    else:
+                        f = f"={JC}!{gc(self.month_col[(anio, m)][0])}{jc_fila}"
+                    ws.cell(rr, cc, f).number_format = MONEY
 
         def _cierre(rr: int) -> None:
             """Total de cada año, la diferencia y el porcentaje."""
@@ -911,9 +923,50 @@ class ExcelExporter:
             tt.number_format = MONEY
             tt.font = Font(bold=True)
 
+        def _plata_linea(rr: int, jc_fila: int) -> None:
+            """Las siete columnas de plata de una línea.
+
+            ⚠️ Mismo reparto que el Job Cost: lo que es DATO se trae de allá, lo
+            que es CÁLCULO se calcula acá. Copiar los resultados dejaría una
+            hoja muerta —tocás el presupuesto y nada se mueve—, y el owner pidió
+            que estuviera formulada.
+            """
+            # Datos base: viven en el Job Cost, no se duplican.
+            ws.cell(rr, 7, f"={JC}!G{jc_fila}").number_format = MONEY   # Budget Original
+            ws.cell(rr, 8, f"={JC}!H{jc_fila}").number_format = MONEY   # Budget Change
+            # El gasto sale del LEDGER por cost code, igual que allá: la columna
+            # B de ESTA fila manda, así que corregir el código mueve el número.
+            ws.cell(
+                rr, 10, f"=SUMIF(LEDGER!$A:$A,$B{rr},LEDGER!$G:$G)"
+            ).number_format = MONEY                                     # Spend
+            # El forecast depende del plan posterior al corte, que vive allá.
+            ws.cell(rr, 12, f"={JC}!L{jc_fila}").number_format = MONEY  # Forecast
+            # Derivados: se calculan en la hoja.
+            ws.cell(rr, 9, f"=G{rr}+H{rr}").number_format = MONEY       # Budget Revised
+            ws.cell(rr, 11, f"=I{rr}-J{rr}").number_format = MONEY      # Remaining
+            ws.cell(rr, 13, f"=L{rr}-I{rr}").number_format = MONEY      # Over/Under
+
+        def _plata_suma(
+            rr: int, tramo: tuple[int, int] | None, filas: list[int] | None = None
+        ) -> None:
+            """Una fila de total: suma lo que tiene arriba, no lo copia.
+
+            ⚠️ La letra de columna va de los DOS lados del rango: `SUM(G7:G26)`.
+            Escrito `SUM(G7:26)` Excel no lo lee como la columna G.
+            """
+            for cc in range(7, 14):
+                ref = (
+                    f"=SUM({gc(cc)}{tramo[0]}:{gc(cc)}{tramo[1]})"
+                    if tramo
+                    else _suma(f"{gc(cc)}{x}" for x in (filas or []))
+                )
+                ws.cell(rr, cc, ref).number_format = MONEY
+
         # --- el cuerpo: se relee el plano del Job Cost, fila por fila ---
         r = hr + 1
-        filas_linea: list[int] = []
+        sec_lineas: list[int] = []
+        cp_cost: list[int] = []
+        cp_sale: list[int] = []
         for p in plan:
             tipo = p["tipo"]
             if tipo == "sec":
@@ -921,6 +974,7 @@ class ExcelExporter:
                     ws.cell(r, i).fill = CATF
                 ws.cell(r, 2, p["sec"])
                 ws.cell(r, 3, p["etq"]).font = BOLD
+                sec_lineas = []
                 r += 1
                 continue
             relleno = {
@@ -940,19 +994,39 @@ class ExcelExporter:
                 ws.cell(r, 4, p["owner"])
                 ws.cell(r, 5, p["category"])
                 ws.cell(r, 6, p["phase"])
-                filas_linea.append(r)
             else:
                 if p.get("code"):
                     ws.cell(r, 2, p["code"])
                 ws.cell(r, 3, p["etq"]).font = BOLD
-            # Presupuesto, gastado y variacion: las mismas celdas del Job Cost.
-            for cc, jcl in FIJ_JC.items():
-                ws.cell(r, cc, f"={JC}!{jcl}{p['fila']}").number_format = MONEY
-            _meses(r, p["fila"])
+            if tipo == "linea":
+                _plata_linea(r, p["fila"])
+                sec_lineas.append(r)
+            elif tipo == "subtotal" and sec_lineas:
+                _plata_suma(r, (sec_lineas[0], sec_lineas[-1]))
+                cp_cost.append(r)
+            elif tipo == "venta":
+                # La linea de venta no se lista en ninguna de las dos hojas: su
+                # unico rastro es la fila TOTAL SALES del Job Cost.
+                for cc, jcl in enumerate("GHIJKLM", start=7):
+                    ws.cell(r, cc, f"={JC}!{jcl}{p['fila']}").number_format = MONEY
+                cp_sale.append(r)
+            elif tipo == "gran":
+                _plata_suma(r, None, cp_cost if p["etq"].endswith("EXPENSES") else cp_cost + cp_sale)
+            elif tipo == "granventa":
+                _plata_suma(r, None, cp_sale)
+            if tipo == "linea" or tipo == "venta":
+                _meses(r, p["fila"])
+            elif tipo == "subtotal" and sec_lineas:
+                _meses(r, p["fila"], tramo=(sec_lineas[0], sec_lineas[-1]))
+            elif tipo == "granventa":
+                _meses(r, p["fila"], filas=cp_sale)
+            else:
+                _meses(r, p["fila"],
+                       filas=cp_cost if p["etq"].endswith("EXPENSES") else cp_cost + cp_sale)
             _cierre(r)
             if tipo != "linea":
                 for cc in [
-                    *FIJ_JC,
+                    *range(7, 14),
                     *[x for m in mescol.values() for x in m],
                     T_A, T_B, T_V,
                     *solocol.values(), solo_tot,
@@ -971,8 +1045,9 @@ class ExcelExporter:
             ),
         )
 
+        # Los mismos anchos que el Job Cost, para que las dos hojas se lean igual.
         for c2, w in zip(
-            range(1, 10), [11, 10, 42, 14, 20, 20, 16, 16, 15], strict=False
+            range(1, 14), [11, 10, 42, 14, 20, 20, 15, 14, 15, 15, 15, 15, 14], strict=False
         ):
             ws.column_dimensions[gc(c2)].width = w
         ws.freeze_panes = ws.cell(hr + 1, col0)
