@@ -2041,10 +2041,11 @@ export function useLedgerOptions(q: string, enabled = true) {
 
 /** El puente del saldo bancario. Sale de `services/conciliacion.py`.
  *
- *  `confianza` separa lo que el banco informa y esta medido ("dato") de lo que
- *  casi seguro es carga incompleta ("hueco"). Mezclarlas es como se arma un
- *  numero que asusta y que nadie puede usar: tres de las cuatro partidas que se
- *  pidieron resultaron ser huecos. */
+ *  ⚠️ El pendiente sale del LEDGER —`amount` menos `amount_paid`—, no de la
+ *  tabla `disbursement`. Owner, 2026-11-09: *«el ledger muestra lo solicitado y
+ *  lo pagado y la diferencia.. solo hay que tomar en cuenta esas cosas que no
+ *  se han pagado»* · *«es lo que realmente paso»*. La version anterior contaba
+ *  las tandas en `draft` y daba $3,585,878 contra los $259,724 reales. */
 export interface BankBridge {
   fecha: string;
   cuentas: {
@@ -2058,21 +2059,43 @@ export interface BankBridge {
   }[];
   saldo_banco: number;
   saldo_por_extracto: number;
-  partidas: {
-    etq: string;
-    monto: number;
-    n: number;
-    confianza: "dato" | "hueco";
-    nota: string;
-  }[];
+  /** Plata que el banco YA movio y el LEDGER no tiene registrada. */
+  banco: { etq: string; monto: number; n: number; nota: string }[];
+  /** Plata que el LEDGER dice que todavia NO se movio. */
+  compromisos: { etq: string; monto: number; n: number; nota: string }[];
   intereses: number;
   cargos: number;
-  pedido: number;
-  pedido_viejo: number;
-  tandas: { status: string; disb: string; mes: string | null; monto: number; en_ledger: number }[];
+  /** Los tres totales del LEDGER, para cuadrarlo contra la hoja. */
+  ledger: { filas: number; solicitado: number; pagado: number; diferencia: number };
+  pendiente: number;
+  pagado_de_mas: number;
+  sin_pagar: {
+    wbs: string | null;
+    fecha: string | null;
+    beneficiario: string | null;
+    descripcion: string | null;
+    solicitado: number;
+    pagado: number;
+    pendiente: number;
+  }[];
+  por_anio: {
+    anio: string;
+    filas: number;
+    solicitado: number;
+    pagado: number;
+    pendiente: number;
+  }[];
+  de_mas: {
+    wbs: string | null;
+    fecha: string | null;
+    beneficiario: string | null;
+    solicitado: number;
+    pagado: number;
+    de_mas: number;
+  }[];
   sin_ledger: { cuenta: number; nombre: string; n: number; monto: number }[];
   saldo_ajustado: number;
-  saldo_si_todo_cuenta: number;
+  saldo_tras_pendiente: number;
 }
 
 export interface BudgetProposalRow {

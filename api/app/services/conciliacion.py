@@ -1,17 +1,31 @@
-"""El puente del saldo bancario: del banco a lo que el sistema sabe.
+"""El puente del saldo bancario: del banco a lo que el LEDGER dice que falta pagar.
 
 Owner, 2026-11-09: *«Necesito hacer una conciliacion del Banco. pegar el saldo
 del banco con los short payments solicitados y no pagados, con los ingresos de
-intereses no registrados y los gastos por intereses no registrados... arma algo
-primero para ver como se pega el saldo del banco»*.
+intereses no registrados y los gastos por intereses no registrados»*.
 
-## Qué es esto y qué NO es
+## ⚠️ El pendiente sale del LEDGER, no de `disbursement`
 
-Es un **puente de saldo**, no un cuadre línea por línea. El tab «Bank
-Reconciliation» que ya existe compara el extracto contra el LEDGER movimiento a
-movimiento; esto arranca del saldo que informa el banco y va restando y sumando
-hasta llegar a lo que el sistema tiene registrado, dejando a la vista cada
-partida que explica la diferencia.
+Owner, 2026-11-09: *«lo que esta en el ledger no se puede tocar»* · *«es lo que
+realmente paso»* · *«el ledger muestra lo solicitado y lo pagado y la
+diferencia.. solo hay que tomar en cuenta esas cosas que no se han pagado»*.
+
+El LEDGER **ya trae las tres columnas**: `amount` (lo solicitado), `amount_paid`
+(lo pagado), y la diferencia es el pendiente. No hay nada que deducir ni que
+corregir — es el registro de lo que pasó.
+
+    solicitado  14,573,161.72
+    pagado      14,313,437.35
+    pendiente      259,724.37   ← esto es lo que va al puente
+
+La primera versión de este archivo tomaba el pendiente de la tabla
+`disbursement`, contando las tandas que seguían en `draft`, y daba
+**$3,585,878** — casi catorce veces de más. Ese número no era una obligación:
+era un estado que nadie cerró. La tabla `disbursement` es la **solicitud**; el
+LEDGER es el **hecho**. Para saber qué falta pagar se mira el hecho.
+
+⚠️ Por lo mismo, este módulo **no toca** `ledger_sheet_row` ni propone
+correcciones sobre él. Solo lee.
 
 ## ⚠️ El saldo sale del ÚLTIMO MOVIMIENTO, no del extracto
 
@@ -30,25 +44,8 @@ Tomar «el extracto más reciente por `period_to`» desempata al azar entre los
 dos. Por eso acá el saldo sale del **último `balance` que informó el banco en
 `bank_tx`**, que es el dato que el banco mismo pone en cada línea.
 
-⚠️ El Dashboard tomaba el extracto y por eso muestra $49,673.41 — $1,463.65 de
+⚠️ El Dashboard tomaba el extracto y por eso mostraba $49,673.41 — $1,463.65 de
 más. Está corregido en `tablero.py` junto con este cambio.
-
-## Por qué cada partida lleva una marca de confianza
-
-Tres de las cuatro partidas que pidió el owner resultaron ser, al medirlas,
-**huecos de carga y no obligaciones reales**:
-
-* los 25 Short Payments «pedidos y no pagados» arrancan en **diciembre de 2024**
-  y ninguno aparece en el LEDGER. Con $14.3M pagados en el proyecto, lo que pasó
-  es que el flujo de estados nunca pasó de `draft`;
-* los pagos a proveedor «sin fila en el LEDGER» incluyen los $10.4M de la cuenta
-  #1, que son los giros de los dueños vistos desde el otro lado;
-* los intereses y comisiones sí son reales, pero suman $1,455 contra un saldo de
-  $48 mil: mueven la tercera cifra decimal del proyecto, no el proyecto.
-
-Un puente que presentara las cuatro como equivalentes diría que faltan $3.5
-millones. Por eso cada partida viaja con `confianza` y el frontend las separa:
-mezclarlas es cómo se arma un número que asusta y que nadie puede usar.
 """
 
 from __future__ import annotations
@@ -62,6 +59,11 @@ from sqlalchemy.orm import Session
 
 def _f(x: Any) -> float:
     return round(float(x or 0), 2)
+
+
+# El pendiente de una fila del LEDGER: lo solicitado menos lo pagado. Se repite
+# en varias consultas, así que vive en un solo lugar.
+_PEND = "COALESCE(amount, 0) - COALESCE(amount_paid, 0)"
 
 
 def construir(db: Session) -> dict[str, Any]:
@@ -129,42 +131,99 @@ def construir(db: Session) -> dict[str, Any]:
     intereses = round(sum(v["credito"] for v in mov.values() if v["es_ingreso"]), 2)
     cargos = round(sum(v["debito"] for v in mov.values() if v["es_cargo"]), 2)
 
-    # ── Short Payments pedidos y todavía sin marcar como pagados ──────────
-    tandas = [
+    # ── Lo solicitado y no pagado, tal como lo trae el LEDGER ─────────────
+    totales = (
+        db.execute(
+            text(
+                f"""
+                SELECT COUNT(*) AS filas,
+                       COALESCE(SUM(COALESCE(amount, 0)), 0)      AS solicitado,
+                       COALESCE(SUM(COALESCE(amount_paid, 0)), 0) AS pagado,
+                       COALESCE(SUM({_PEND}), 0)                  AS diferencia
+                  FROM ledger_sheet_row
+                 WHERE kind = 'data'
+                """
+            )
+        )
+        .mappings()
+        .one()
+    )
+
+    # Las filas que todavía tienen saldo. Se listan enteras: son 35 y el owner
+    # necesita verlas, no un total que haya que creer.
+    sin_pagar = [
         {
-            "status": r["status"],
-            "disb": f"{r['disb_no']}.{r['disb_sub']}",
-            "mes": str(r["period_month"]) if r["period_month"] else None,
-            "monto": _f(r["total_amount"]),
-            # ⚠️ Si no hay NADA en el LEDGER que cite esta tanda, es señal de que
-            # el estado se quedó en `draft` y no de que el dinero esté pendiente.
-            "en_ledger": _f(r["en_ledger"]),
+            "wbs": r["cost_code"],
+            "fecha": r["entry_date"],
+            "beneficiario": r["payee"],
+            "descripcion": r["description"],
+            "solicitado": _f(r["amount"]),
+            "pagado": _f(r["amount_paid"]),
+            "pendiente": _f(r["pendiente"]),
         }
         for r in db.execute(
             text(
-                """
-                SELECT d.status, d.disb_no, d.disb_sub, d.period_month, d.total_amount,
-                       (SELECT COALESCE(SUM(l.amount_paid), 0)
-                          FROM ledger_sheet_row l
-                         WHERE l.kind = 'data'
-                           AND l.description ILIKE '%Disbursement #'
-                               || d.disb_no || '%') AS en_ledger
-                  FROM disbursement d
-                 WHERE d.status IN ('draft', 'submitted')
-                 ORDER BY d.disb_no, d.disb_sub
+                f"""
+                SELECT cost_code, entry_date, payee, description,
+                       amount, amount_paid, {_PEND} AS pendiente
+                  FROM ledger_sheet_row
+                 WHERE kind = 'data' AND {_PEND} > 0.5
+                 ORDER BY {_PEND} DESC
                 """
             )
         ).mappings()
     ]
-    pedido = round(sum(t["monto"] for t in tandas), 2)
-    # Las que además son VIEJAS: pedidas antes del mes pasado y sin rastro en el
-    # LEDGER. Son las que casi seguro ya se pagaron y nadie cerró el estado.
-    corte = dt.date.today().replace(day=1) - dt.timedelta(days=1)
-    viejas = [
-        t for t in tandas
-        if t["en_ledger"] < 0.5 and t["mes"] and t["mes"] <= str(corte)
+    pendiente = round(sum(f["pendiente"] for f in sin_pagar), 2)
+
+    # Por año, para que se vea de cuándo viene el saldo.
+    por_anio = [
+        {
+            "anio": r["anio"],
+            "filas": r["filas"],
+            "solicitado": _f(r["solicitado"]),
+            "pagado": _f(r["pagado"]),
+            "pendiente": _f(r["pendiente"]),
+        }
+        for r in db.execute(
+            text(
+                f"""
+                SELECT LEFT(entry_date, 4) AS anio, COUNT(*) AS filas,
+                       COALESCE(SUM(COALESCE(amount, 0)), 0)      AS solicitado,
+                       COALESCE(SUM(COALESCE(amount_paid, 0)), 0) AS pagado,
+                       COALESCE(SUM({_PEND}), 0)                  AS pendiente
+                  FROM ledger_sheet_row
+                 WHERE kind = 'data' AND {_PEND} > 0.5
+                 GROUP BY 1 ORDER BY 1
+                """
+            )
+        ).mappings()
     ]
-    pedido_viejo = round(sum(t["monto"] for t in viejas), 2)
+
+    # ⚠️ Y lo contrario: filas donde se pagó MÁS de lo solicitado. Son dos y
+    # suman $54.01, pero si no se muestran el puente no cierra al centavo.
+    de_mas = [
+        {
+            "wbs": r["cost_code"],
+            "fecha": r["entry_date"],
+            "beneficiario": r["payee"],
+            "solicitado": _f(r["amount"]),
+            "pagado": _f(r["amount_paid"]),
+            "de_mas": _f(r["de_mas"]),
+        }
+        for r in db.execute(
+            text(
+                """
+                SELECT cost_code, entry_date, payee, amount, amount_paid,
+                       COALESCE(amount_paid, 0) - COALESCE(amount, 0) AS de_mas
+                  FROM ledger_sheet_row
+                 WHERE kind = 'data'
+                   AND COALESCE(amount_paid, 0) - COALESCE(amount, 0) > 0.5
+                 ORDER BY 6 DESC
+                """
+            )
+        ).mappings()
+    ]
+    pagado_de_mas = round(sum(f["de_mas"] for f in de_mas), 2)
 
     # ── Pagos del banco sin fila en el LEDGER ─────────────────────────────
     sin_ledger = [
@@ -194,38 +253,44 @@ def construir(db: Session) -> dict[str, Any]:
 
     # ── El puente, partida por partida ────────────────────────────────────
     #
-    # `confianza`:
-    #   "dato"   el banco lo informa y está medido: se puede usar tal cual
-    #   "hueco"  casi seguro es carga incompleta, no una obligación real
-    partidas: list[dict[str, Any]] = [
+    # Las dos primeras son del banco: plata que ya se movió y el LEDGER no tiene.
+    # Las dos últimas son del LEDGER: plata que todavía no se movió.
+    banco: list[dict[str, Any]] = [
         {
             "etq": "Interest earned, not in the LEDGER",
             "monto": -intereses,
             "n": sum(v["n"] for v in mov.values() if v["es_ingreso"]),
-            "confianza": "dato",
             "nota": "The bank credited it; the LEDGER has no row for it.",
         },
         {
             "etq": "Bank charges and fees, not in the LEDGER",
             "monto": cargos,
             "n": sum(v["n"] for v in mov.values() if v["es_cargo"]),
-            "confianza": "dato",
             "nota": "Transfer fees and admin charges the LEDGER never recorded.",
         },
-        {
-            "etq": "Short Payments requested, not marked paid",
-            "monto": -pedido,
-            "n": len(tandas),
-            "confianza": "hueco",
-            "nota": (
-                f"{len(viejas)} of the {len(tandas)} batches "
-                f"({_f(pedido_viejo)}) are from before last month and have no trace "
-                "in the LEDGER. With $14.3M paid on the project, that is a status "
-                "that never moved past «draft», not money still owed."
-            ),
-        },
     ]
+    compromisos: list[dict[str, Any]] = [
+        {
+            "etq": "Requested and not paid, per the LEDGER",
+            "monto": pendiente,
+            "n": len(sin_pagar),
+            "nota": (
+                "Amount minus Amount Paid on every LEDGER row that still has a "
+                "balance. This is the record of what happened, not an estimate."
+            ),
+        }
+    ]
+    if de_mas:
+        compromisos.append(
+            {
+                "etq": "Paid over the amount requested",
+                "monto": -pagado_de_mas,
+                "n": len(de_mas),
+                "nota": "Rows where Amount Paid came in above Amount.",
+            }
+        )
 
+    ajustado = round(saldo - intereses + cargos, 2)
     return {
         "fecha": str(dt.date.today()),
         "cuentas": cuentas,
@@ -233,23 +298,27 @@ def construir(db: Session) -> dict[str, Any]:
         # ⚠️ Lo que diría el tablero si tomara el extracto en vez del último
         # movimiento. Se expone para que la diferencia se vea, no se adivine.
         "saldo_por_extracto": round(sum(c["saldo_extracto"] for c in cuentas), 2),
-        "partidas": partidas,
+        "banco": banco,
+        "compromisos": compromisos,
         "intereses": intereses,
         "cargos": cargos,
-        "pedido": pedido,
-        "pedido_viejo": pedido_viejo,
-        "tandas": tandas,
+        # Los tres totales del LEDGER, para poder cuadrarlo contra la hoja.
+        "ledger": {
+            "filas": totales["filas"],
+            "solicitado": _f(totales["solicitado"]),
+            "pagado": _f(totales["pagado"]),
+            "diferencia": _f(totales["diferencia"]),
+        },
+        "pendiente": pendiente,
+        "pagado_de_mas": pagado_de_mas,
+        "sin_pagar": sin_pagar,
+        "por_anio": por_anio,
+        "de_mas": de_mas,
         "sin_ledger": sin_ledger,
         "mov": mov,
-        # El saldo contando SOLO las partidas que son dato duro.
-        "saldo_ajustado": round(
-            saldo
-            + sum(p["monto"] for p in partidas if p["confianza"] == "dato"),
-            2,
-        ),
-        # Y el que saldría contando todo, para mostrar la diferencia entre
-        # «lo que el banco dice» y «lo que el sistema cree».
-        "saldo_si_todo_cuenta": round(
-            saldo + sum(p["monto"] for p in partidas), 2
-        ),
+        # El saldo después de lo que el banco ya movió y el LEDGER no registra.
+        "saldo_ajustado": ajustado,
+        # Y después de descontar lo que falta pagar. Puede dar NEGATIVO: el
+        # proyecto debe más de lo que tiene en el banco, y eso es el dato.
+        "saldo_tras_pendiente": round(ajustado - pendiente + pagado_de_mas, 2),
     }

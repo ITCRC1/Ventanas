@@ -285,22 +285,19 @@ function Adelantados({ d }: { d: DashboardSummary }) {
         />
       </div>
 
-      {/* ⚠️ Esto no es una nota de color: es el hallazgo. Sin esto, «Billed,
-          not marked paid» se lee como plata comprometida cuando el 95% es una
-          columna que nadie lleno en la carga inicial del LEDGER. */}
+      {/* ⚠️ Esta nota decia que la cifra «es casi seguro un hueco de carga».
+          Era una lectura MIA y estaba equivocada. Owner, 2026-11-09: *«lo que
+          esta en el ledger no se puede tocar»* · *«es lo que realmente paso»* ·
+          *«el ledger muestra lo solicitado y lo pagado y la diferencia.. solo
+          hay que tomar en cuenta esas cosas que no se han pagado»*. El LEDGER
+          es el registro del hecho: la diferencia es plata que falta pagar, y se
+          presenta como tal. */}
       <p className="rounded border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
         <b>What these two actually measure.</b> «Billed, not marked paid» is{" "}
-        <code>Amount − Amount Paid</code> on the LEDGER; «Not in the LEDGER» is the rest of the
-        remaining budget. Neither one knows about contracts.{" "}
-        <b>
-          29 of the 35 rows that produce it — $247,485 of $259,724 — have the Amount Paid column
-          empty
-        </b>
-        , along with the date and the paid total, and almost all of them read «Disbursement #00»
-        from the January-2024 initial load. So that figure is most likely a data-entry gap, not a
-        commitment: the share with nothing behind it is closer to 100% than to 96%, and if those
-        rows were in fact paid then Paid is short by $247,485 and Remaining is overstated by the
-        same.
+        <code>Amount − Amount Paid</code> on the LEDGER — the record of what happened, so it is
+        money still owed. «Not in the LEDGER» is the rest of the remaining budget: nothing has been
+        requested against it yet. Neither one knows about contracts. The full row-by-row breakdown
+        lives in <b>Banking → Balance bridge</b>, which ties it back to the bank balance.
       </p>
 
       {!ct.existe ? (

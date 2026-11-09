@@ -6,8 +6,8 @@ import {
   useAbsorbWire,
   useAddWireFee,
   useBankAccounts,
-  useBankChargesMonthly,
   useBankBridge,
+  useBankChargesMonthly,
   useBankChargesPending,
   useBankFees,
   useBankFeesByYear,
@@ -823,11 +823,14 @@ function BankFeesPanel() {
  * solicitados y no pagados, con los ingresos de intereses no registrados y los
  * gastos por intereses no registrados»* · *«debe ser un sub tab del banco»*.
  *
- * ⚠️ Las partidas van SEPARADAS por confianza y no sumadas en una columna. Al
- * medirlas, tres de las cuatro resultaron ser huecos de carga y no obligaciones:
- * las 25 tandas «pedidas y no pagadas» arrancan en diciembre de 2024 y ninguna
- * aparece en el LEDGER, con $14.3M ya pagados en el proyecto. Un puente que las
- * presentara como equivalentes diria que faltan $3.5 millones.
+ * ⚠️ Lo que falta pagar sale del LEDGER, no de la tabla `disbursement`. Owner,
+ * 2026-11-09: *«lo que esta en el ledger no se puede tocar»* · *«es lo que
+ * realmente paso»* · *«el ledger muestra lo solicitado y lo pagado y la
+ * diferencia.. solo hay que tomar en cuenta esas cosas que no se han pagado»*.
+ *
+ * La primera version contaba las tandas que seguian en `draft` y daba
+ * **$3,585,878** contra los **$259,724** que el LEDGER tiene de verdad sin
+ * pagar. La tabla `disbursement` es la SOLICITUD; el LEDGER es el HECHO.
  */
 function BalanceBridge() {
   const q = useBankBridge();
@@ -836,9 +839,6 @@ function BalanceBridge() {
     return <p className="text-sm text-red-600">Could not load it: {(q.error as Error).message}</p>;
   const d = q.data;
   if (!d) return null;
-
-  const duro = d.partidas.filter((p) => p.confianza === "dato");
-  const hueco = d.partidas.filter((p) => p.confianza === "hueco");
 
   return (
     <div className="space-y-4">
@@ -892,7 +892,7 @@ function BalanceBridge() {
         <h2 className="mb-2 text-sm font-semibold text-slate-600">
           The bridge
           <span className="ml-2 font-normal text-slate-400">
-            — what the bank moved and the LEDGER never recorded
+            — from the bank balance to what is still owed
           </span>
         </h2>
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -903,7 +903,8 @@ function BalanceBridge() {
                 <td className="px-3 py-2 text-right text-slate-400">—</td>
                 <td className="tabular px-3 py-2 text-right">{moneyUsd(d.saldo_banco)}</td>
               </tr>
-              {duro.map((p) => (
+              {/* Lo que el banco YA movió y el LEDGER no tiene. */}
+              {d.banco.map((p) => (
                 <tr key={p.etq}>
                   <td className="px-3 py-1.5">
                     {p.etq}
@@ -917,38 +918,175 @@ function BalanceBridge() {
                   </td>
                 </tr>
               ))}
-              <tr className="border-t-2 border-slate-700 bg-[#D8F4E6] font-bold">
-                <td className="px-3 py-2">BALANCE AFTER WHAT THE BANK ALREADY MOVED</td>
+              <tr className="border-t-2 border-slate-400 bg-[#D8F4E6] font-semibold">
+                <td className="px-3 py-2">Balance after what the bank already moved</td>
                 <td className="px-3 py-2" />
                 <td className="tabular px-3 py-2 text-right">{moneyUsd(d.saldo_ajustado)}</td>
+              </tr>
+              {/* Y lo que el LEDGER dice que todavía NO se movió. */}
+              {d.compromisos.map((p) => (
+                <tr key={p.etq}>
+                  <td className="px-3 py-1.5">
+                    {p.etq}
+                    <div className="text-xs text-slate-400">{p.nota}</div>
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-xs text-slate-400">{p.n} rows</td>
+                  <td
+                    className={`tabular px-3 py-1.5 text-right ${p.monto < 0 ? "text-emerald-700" : "text-red-700"}`}
+                  >
+                    {moneyUsd(-p.monto)}
+                  </td>
+                </tr>
+              ))}
+              {/* ⚠️ Puede dar NEGATIVO, y eso es el dato: el proyecto debe mas
+                  de lo que tiene en el banco. Se pinta en rojo, no se esconde. */}
+              <tr
+                className={`border-t-2 border-slate-800 font-bold ${
+                  d.saldo_tras_pendiente < 0 ? "bg-red-100 text-red-900" : "bg-[#B8E8D2]"
+                }`}
+              >
+                <td className="px-3 py-2">POSITION AFTER WHAT IS STILL OWED</td>
+                <td className="px-3 py-2" />
+                <td className="tabular px-3 py-2 text-right">{moneyUsd(d.saldo_tras_pendiente)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {d.saldo_tras_pendiente < 0 ? (
+          <p className="mt-1 text-xs text-red-700">
+            Negative on purpose: the LEDGER has <b className="tabular">{moneyUsd(d.pendiente)}</b>{" "}
+            requested and not paid against <b className="tabular">{moneyUsd(d.saldo_banco)}</b> in
+            the bank. That is the position, not an error.
+          </p>
+        ) : null}
+      </div>
+
+      {/* ── El cuadre contra el LEDGER ───────────────────────────────── */}
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">
+          The LEDGER&apos;s own three columns
+          <span className="ml-2 font-normal text-slate-400">
+            — requested, paid, and the difference, across all {d.ledger.filas} rows
+          </span>
+        </h2>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-slate-100">
+              <tr>
+                <td className="px-3 py-1.5">Amount (requested)</td>
+                <td className="tabular px-3 py-1.5 text-right">{moneyUsd(d.ledger.solicitado)}</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-1.5">Amount Paid</td>
+                <td className="tabular px-3 py-1.5 text-right">{moneyUsd(d.ledger.pagado)}</td>
+              </tr>
+              <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
+                <td className="px-3 py-2">DIFFERENCE — not paid</td>
+                <td className="tabular px-3 py-2 text-right">{moneyUsd(d.ledger.diferencia)}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* ── Y lo que NO se suma, con el porqué ───────────────────────── */}
-      {hueco.length ? (
-        <div className="rounded-lg border-2 border-alerta bg-amber-50 p-3">
-          <h2 className="mb-1 text-sm font-semibold text-amber-900">
-            Asked for, but not added to the bridge
-          </h2>
-          {hueco.map((p) => (
-            <div key={p.etq} className="mt-2 text-sm text-amber-900">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-semibold">{p.etq}</span>
-                <span className="tabular font-bold">{moneyUsd(p.monto)}</span>
-              </div>
-              <p className="mt-0.5 text-xs">{p.nota}</p>
+      {/* ── Las filas que todavía tienen saldo, una por una ──────────── */}
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">
+          Requested and not paid — every row
+          <span className="ml-2 font-normal text-slate-400">
+            — {d.sin_pagar.length} LEDGER rows still carrying a balance
+          </span>
+        </h2>
+        <div className="mb-2 flex flex-wrap gap-2">
+          {d.por_anio.map((a) => (
+            <div
+              key={a.anio}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm"
+            >
+              <span className="font-semibold">{a.anio}</span>
+              <span className="ml-2 text-xs text-slate-500">{a.filas} rows</span>
+              <span className="tabular ml-2 font-bold text-red-700">{moneyUsd(a.pendiente)}</span>
             </div>
           ))}
-          <p className="mt-3 border-t border-amber-300 pt-2 text-xs text-amber-900">
-            Counting it anyway would put the balance at{" "}
-            <b className="tabular">{moneyUsd(d.saldo_si_todo_cuenta)}</b>. That is not a cash
-            position — it is the same reporting gap the Dashboard flags on «Billed, not marked
-            paid»: the data entry stops before the status moves. Close those batches and this line
-            goes away on its own.
-          </p>
+        </div>
+        <div className="max-h-[28rem] overflow-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-slate-100 text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-2">WBS</th>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Payee</th>
+                <th className="px-3 py-2">Description</th>
+                <th className="px-3 py-2 text-right">Requested</th>
+                <th className="px-3 py-2 text-right">Paid</th>
+                <th className="px-3 py-2 text-right">Not paid</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {d.sin_pagar.map((f, i) => (
+                <tr key={`${f.wbs}-${f.fecha}-${i}`} className="hover:bg-slate-50">
+                  <td className="tabular px-3 py-1.5 font-semibold">{f.wbs ?? "—"}</td>
+                  <td className="px-3 py-1.5 text-slate-500">{f.fecha ?? "—"}</td>
+                  <td className="px-3 py-1.5">{f.beneficiario ?? "—"}</td>
+                  <td className="px-3 py-1.5 text-slate-500">{f.descripcion ?? "—"}</td>
+                  <td className="tabular px-3 py-1.5 text-right">{moneyUsd(f.solicitado)}</td>
+                  <td className="tabular px-3 py-1.5 text-right text-slate-500">
+                    {f.pagado ? moneyUsd(f.pagado) : "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right font-semibold text-red-700">
+                    {moneyUsd(f.pendiente)}
+                  </td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
+                <td className="px-3 py-2" colSpan={6}>
+                  TOTAL NOT PAID
+                </td>
+                <td className="tabular px-3 py-2 text-right">{moneyUsd(d.pendiente)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ⚠️ Y lo contrario: filas donde se pago MAS de lo solicitado. Son dos
+          y suman $54.01, pero sin mostrarlas el puente no cierra al centavo. */}
+      {d.de_mas.length ? (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-slate-600">
+            Paid over the amount requested
+            <span className="ml-2 font-normal text-slate-400">
+              — {d.de_mas.length} rows, {moneyUsd(d.pagado_de_mas)} in all
+            </span>
+          </h2>
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">WBS</th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Payee</th>
+                  <th className="px-3 py-2 text-right">Requested</th>
+                  <th className="px-3 py-2 text-right">Paid</th>
+                  <th className="px-3 py-2 text-right">Over</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {d.de_mas.map((f, i) => (
+                  <tr key={`${f.wbs}-${i}`}>
+                    <td className="tabular px-3 py-1.5 font-semibold">{f.wbs ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-slate-500">{f.fecha ?? "—"}</td>
+                    <td className="px-3 py-1.5">{f.beneficiario ?? "—"}</td>
+                    <td className="tabular px-3 py-1.5 text-right">{moneyUsd(f.solicitado)}</td>
+                    <td className="tabular px-3 py-1.5 text-right">{moneyUsd(f.pagado)}</td>
+                    <td className="tabular px-3 py-1.5 text-right font-semibold text-amber-700">
+                      {moneyUsd(f.de_mas)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
 
