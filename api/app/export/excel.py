@@ -648,10 +648,17 @@ class ExcelExporter:
                 r += 1
             last_cost = r - 1
 
-            # --- TOTAL GASTOS (SUM del rango contiguo de líneas de gasto) ---
+            # --- TOTAL de la sección (SUM del rango contiguo de líneas) ---
+            #
+            # ⚠️ El rótulo es el mismo que el de la pantalla
+            # (JobCostFull.tsx:1989): "TOTAL" a secas cuando la sección no
+            # tiene venta, y recién ahí se parte en EXPENSES / SALES. Antes
+            # decía "TOTAL EXPENSES" en las once secciones, aunque diez de
+            # ellas no tienen una sola línea de venta.
+            etq_total = "TOTAL EXPENSES" if sales else "TOTAL"
             for i in range(1, self.total_col + 1):
                 ws.cell(r, i).fill = TOTAL
-            ws.cell(r, 3, "TOTAL EXPENSES").font = BOLD
+            ws.cell(r, 3, etq_total).font = BOLD
             for c in money_cols:
                 if costs:
                     ws.cell(r, c, f"=SUM({gc(c)}{first_cost}:{gc(c)}{last_cost})")
@@ -660,7 +667,7 @@ class ExcelExporter:
                 ws.cell(r, c).number_format = numfmt(c)
                 ws.cell(r, c).font = BOLD
             cost_totals.append(r)
-            self.jc_plan.append({"tipo": "subtotal", "etq": "TOTAL EXPENSES", "fila": r})
+            self.jc_plan.append({"tipo": "subtotal", "etq": etq_total, "fila": r})
             r += 1
 
             # --- TOTAL VENTA (sólo si la sección tiene proceeds) ---
