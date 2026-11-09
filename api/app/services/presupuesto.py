@@ -100,6 +100,11 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
     vencido: dict[str, float] = defaultdict(float)
     arrastre: dict[str, float] = defaultdict(float)
     posterior: dict[str, float] = defaultdict(float)
+    # El ano anterior, mes a mes. ⚠️ Va APARTE de los tramos y no toca su
+    # reparto: es solo la columna de comparacion del tab «Edit», que hasta hoy
+    # salia de una segunda consulta en el frontend. El Excel no tiene esa
+    # segunda fuente, asi que si no viaja aca la hoja no se puede armar.
+    base_mes: dict[str, list[float]] = defaultdict(lambda: [0.0] * 12)
     for r in db.execute(
         text(
             """
@@ -113,6 +118,8 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
         code, w, monto = r["wbs_code"], r["week_start"], _f(r["monto"])
         if isinstance(w, dt.datetime):
             w = w.date()
+        if w.year == anio - 1:
+            base_mes[code][w.month - 1] += monto
         if w.year == anio:
             plan[code][str(w)] = plan[code].get(str(w), 0.0) + monto
         elif w.year > anio:
@@ -182,6 +189,8 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
                 "propuesta": propuesta,
                 "propuesta_total": round(sum(propuesta.values()), 2),
                 "ritmo_ledger": ritmo.get(code),
+                # Los doce meses del ano anterior, para comparar al lado.
+                "meses_base": [round(x, 2) for x in base_mes.get(code, [0.0] * 12)],
             }
         )
 
