@@ -169,14 +169,14 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
           sub={`${d.avance.pct_por_costo.toFixed(1)}% of the revised budget`}
         />
         <Kpi
-          label="Committed, not yet paid"
+          label="Billed, not marked paid"
           value={moneyUsd(c.por_pagar)}
-          sub="already under contract — unavoidable"
+          sub="a LEDGER row with an amount and no payment recorded"
         />
         <Kpi
-          label="Still to commit"
+          label="Not in the LEDGER"
           value={moneyUsd(c.sin_comprometer)}
-          sub="no contract behind it yet"
+          sub="budget with no LEDGER row behind it"
           tono={d.adelantados.exposicion_sin_contrato_pct > 50 ? "bad" : undefined}
         />
       </div>
@@ -195,8 +195,8 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
                 ],
                 ["Revised budget", c.budget_revised, "what the Job Cost shows today"],
                 ["Paid", -c.pagado, ""],
-                ["Committed, not yet paid", -c.por_pagar, ""],
-                ["Still to commit", -c.sin_comprometer, ""],
+                ["Billed, not marked paid", -c.por_pagar, ""],
+                ["Not in the LEDGER", -c.sin_comprometer, ""],
               ] as [string, number, string][]
             ).map(([et, v, nota], i) => (
               <tr
@@ -238,9 +238,9 @@ function Adelantados({ d }: { d: DashboardSummary }) {
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi
-          label="Remaining with no contract"
+          label="Remaining not in the LEDGER"
           value={`${a.exposicion_sin_contrato_pct.toFixed(1)}%`}
-          sub={`${moneyUsd(a.exposicion_sin_contrato)} priced but not signed`}
+          sub={`${moneyUsd(a.exposicion_sin_contrato)} with no LEDGER row behind it`}
           tono={
             a.exposicion_sin_contrato_pct > 75
               ? "bad"
@@ -284,6 +284,24 @@ function Adelantados({ d }: { d: DashboardSummary }) {
           tono={a.caja_faltante > 0 ? "bad" : "ok"}
         />
       </div>
+
+      {/* ⚠️ Esto no es una nota de color: es el hallazgo. Sin esto, «Billed,
+          not marked paid» se lee como plata comprometida cuando el 95% es una
+          columna que nadie lleno en la carga inicial del LEDGER. */}
+      <p className="rounded border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <b>What these two actually measure.</b> «Billed, not marked paid» is{" "}
+        <code>Amount − Amount Paid</code> on the LEDGER; «Not in the LEDGER» is the rest of the
+        remaining budget. Neither one knows about contracts.{" "}
+        <b>
+          29 of the 35 rows that produce it — $247,485 of $259,724 — have the Amount Paid column
+          empty
+        </b>
+        , along with the date and the paid total, and almost all of them read «Disbursement #00»
+        from the January-2024 initial load. So that figure is most likely a data-entry gap, not a
+        commitment: the share with nothing behind it is closer to 100% than to 96%, and if those
+        rows were in fact paid then Paid is short by $247,485 and Remaining is overstated by the
+        same.
+      </p>
 
       {!ct.existe ? (
         <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -425,7 +443,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
           <p className="mb-2 text-sm font-semibold text-slate-600">
-            Remaining by section — committed vs still open
+            Remaining by section — billed vs not in the LEDGER
           </p>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={barras} layout="vertical" margin={{ left: 8, right: 24 }}>
@@ -437,8 +455,8 @@ function Pendiente({ d }: { d: DashboardSummary }) {
                 contentStyle={{ fontSize: 11 }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="committed" name="Under contract" stackId="a" fill={VERDE} />
-              <Bar dataKey="open" name="No contract yet" stackId="a" fill={AMBAR} />
+              <Bar dataKey="committed" name="Billed, not marked paid" stackId="a" fill={VERDE} />
+              <Bar dataKey="open" name="Not in the LEDGER" stackId="a" fill={AMBAR} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -477,8 +495,8 @@ function Pendiente({ d }: { d: DashboardSummary }) {
               <th className="px-3 py-2 text-right">Lines</th>
               <th className="px-3 py-2 text-right">Budget</th>
               <th className="px-3 py-2 text-right">Paid</th>
-              <th className="px-3 py-2 text-right">Under contract</th>
-              <th className="px-3 py-2 text-right">No contract yet</th>
+              <th className="px-3 py-2 text-right">Billed, not paid</th>
+              <th className="px-3 py-2 text-right">Not in LEDGER</th>
               <th className="px-3 py-2 text-right">Remaining</th>
               <th className="px-3 py-2 text-right">%</th>
             </tr>
