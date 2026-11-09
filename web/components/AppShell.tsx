@@ -10,10 +10,17 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 type NavLink = { href: string; label: string; hint?: string; perm?: string };
 type NavItem = NavLink | { label: string; items: NavLink[]; perm?: string };
 
-// Barra agrupada por flujo de trabajo: lo del proyecto, lo que se le pide a
-// corporativo, las facturas y lo bancario. El Cronograma sigue fuera del menú
-// (redundante con la edición semanal de Job Cost); la ruta /schedule sigue viva.
+// Barra agrupada por flujo de trabajo: primero el resumen, despues lo del
+// proyecto, lo que se le pide a corporativo, las facturas y lo bancario.
+//
+// ⚠️ El Dashboard va PRIMERO (pedido del owner, 2026-11-09). Es la pantalla que
+// se abre para saber como viene la cosa; tenerla tercera obligaba a pasar por
+// Job Cost y Timeline para llegar al resumen.
+//
+// El Cronograma sigue fuera del menú (redundante con la edición semanal de Job
+// Cost); la ruta /schedule sigue viva.
 const NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", hint: "Executive summary", perm: "report.view" },
   {
     href: "/job-cost",
     label: "Job Cost",
@@ -28,7 +35,6 @@ const NAV: NavItem[] = [
       { href: "/timeline-detail", label: "Timeline Detail", hint: "Week by week, per task" },
     ],
   },
-  { href: "/dashboard", label: "Dashboard", hint: "Executive summary", perm: "report.view" },
   {
     href: "/reporting",
     label: "Reporting",
@@ -81,7 +87,11 @@ const NAV: NavItem[] = [
       // Un proveedor con contratos por etapas: lo que importa no es el total
       // de la factura sino sus LINEAS, porque una sola trae el cierre de un
       // contrato y el arranque de otro.
-      { href: "/dehc-invoices", label: "DEHC Invoices", hint: "Every line DEHC bills, with its PDF" },
+      {
+        href: "/dehc-invoices",
+        label: "DEHC Invoices",
+        hint: "Every line DEHC bills, with its PDF",
+      },
     ],
   },
   { href: "/ledger", label: "Ledger", hint: "Every payment, as in the Excel", perm: "view.ledger" },

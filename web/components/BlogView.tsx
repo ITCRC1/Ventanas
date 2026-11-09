@@ -176,8 +176,8 @@ export function BlogView() {
   return (
     <div className="space-y-4">
       <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Entries <strong>cannot be deleted or edited</strong> — not from here and not by hand:
-        the database rejects it. A correction goes in as a new entry that cites the earlier one.
+        Entries <strong>cannot be deleted or edited</strong> — not from here and not by hand: the
+        database rejects it. A correction goes in as a new entry that cites the earlier one.
       </div>
 
       {puedeEscribir && !abierto && (
@@ -224,7 +224,8 @@ export function BlogView() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600">
-              Source <span className="font-normal text-slate-400">(contract, ledger entry, email)</span>
+              Source{" "}
+              <span className="font-normal text-slate-400">(contract, ledger entry, email)</span>
             </label>
             <input
               value={source}
@@ -236,7 +237,9 @@ export function BlogView() {
           <div>
             <label className="block text-xs font-medium text-slate-600">
               Supersedes entry #{" "}
-              <span className="font-normal text-slate-400">(only if it corrects an earlier one)</span>
+              <span className="font-normal text-slate-400">
+                (only if it corrects an earlier one)
+              </span>
             </label>
             <input
               value={supersedes}
@@ -246,9 +249,7 @@ export function BlogView() {
             />
           </div>
           {crear.isError && (
-            <p className="text-sm text-red-600">
-              Not saved: {(crear.error as Error).message}
-            </p>
+            <p className="text-sm text-red-600">Not saved: {(crear.error as Error).message}</p>
           )}
           <div className="flex gap-2">
             <button
@@ -301,7 +302,7 @@ export function BlogView() {
             )}
             {e.fue_reemplazada && (
               <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
-                reemplazada por una entrada posterior
+                superseded by a later entry
               </span>
             )}
           </header>

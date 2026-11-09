@@ -34,7 +34,7 @@ export function BotonMasterFile({ tono = "barra" }: { tono?: "barra" | "pagina" 
     } catch (e) {
       // El 401 ya lo atiende el cliente HTTP (manda a login). Acá solo se
       // muestra lo demás, para que un fallo no quede mudo.
-      setError(e instanceof ApiError ? e.problem.title : "No se pudo generar");
+      setError(e instanceof ApiError ? e.problem.title : "Could not generate it");
     } finally {
       setBajando(false);
     }

@@ -122,7 +122,10 @@ export function DashboardView() {
     const titulos = new Map(
       todas.filter((r) => /^\d+$/.test(r.wbs_code)).map((r) => [r.wbs_code, r.title]),
     );
-    const porSec = new Map<string, { budget: number; spend: number; remaining: number; n: number }>();
+    const porSec = new Map<
+      string,
+      { budget: number; spend: number; remaining: number; n: number }
+    >();
     for (const r of gastos) {
       const k = seccionDe(r.wbs_code);
       const a = porSec.get(k) ?? { budget: 0, spend: 0, remaining: 0, n: 0 };
@@ -202,37 +205,37 @@ export function DashboardView() {
       {/* ── Indicadores lideres: plata que todavia no salio ───────────── */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Lo que viene
+          What is coming
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Kpi
-            label="Recien pedido"
+            label="Just requested"
             value={adelanto.ultima ? moneyUsd(adelanto.ultima.total_amount) : "-"}
             sub={
               adelanto.ultima
                 ? `Tanda #${adelanto.ultima.disb_no}.${adelanto.ultima.disb_sub} \u00b7 ${mesCorto(adelanto.ultima.period_month)}`
-                : "sin tandas"
+                : "no batches yet"
             }
             acento
           />
           <Kpi
-            label="Pedido sin pagar"
+            label="Requested, unpaid"
             value={moneyUsd(adelanto.pendiente)}
-            sub={`${(tandas.data ?? []).filter((b) => b.status !== "paid").length} tandas abiertas`}
+            sub={`${(tandas.data ?? []).filter((b) => b.status !== "paid").length} open batches`}
             acento
           />
           <Kpi
-            label={`Este mes \u00b7 ${mesCorto(adelanto.mesAct)}`}
+            label={`This month \u00b7 ${mesCorto(adelanto.mesAct)}`}
             value={moneyUsd(adelanto.actual)}
             acento
           />
           <Kpi
-            label={`Mes siguiente \u00b7 ${mesCorto(adelanto.mesSig)}`}
+            label={`Next month \u00b7 ${mesCorto(adelanto.mesSig)}`}
             value={moneyUsd(adelanto.siguiente)}
             acento
           />
           <Kpi
-            label={`Falta en ${adelanto.anio}`}
+            label={`Left in ${adelanto.anio}`}
             value={moneyUsd(adelanto.anioFalta)}
             sub={`${moneyUsd(adelanto.anioHecho)} spent so far \u00b7 ${moneyUsd(adelanto.anioHecho + adelanto.anioFalta)} for the year`}
             acento
@@ -259,13 +262,9 @@ export function DashboardView() {
           <Kpi
             label="Mini projects"
             value={moneyUsd(mini.budget)}
-            sub={`${mini.lineas} l\u00edneas \u00b7 ${moneyUsd(mini.remaining)} por gastar`}
+            sub={`${mini.lineas} lines \u00b7 ${moneyUsd(mini.remaining)} left to spend`}
           />
-          <Kpi
-            label="Venta del lote"
-            value={moneyUsd(venta.budget)}
-            sub="outside the totals above"
-          />
+          <Kpi label="Lot sale" value={moneyUsd(venta.budget)} sub="outside the totals above" />
         </div>
       </div>
 
@@ -339,7 +338,7 @@ export function DashboardView() {
           cuadrar contra los de la otra. Por eso van las dos. ──────────────── */}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-3 py-2">
-          <p className="text-sm font-semibold text-slate-600">Job Cost resumido</p>
+          <p className="text-sm font-semibold text-slate-600">Job Cost summary</p>
           <p className="text-xs text-slate-400">
             By WBS section, without the lot sale. The total is the project&apos;s.
           </p>
@@ -374,7 +373,7 @@ export function DashboardView() {
           <tfoot className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
             <tr>
               <td className="px-3 py-2" colSpan={2}>
-                TOTAL DEL PROYECTO
+                PROJECT TOTAL
               </td>
               <td className="tabular px-3 py-2 text-right">
                 {secciones.reduce((n, x) => n + x.n, 0)}

@@ -51,13 +51,13 @@ async function proxy(req: NextRequest): Promise<Response> {
     // El código de causa es el diagnóstico: ENOTFOUND = el nombre del servicio no
     // existe; ECONNREFUSED = resuelve pero nadie escucha en ese puerto.
     const err = e as { message?: string; cause?: { code?: string; message?: string } };
-    const causa = err.cause?.code ?? err.cause?.message ?? err.message ?? "desconocida";
+    const causa = err.cause?.code ?? err.cause?.message ?? err.message ?? "unknown";
     return new Response(
       JSON.stringify({
         type: "about:blank",
-        title: "El front no pudo hablar con la API",
+        title: "The front end could not reach the API",
         status: 502,
-        detail: `${causa} — destino: ${url}`,
+        detail: `${causa} — target: ${url}`,
       }),
       { status: 502, headers: { "content-type": "application/problem+json" } },
     );

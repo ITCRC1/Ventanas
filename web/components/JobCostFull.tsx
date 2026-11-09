@@ -655,9 +655,9 @@ export function JobCostFull() {
   // Se guarda por INDICES de fila y columna (no por wbs_id y fecha) porque el
   // movimiento es "correr N columnas": con indices es una resta, y con fechas
   // habria que recalcular que semana cae N lugares mas alla cada vez.
-  const [bloque, setBloque] = useState<
-    { f0: number; f1: number; c0: number; c1: number } | null
-  >(null);
+  const [bloque, setBloque] = useState<{ f0: number; f1: number; c0: number; c1: number } | null>(
+    null,
+  );
   const [onlyIssues, setOnlyIssues] = useState(false);
   const [adding, setAdding] = useState(false);
   // Arrastrar un monto de un mes/semana a otro (misma línea). null = sin arrastre.
@@ -1726,8 +1726,7 @@ export function JobCostFull() {
           <div className="flex items-center gap-2 rounded-lg border-2 border-blue-500 bg-white px-3 py-2 shadow-xl">
             <span className="text-xs font-semibold text-blue-900">
               {bloque.f1 - bloque.f0 + 1} {bloque.f1 === bloque.f0 ? "line" : "lines"} ×{" "}
-              {bloque.c1 - bloque.c0 + 1}{" "}
-              {bloque.c1 === bloque.c0 ? "week" : "weeks"}
+              {bloque.c1 - bloque.c0 + 1} {bloque.c1 === bloque.c0 ? "week" : "weeks"}
               <span className="ml-2 tabular font-bold">
                 {usd(celdasDelBloque().reduce((a, x) => a + x.monto, 0))}
               </span>
@@ -1916,14 +1915,14 @@ export function JobCostFull() {
               <th
                 className="sticky top-0 z-30 bg-[#1a7f4b] px-2 py-2 text-right text-[10px] uppercase"
                 style={{ minWidth: 90 }}
-                title="Actual = timeline ANTES del Forecast Cut-off (ejecutado/pagado del ledger)"
+                title="Actual = the timeline BEFORE the Forecast cut-off (executed / paid, from the ledger)"
               >
                 Actual
               </th>
               <th
                 className="sticky top-0 z-30 bg-[#856404] px-2 py-2 text-right text-[10px] uppercase"
                 style={{ minWidth: 90 }}
-                title="Forecast = timeline DESDE el Forecast Cut-off en adelante (plan)"
+                title="Forecast = the timeline FROM the Forecast cut-off onward (the plan)"
               >
                 Forecast
               </th>
@@ -2218,9 +2217,7 @@ export function JobCostFull() {
                       if (!bloque) return false;
                       const f = navRowIds.indexOf(r.id);
                       const ci = navCols.indexOf(c.key);
-                      return (
-                        f >= bloque.f0 && f <= bloque.f1 && ci >= bloque.c0 && ci <= bloque.c1
-                      );
+                      return f >= bloque.f0 && f <= bloque.f1 && ci >= bloque.c0 && ci <= bloque.c1;
                     })();
                     return (
                       <td
@@ -2520,8 +2517,8 @@ export function JobCostFull() {
               <div>
                 <h2 className="text-base font-semibold">Pull history from the LEDGER</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Rewrites the weeks before the cut-off with the real LEDGER payments, each one
-                  in the week it was paid. Nothing from the cut-off onward is touched.
+                  Rewrites the weeks before the cut-off with the real LEDGER payments, each one in
+                  the week it was paid. Nothing from the cut-off onward is touched.
                 </p>
               </div>
               <button
@@ -2619,7 +2616,7 @@ export function JobCostFull() {
                     onClick={() => setHistOpen(false)}
                     className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
                   >
-                    Cancelar
+                    Cancel
                   </button>
                   <button
                     type="button"
