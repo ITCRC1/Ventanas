@@ -31,11 +31,13 @@
 import { Fragment, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
-import { type BudgetProposalRow, useBudgetProposal } from "@/lib/hooks";
+import { type BudgetProposalRow, useBudgetProposal, useMe } from "@/lib/hooks";
+
+import { BudgetGridView } from "./BudgetGridView";
 
 const MES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-type Vista = "datos" | "meses" | "anio";
+type Vista = "datos" | "meses" | "anio" | "grid";
 
 function usd(n: number | null | undefined): string {
   if (!n) return "—";
@@ -60,6 +62,12 @@ export function BudgetProposalView() {
   const [porSemana, setPorSemana] = useState(false);
   const q = useBudgetProposal(anio);
   const d = q.data;
+  // ⚠️ La grilla ESCRIBE. El resto de esta pantalla es de solo lectura, asi
+  // que el cuarto sub-tab solo aparece para quien puede editar el
+  // cronograma: mostrarselo a un viewer seria ofrecerle algo que la API le
+  // va a rechazar.
+  const me = useMe();
+  const puedeEditar = (me.data?.permissions ?? []).includes("schedule.edit");
 
   const bandas = useMemo(() => {
     const out: { mes: number; desde: number; hasta: number }[] = [];
@@ -93,6 +101,13 @@ export function BudgetProposalView() {
     ["datos", "Line Data", "Budget, spent, and how the remaining splits"],
     ["meses", "Month by Month", `The ${anio} proposal, January to December`],
     ["anio", `Budget ${anio}`, "How the year is shaping up, by section"],
+    ...(puedeEditar
+      ? ([["grid", "✎ Grid (edit)", `Edit ${anio} with ${anio - 1} beside it`]] as [
+          Vista,
+          string,
+          string,
+        ][])
+      : []),
   ];
 
   return (
@@ -196,13 +211,23 @@ export function BudgetProposalView() {
         ) : null}
       </div>
 
-      <div className="max-h-[68vh] overflow-auto rounded-lg border border-slate-200 bg-white">
+      {/* La grilla trae su propio contenedor y su propio scroll: meterla dentro
+          de este le pondria dos barras y dos bordes. */}
+      <div
+        className={
+          vista === "grid"
+            ? ""
+            : "max-h-[68vh] overflow-auto rounded-lg border border-slate-200 bg-white"
+        }
+      >
         {vista === "datos" ? (
           <TablaDatos d={d} porCat={porCat} />
         ) : vista === "meses" ? (
           <TablaMeses d={d} porCat={porCat} bandas={bandas} porSemana={porSemana} />
-        ) : (
+        ) : vista === "anio" ? (
           <TablaAnio d={d} porCat={porCat} />
+        ) : (
+          <BudgetGridView anio={anio} />
         )}
       </div>
     </div>

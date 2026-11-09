@@ -53,12 +53,9 @@ const NAV: NavItem[] = [
     hint: "The year by week, from the schedule and the LEDGER",
     perm: "report.view",
   },
-  {
-    href: "/budget-grid",
-    label: "Budget Grid",
-    hint: "Edit next year with last year beside it",
-    perm: "schedule.edit",
-  },
+  // La grilla vive como sub-tab DENTRO de Budget Proposal (pedido del owner,
+  // 2026-11-09: «debe ser un sub tab en Budget»). La ruta /budget-grid sigue
+  // existiendo para quien tenga el link, pero no ocupa un lugar en la barra.
   {
     label: "Payments",
     perm: "view.payments",

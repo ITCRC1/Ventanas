@@ -50,9 +50,14 @@ function usd(n: number): string {
 
 const seccionDe = (code: string): string => (code || "").split(".")[0];
 
-export function BudgetGridView() {
+/** `anio` viene de afuera cuando vive como sub-tab de Budget Proposal: el
+ *  selector de año es uno solo, arriba, y las cuatro vistas lo comparten.
+ *  Sin esto habria dos selectores en la misma pantalla diciendo años
+ *  distintos, y nadie sabria cuál manda. */
+export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
   const ahora = new Date().getFullYear();
-  const [anio, setAnio] = useState(ahora + 1);
+  const [anioLocal, setAnio] = useState(ahora + 1);
+  const anio = anioProp ?? anioLocal;
   const base = anio - 1;
 
   const fin = useFinancials();
@@ -292,6 +297,7 @@ export function BudgetGridView() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2">
+        {anioProp === undefined ? (
         <label className="flex items-center gap-2 text-xs font-semibold text-teal-900">
           Year
           <select
@@ -310,6 +316,7 @@ export function BudgetGridView() {
             ))}
           </select>
         </label>
+        ) : null}
         <span className="text-[11px] text-teal-800">
           editing <b>{anio}</b> · <b>{base}</b> read-only beside it
         </span>
