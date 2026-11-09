@@ -65,6 +65,9 @@ export function BudgetGridView() {
   // Lo escrito y todavía sin guardar, por celda semanal.
   const [pend, setPend] = useState<Map<string, Pend>>(new Map());
   const [sel, setSel] = useState<{ wbs: number; mes: number } | null>(null);
+  const [panel, setPanel] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [aviso, setAviso] = useState<string | null>(null);
   const [buf, setBuf] = useState<string | null>(null);
   const cajaRef = useRef<HTMLInputElement | null>(null);
 
@@ -146,13 +149,15 @@ export function BudgetGridView() {
     return [...m.entries()];
   }, [lineas]);
 
-  /** Escribe un mes: reparte entre sus semanas, igual que el Job Cost. */
-  function anotarMes(wbs: number, mes: number, texto: string) {
+  const limpiar = (t: string) => (t ?? "").replace(/[$,\s]/g, "").trim();
+
+  /** Escribe un mes dentro de un buffer. La regla de reparto, en un solo lugar. */
+  function aplicarMes(destino: Map<string, Pend>, wbs: number, mes: number, texto: string) {
     const ws = semanasDe.get(`${anio}-${String(mes).padStart(2, "0")}`) ?? [];
     if (ws.length === 0) return;
     const actual = total(wbs, anio, mes);
-    const t = texto.trim();
-    const nuevo = new Map(pend);
+    const t = limpiar(texto);
+    const nuevo = destino;
     const poner = (w: string, v: number | null) =>
       nuevo.set(`${wbs}|${w}`, {
         wbs_id: wbs,
@@ -163,7 +168,6 @@ export function BudgetGridView() {
 
     if (t === "") {
       if (Math.abs(actual) > 0.005) ws.forEach((w) => poner(w, null));
-      setPend(nuevo);
       return;
     }
     const val = evalMath(t) ?? Number(t.replace(/[^0-9.-]/g, ""));
@@ -177,7 +181,89 @@ export function BudgetGridView() {
         poner(w, i === ws.length - 1 ? Math.round((val - per * (ws.length - 1)) * 100) / 100 : per),
       );
     }
+  }
+
+  /** Escribe un mes y lo deja pendiente. */
+  function anotarMes(wbs: number, mes: number, texto: string) {
+    const nuevo = new Map(pend);
+    aplicarMes(nuevo, wbs, mes, texto);
     setPend(nuevo);
+  }
+
+  /** La grilla entera como TSV, lista para pegar en Excel. */
+  function tsv(): string {
+    const cab = [
+      "WBS", "TASK",
+      ...MES.map((m) => `${m} ${anio}`),
+      `TOTAL ${anio}`,
+      ...MES.map((m) => `${m} ${base}`),
+      `TOTAL ${base}`,
+    ];
+    const filas = lineas.map((l) => [
+      l.wbs_code,
+      l.title,
+      ...Array.from({ length: 12 }, (_, i) => total(l.id, anio, i + 1) || 0),
+      anual(l.id, anio) || 0,
+      ...Array.from({ length: 12 }, (_, i) => total(l.id, base, i + 1) || 0),
+      anual(l.id, base) || 0,
+    ]);
+    return [cab, ...filas].map((f) => f.join("\t")).join("\n");
+  }
+
+  /** Lo editado en Excel, de vuelta.
+   *
+   * ⚠️ Se empareja por CÓDIGO DE WBS, no por posición. Es la diferencia entre
+   * que esto sirva o sea una trampa: en Excel se ordena, se filtra y se
+   * esconden filas sin pensarlo, y al volver pegadas en otro orden la
+   * coincidencia por fila metería cada monto en la línea equivocada —con
+   * números creíbles y sin un solo error a la vista.
+   *
+   * Las columnas se leen por posición DESPUÉS del código: WBS y luego los doce
+   * meses. La columna TASK se salta si viene. Lo que no se reconozca se cuenta
+   * y se informa en vez de aplicarse a medias.
+   */
+  function importar(txt: string) {
+    const porCode = new Map(lineas.map((l) => [l.wbs_code.trim(), l.id]));
+    let puestas = 0;
+    const sinLinea: string[] = [];
+    const bloqueadas = new Set<number>();
+    const nuevo = new Map(pend);
+
+    for (const cruda of txt.replace(/\r/g, "").split("\n")) {
+      const celdas = cruda.split("\t");
+      if (celdas.length < 2) continue;
+      const code = (celdas[0] ?? "").trim();
+      if (!code || /^wbs$/i.test(code)) continue;      // la fila de encabezado
+      const wbs = porCode.get(code);
+      if (wbs == null) {
+        sinLinea.push(code);
+        continue;
+      }
+      // Después del código puede venir TASK (texto) o ya los meses.
+      const resto = celdas.slice(1);
+      const i0 = resto.length && Number.isNaN(Number(limpiar(resto[0]))) ? 1 : 0;
+      for (let k = 0; k < 12; k++) {
+        const celda = resto[i0 + k];
+        if (celda === undefined) break;
+        const mes = k + 1;
+        if (bloqueado(mes)) {
+          bloqueadas.add(mes);
+          continue;
+        }
+        aplicarMes(nuevo, wbs, mes, celda);
+        // Celdas LEÍDAS, no cambiadas: una que ya tenía ese monto se lee igual
+        // y no mueve nada. Contar solo las que cambian haría pensar que el
+        // bloque se leyó a medias cuando en realidad ya estaba puesto.
+        puestas += 1;
+      }
+    }
+    setPend(nuevo);
+    const partes = [`${puestas} cells read`];
+    if (bloqueadas.size)
+      partes.push(`${bloqueadas.size} locked month(s) skipped (history from the LEDGER)`);
+    if (sinLinea.length)
+      partes.push(`${sinLinea.length} WBS not found: ${sinLinea.slice(0, 5).join(", ")}`);
+    setAviso(partes.join(" · "));
   }
 
   /** Pegar desde Excel: una fila de meses, o un bloque de varias líneas. */
@@ -252,8 +338,84 @@ export function BudgetGridView() {
           >
             Discard
           </button>
+          <span className="mx-1 h-4 w-px bg-teal-300" />
+          <button
+            type="button"
+            onClick={async () => {
+              await navigator.clipboard?.writeText(tsv());
+              setAviso("Grid copied — paste it into Excel with Ctrl+V");
+            }}
+            title="Copy the whole grid. Paste it into Excel and you have it as a table."
+            className="rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+          >
+            ⧉ Copy for Excel
+          </button>
+          <button
+            type="button"
+            onClick={() => setPanel((v) => !v)}
+            title="Paste the block back after editing it in Excel"
+            className="rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+          >
+            ⎗ Paste back
+          </button>
         </span>
       </div>
+
+      {panel ? (
+        <div className="space-y-2 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+          <p className="text-xs font-semibold text-emerald-900">Paste back from Excel</p>
+          <p className="text-[11px] text-emerald-800">
+            Copy the block in Excel and paste it here. The first column has to be the <b>WBS</b>,
+            then the twelve months of {anio}; a TASK column in between is fine. Rows are matched
+            by <b>WBS code</b>, not by position &mdash; so sorting or filtering in Excel does not
+            land the numbers on the wrong line. Nothing is saved until you press Save.
+          </p>
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            rows={5}
+            placeholder={"0.4\t3750\t3750\t3750\t…"}
+            className="w-full rounded border border-emerald-300 bg-white px-2 py-1 font-mono text-[11px]"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!texto.trim()}
+              onClick={() => {
+                importar(texto);
+                setTexto("");
+                setPanel(false);
+              }}
+              className="rounded bg-emerald-700 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-40"
+            >
+              Read the block
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPanel(false);
+                setTexto("");
+              }}
+              className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {aviso ? (
+        <div className="flex items-center gap-2 rounded border border-slate-300 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-700">
+          {aviso}
+          <button
+            type="button"
+            onClick={() => setAviso(null)}
+            className="ml-auto font-bold text-slate-500"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <p className="text-[11px] text-slate-500">
         Type a monthly total and it spreads across that month&apos;s weeks, the same rule the Job
