@@ -51,13 +51,13 @@ type Vista = "datos" | "meses" | "anio" | "grid";
 const TRAMOS = {
   remanente: {
     etq: "Job Cost remaining",
-    de: "Budget Revised − Spend, línea por línea, de v_wbs_financials: la misma vista que alimenta el Job Cost. Es lo que queda por gastar.",
+    de: "Budget Revised − Spend, line by line, from v_wbs_financials: the same view that feeds the Job Cost. It is what is left to spend.",
     linea: (f: BudgetProposalRow) => f.remaining,
     cls: "text-slate-900",
   },
   vencido: {
     etq: "Overdue (week already passed)",
-    de: "Plata que el cronograma puso en una semana que ya pasó (posterior al corte del Forecast pero anterior a hoy) y que sigue sin gastarse. No desapareció: hay que reubicarla.",
+    de: "Money the schedule put in a week that has already passed (after the Forecast cut-off but before today) and is still unspent. It did not vanish — it needs to be moved somewhere.",
     linea: (f: BudgetProposalRow) => f.vencido,
     cls: "text-red-700",
   },
@@ -69,25 +69,25 @@ const TRAMOS = {
     // son TAMBIEN los doce meses de 2027: $4,735,479 bajo un rotulo que dice
     // «this year» es una mentira de cuatro millones y medio.
     etq: "Carry-over from this year",
-    de: "Lo que el cronograma tiene de hoy al 31 de diciembre del año en curso y todavía no se gastó. A medida que pasan las semanas sin ejecutarse, este monto NO desaparece: migra a «Overdue». El 31 de diciembre llega a cero.",
+    de: "What the schedule holds from today to December 31 of the current year and has not been spent yet. As weeks pass without being executed this amount does NOT vanish: it migrates to «Overdue». On December 31 it reaches zero.",
     linea: (f: BudgetProposalRow) => f.arrastre,
     cls: "text-amber-700",
   },
   plan: {
     etq: "Plan",
-    de: "Lo que el cronograma ya tiene dentro del año que se presupuesta. Sale de schedule_cell, semana por semana.",
+    de: "What the schedule already holds inside the year being budgeted. It comes from schedule_cell, week by week.",
     linea: (f: BudgetProposalRow) => f.plan_total,
     cls: "text-slate-900",
   },
   posterior: {
     etq: "After",
-    de: "Lo que el cronograma pone en años siguientes. No entra en la propuesta de este año, pero se muestra para que el remanente cierre.",
+    de: "What the schedule puts in later years. It is not part of this year's proposal, but it is shown so the remaining adds up.",
     linea: (f: BudgetProposalRow) => f.posterior,
     cls: "text-slate-500",
   },
   sin_ubicar: {
     etq: "Unplaced",
-    de: "Remanente − (vencido + arrastre + plan + posterior). Tiene que ser cero: si no lo es, hay plata pendiente que el cronograma no pone en NINGÚN año, y entonces el presupuesto está incompleto.",
+    de: "Remaining − (overdue + carry-over + plan + after). It has to be zero: if it is not, there is money pending that the schedule puts in NO year at all, and then the budget is incomplete.",
     linea: (f: BudgetProposalRow) =>
       f.remaining - (f.vencido + f.arrastre + f.plan_total + f.posterior),
     cls: "text-emerald-700",
@@ -442,7 +442,7 @@ function Desglose({
             <tfoot className="sticky bottom-0 border-t-2 border-slate-700 bg-[#DCE6F4] font-bold">
               <tr>
                 <td className="px-3 py-1" colSpan={3}>
-                  SUM OF THE {aportes.length} LINES
+                  SUM OF THE {aportes.length} LINE{aportes.length === 1 ? "" : "S"}
                 </td>
                 <td className="tabular px-3 py-1 text-right">{usd(suma)}</td>
                 <td

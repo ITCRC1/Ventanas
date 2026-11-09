@@ -176,8 +176,8 @@ export function BlogView() {
   return (
     <div className="space-y-4">
       <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Las entradas <strong>no se borran ni se editan</strong> — ni desde acá ni a mano: la base las
-        rechaza. Una corrección entra como entrada nueva que cita la anterior.
+        Entries <strong>cannot be deleted or edited</strong> — not from here and not by hand:
+        the database rejects it. A correction goes in as a new entry that cites the earlier one.
       </div>
 
       {puedeEscribir && !abierto && (
@@ -186,34 +186,34 @@ export function BlogView() {
           onClick={() => setAbierto(true)}
           className="rounded bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800"
         >
-          + Nueva entrada
+          + New entry
         </button>
       )}
 
       {puedeEscribir && abierto && (
         <div className="space-y-3 rounded border border-slate-300 bg-white p-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600">Asunto</label>
+            <label className="block text-xs font-medium text-slate-600">Subject</label>
             <input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Cierre 4.2.1 · asiento #2 del ledger"
+              placeholder="4.2.1 close-out · ledger entry #2"
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600">Hallazgo</label>
+            <label className="block text-xs font-medium text-slate-600">Finding</label>
             <textarea
               value={finding}
               onChange={(e) => setFinding(e.target.value)}
               rows={5}
-              placeholder="Qué se encontró, con las cifras y contra qué se comparó."
+              placeholder="What was found, with the figures and what it was compared against."
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600">
-              Qué hay que hacer <span className="font-normal text-slate-400">(opcional)</span>
+              What needs doing <span className="font-normal text-slate-400">(optional)</span>
             </label>
             <textarea
               value={action}
@@ -224,19 +224,19 @@ export function BlogView() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600">
-              Fuente <span className="font-normal text-slate-400">(contrato, asiento, correo)</span>
+              Source <span className="font-normal text-slate-400">(contract, ledger entry, email)</span>
             </label>
             <input
               value={source}
               onChange={(e) => setSource(e.target.value)}
-              placeholder="Contrato 18-oct-2024, cláusula 4.2.1"
+              placeholder="Contract 18-Oct-2024, clause 4.2.1"
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600">
-              Reemplaza a la entrada #{" "}
-              <span className="font-normal text-slate-400">(sólo si corrige una anterior)</span>
+              Supersedes entry #{" "}
+              <span className="font-normal text-slate-400">(only if it corrects an earlier one)</span>
             </label>
             <input
               value={supersedes}
@@ -247,7 +247,7 @@ export function BlogView() {
           </div>
           {crear.isError && (
             <p className="text-sm text-red-600">
-              No se guardó: {(crear.error as Error).message}
+              Not saved: {(crear.error as Error).message}
             </p>
           )}
           <div className="flex gap-2">
@@ -257,25 +257,25 @@ export function BlogView() {
               onClick={guardar}
               className="rounded bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
             >
-              {crear.isPending ? "Guardando…" : "Registrar"}
+              {crear.isPending ? "Saving…" : "Record"}
             </button>
             <button
               type="button"
               onClick={limpiar}
               className="rounded border border-slate-300 px-4 py-2 text-sm"
             >
-              Cancelar
+              Cancel
             </button>
           </div>
           <p className="text-xs text-slate-500">
-            Una vez registrada no se puede corregir ni borrar. Revisá antes de guardar.
+            Once recorded it cannot be edited or deleted. Check it before saving.
           </p>
         </div>
       )}
 
-      {entradas.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+      {entradas.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       {!entradas.isLoading && filas.length === 0 && (
-        <p className="text-sm text-slate-500">Todavía no hay entradas.</p>
+        <p className="text-sm text-slate-500">No entries yet.</p>
       )}
 
       {filas.map((e) => (
@@ -313,7 +313,7 @@ export function BlogView() {
           {e.action && (
             <div className="mt-4 border-l-2 border-brand-200 pl-3">
               <span className="text-xs font-semibold uppercase tracking-wide text-brand-700">
-                Qué hay que hacer
+                What needs doing
               </span>
               <Texto texto={e.action} />
             </div>

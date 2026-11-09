@@ -47,7 +47,7 @@ export function BotonMasterFile({ tono = "barra" }: { tono?: "barra" | "pagina" 
       disabled={bajando}
       title={
         error ??
-        "Ventanas Master File — el libro completo: Job Cost, Timeline, LEDGER, Bancos, Facturas y más, con todo por fórmula"
+        "Ventanas Master File — the whole book: Job Cost, Timeline, LEDGER, Banks, Invoices and more, every figure by formula"
       }
       className={`rounded-md border font-medium transition ${
         tono === "barra" ? "px-2.5 py-1 text-xs" : "px-3 py-1 text-sm font-semibold"

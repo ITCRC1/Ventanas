@@ -64,9 +64,9 @@ export default function LoginPage() {
           HTTP manda acá con ?vencida=1 y se dice por qué. */}
       {vencida ? (
         <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Tu sesión se venció por inactividad. Volvé a entrar: te devolvemos a la
-          pantalla donde estabas. <strong>Lo último que escribiste puede no
-          haberse guardado</strong> — revisalo al volver.
+          Your session expired after a spell of inactivity. Sign in again: we take you back to the
+          screen you were on. <strong>The last thing you typed may not have been
+          saved</strong> — check it when you come back.
         </p>
       ) : null}
 

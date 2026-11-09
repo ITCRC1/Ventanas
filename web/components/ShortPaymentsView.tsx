@@ -634,9 +634,9 @@ function NewBatchBar({ batches }: { batches: ShortPaymentBatch[] }) {
       </button>
       {taken ? (
         <span className="w-full text-[11px] text-amber-700">
-          {monthName(month)} ya tiene la tanda #{taken.disb_no}.{taken.disb_sub}. Ésta se crea
-          como <b>#{disbNoFor(month)}.{proximoSub}</b> — un mes puede tener varias (un pago
-          directo aparte del Short Payment, por ejemplo).
+          {monthName(month)} already has batch #{taken.disb_no}.{taken.disb_sub}. This one is
+          created as <b>#{disbNoFor(month)}.{proximoSub}</b> — a month can have several (a
+          directly-paid line apart from the Short Payment, for instance).
         </span>
       ) : null}
     </div>

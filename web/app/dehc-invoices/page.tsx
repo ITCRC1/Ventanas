@@ -20,9 +20,9 @@ const DEHC_OWNER = "DEHC";
  *  Van en ese orden porque es el de la pregunta: qué nos cobraron, contra qué
  *  presupuesto, y qué falta. */
 const TABS = [
-  { key: "facturas", label: "Facturas", hint: "Lo que DEHC ha cobrado, línea por línea" },
-  { key: "presupuesto", label: "Presupuesto", hint: "Lo que tiene a cargo y en qué se gastó" },
-  { key: "pendiente", label: "Pendiente", hint: "El cronograma de sus líneas, semana a semana" },
+  { key: "facturas", label: "Invoices", hint: "What DEHC has billed, line by line" },
+  { key: "presupuesto", label: "Budget", hint: "What it owns and what was spent on it" },
+  { key: "pendiente", label: "Pending", hint: "The schedule of its lines, week by week" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["key"];

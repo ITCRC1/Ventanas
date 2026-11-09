@@ -44,12 +44,12 @@ const dt = (s: string | null) => (s ? s.slice(0, 10) : "—");
 // Nota de crédito resta → signo negativo; el resto positivo.
 const sgn = (docType: string | null) => (docType === "NC" ? -1 : 1);
 const DOC_LABEL: Record<string, string> = {
-  FE: "Factura",
-  NC: "Nota Crédito",
-  ND: "Nota Débito",
-  TE: "Tiquete",
-  FEC: "Fact. Compra",
-  FEE: "Fact. Export.",
+  FE: "Invoice",
+  NC: "Credit Note",
+  ND: "Debit Note",
+  TE: "Receipt",
+  FEC: "Purchase Inv.",
+  FEE: "Export Inv.",
 };
 
 // Convierte un monto de la factura a USD: si ya es USD tal cual; si es ₡ usa el TC.

@@ -166,7 +166,7 @@ export function PlanningDoc({
   const groups = useMemo(() => {
     const byCat = new Map<string, WbsFinancials[]>();
     for (const r of rows) {
-      const c = r.category ?? "Sin categoría";
+      const c = r.category ?? "No category";
       const arr = byCat.get(c);
       if (arr) arr.push(r);
       else byCat.set(c, [r]);
@@ -310,7 +310,7 @@ export function PlanningDoc({
                 )
               }
               className="rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-              title="La tabla tal como se ve, en Excel, con los totales por fórmula"
+              title="The table exactly as shown, in Excel, with the totals by formula"
             >
               ⬇ Excel
             </button>
@@ -488,7 +488,7 @@ export function PlanningDoc({
                   />
                 </th>
               ) : null}
-              <th className="px-2 py-2">No. Proyecto</th>
+              <th className="px-2 py-2">Project No.</th>
               <th className="px-2 py-2">Task / Phase</th>
               <th className="px-2 py-2 text-right">Budget</th>
               <th className="px-2 py-2 text-right">Spent</th>

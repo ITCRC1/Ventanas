@@ -580,7 +580,7 @@ export function LedgerView() {
             type="text"
             inputMode="decimal"
             placeholder="e.g. 12"
-            title="El número de la tanda. Si el mes tiene varias (#28.0 y #28.1), con poner 28 entran todas."
+            title="The batch number. If the month has several (#28.0 and #28.1), typing 28 brings them all in."
             className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
             value={disbNo}
             onChange={(e) => setDisbNo(e.target.value)}

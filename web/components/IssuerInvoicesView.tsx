@@ -48,21 +48,21 @@ function Estado({ r }: { r: IssuerReceipt }) {
       : "bg-amber-100 text-amber-800";
   return (
     <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs ${tono}`}>
-      {ligada ? "pagada" : r.status === "ignored" ? "anulada" : "sin ligar al pago"}
+      {ligada ? "paid" : r.status === "ignored" ? "voided" : "not linked to a payment"}
     </span>
   );
 }
 
 export function IssuerInvoicesView({ issuer }: { issuer: string }) {
   const q = useInvoicesByIssuer(issuer);
-  if (q.isLoading) return <p className="text-sm text-slate-500">Cargando…</p>;
+  if (q.isLoading) return <p className="text-sm text-slate-500">Loading…</p>;
   if (q.isError)
-    return <p className="text-sm text-red-600">No se pudo cargar: {(q.error as Error).message}</p>;
+    return <p className="text-sm text-red-600">Could not load: {(q.error as Error).message}</p>;
 
   const d: IssuerInvoices | undefined = q.data;
   const recibos = d?.receipts ?? [];
   if (!recibos.length)
-    return <p className="text-sm text-slate-500">No hay facturas de este proveedor.</p>;
+    return <p className="text-sm text-slate-500">No invoices from this vendor.</p>;
 
   const sum = (f: (r: IssuerReceipt) => unknown) =>
     recibos.reduce((a, r) => a + Number(f(r) || 0), 0);
@@ -77,9 +77,9 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
         <span className="text-lg font-semibold">{d?.issuer_name}</span>
-        <span className="text-slate-500">cédula {issuer}</span>
+        <span className="text-slate-500">tax ID {issuer}</span>
         <span className="text-slate-700">
-          <strong>{d?.count}</strong> facturas · <strong>{nLineas}</strong> líneas ·{" "}
+          <strong>{d?.count}</strong> invoices · <strong>{nLineas}</strong> lines ·{" "}
           <strong>${money(d?.total)}</strong>
         </span>
       </div>
@@ -88,25 +88,25 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
         <table className="w-full border-collapse text-sm">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
-              <th className={th}>Emitida</th>
-              <th className={th}>Factura</th>
-              <th className={th}>Oferta</th>
-              <th className={th}>Proyecto</th>
-              <th className={th}>Detalle de la línea</th>
-              <th className={thN}>Monto línea</th>
+              <th className={th}>Issued</th>
+              <th className={th}>Invoice</th>
+              <th className={th}>Offer</th>
+              <th className={th}>Project</th>
+              <th className={th}>Line detail</th>
+              <th className={thN}>Line amount</th>
               <th className={thN}>Subtotal</th>
-              <th className={thN}>Impuesto</th>
+              <th className={thN}>Tax</th>
               <th className={thN}>Total</th>
               <th className={th}>WBS</th>
-              <th className={th}>Estado</th>
-              <th className={th}>Archivos</th>
+              <th className={th}>Status</th>
+              <th className={th}>Files</th>
             </tr>
           </thead>
           <tbody>
             {recibos.map((r) => {
               const lineas = r.lineas.length
                 ? r.lineas
-                : [{ n: 1, detalle: "(no se pudo leer el detalle)", monto: "" }];
+                : [{ n: 1, detalle: "(line detail could not be read)", monto: "" }];
               return lineas.map((ln, i) => (
                 <tr
                   key={`${r.id}-${i}`}
@@ -151,7 +151,7 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
                         <div className="text-slate-400">
                           <span className="font-mono">{r.wbs_probable.cost_code}</span>
                           <div>{r.wbs_probable.wbs_title}</div>
-                          <div className="italic">probable · por la oferta</div>
+                          <div className="italic">likely · from the offer</div>
                         </div>
                       ) : (
                         <span className="text-slate-400">—</span>
@@ -191,7 +191,7 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
           <tfoot>
             <tr className="border-t-2 border-slate-500 bg-slate-100 font-semibold">
               <td className={td} colSpan={6}>
-                TOTAL · {recibos.length} facturas · {nLineas} líneas
+                TOTAL · {recibos.length} invoices · {nLineas} lines
               </td>
               <td className={tdN}>{money(sum((r) => r.subtotal))}</td>
               <td className={tdN}>{money(sum((r) => r.tax))}</td>
@@ -203,14 +203,14 @@ export function IssuerInvoicesView({ issuer }: { issuer: string }) {
       </div>
 
       <p className="text-xs text-slate-500">
-        El <strong>monto de la línea</strong> es el neto, sin impuesto — igual que la columna DEBE
-        del PDF. <strong>Oferta</strong> es el número de contrato del proveedor y{" "}
-        <strong>Proyecto</strong> es como él lo llama, que no siempre coincide con el WBS.
-        <strong>«Sin ligar al pago»</strong> no quiere decir que la factura esté sin pagar ni que
-        el gasto no tenga proyecto: el ledger lo trae en todas sus filas. Quiere decir que nadie
-        dijo todavía cuál pago cubre esta factura. El proyecto <em>probable</em> sale de que las
-        facturas ya ligadas de la misma oferta apuntan todas al mismo WBS — es una pista para
-        amarrarla, no el proyecto al que se cargó.
+        The <strong>line amount</strong> is the net, before tax — the same as the DEBE column
+        in the PDF. <strong>Offer</strong> is the vendor&apos;s own contract number and{" "}
+        <strong>Project</strong> is what the vendor calls it, which does not always match the WBS.
+        <strong>&quot;Not linked to a payment&quot;</strong> does not mean the invoice is unpaid, nor
+        that the expense has no project: the ledger carries one on every row. It means nobody has
+        said yet WHICH payment covers this invoice. The <em>likely</em> project comes from the
+        already-linked invoices on the same offer all pointing at one WBS — it is a lead for
+        tying it down, not the project it was charged to.
       </p>
     </div>
   );

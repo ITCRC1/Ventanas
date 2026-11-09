@@ -15,12 +15,12 @@ const usd = (n: number | null) =>
     ? "—"
     : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const DOC_LABEL: Record<string, string> = {
-  FE: "Factura",
-  NC: "Nota Crédito",
-  ND: "Nota Débito",
-  TE: "Tiquete",
-  FEC: "Fact. Compra",
-  FEE: "Fact. Export.",
+  FE: "Invoice",
+  NC: "Credit Note",
+  ND: "Debit Note",
+  TE: "Receipt",
+  FEC: "Purchase Inv.",
+  FEE: "Export Inv.",
 };
 
 // Fila de totales — se usa arriba (dentro del encabezado) y abajo.
@@ -152,7 +152,7 @@ export function ReconstructedLedger() {
               <th className="border border-slate-600 px-2 py-1 text-right">Amount Due</th>
               <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Type</th>
               <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Invoice #</th>
-              <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Proveedor</th>
+              <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1">Vendor</th>
               <th className="border border-slate-600 bg-[#8a5a00] px-2 py-1 text-right">
                 Invoice USD
               </th>

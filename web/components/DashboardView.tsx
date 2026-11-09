@@ -33,7 +33,7 @@ function money$(v: string | number | null): ReactNode {
   return <span className={isNegative(v) ? "text-red-600" : undefined}>{moneyUsd(v)}</span>;
 }
 
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const MESES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
 /** "2026-11-01" o "2026-11" -> "nov 2026". */
 function mesCorto(iso: string): string {
@@ -234,7 +234,7 @@ export function DashboardView() {
           <Kpi
             label={`Falta en ${adelanto.anio}`}
             value={moneyUsd(adelanto.anioFalta)}
-            sub={`${moneyUsd(adelanto.anioHecho)} ya ejecutado \u00b7 ${moneyUsd(adelanto.anioHecho + adelanto.anioFalta)} el a\u00f1o`}
+            sub={`${moneyUsd(adelanto.anioHecho)} spent so far \u00b7 ${moneyUsd(adelanto.anioHecho + adelanto.anioFalta)} for the year`}
             acento
           />
         </div>
@@ -243,28 +243,28 @@ export function DashboardView() {
       {/* ── El proyecto. SIN la venta del lote ────────────────────────────── */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          El proyecto{" "}
+          The project{" "}
           <span className="font-normal normal-case text-slate-400">
-            &mdash; sin la venta del lote
+            &mdash; without the lot sale
           </span>
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Kpi label="Presupuesto revisado" value={moneyUsd(totals.budget)} />
+          <Kpi label="Budget revised" value={moneyUsd(totals.budget)} />
           <Kpi
-            label="Gastado"
+            label="Spent"
             value={moneyUsd(totals.spend)}
-            sub={`${pct(totals.spend, totals.budget)} ejecutado`}
+            sub={`${pct(totals.spend, totals.budget)} spent`}
           />
-          <Kpi label="Remanente" value={moneyUsd(totals.remaining)} />
+          <Kpi label="Remaining" value={moneyUsd(totals.remaining)} />
           <Kpi
-            label="Mini proyectos"
+            label="Mini projects"
             value={moneyUsd(mini.budget)}
             sub={`${mini.lineas} l\u00edneas \u00b7 ${moneyUsd(mini.remaining)} por gastar`}
           />
           <Kpi
             label="Venta del lote"
             value={moneyUsd(venta.budget)}
-            sub="fuera de los totales de arriba"
+            sub="outside the totals above"
           />
         </div>
       </div>
@@ -341,18 +341,18 @@ export function DashboardView() {
         <div className="border-b border-slate-200 px-3 py-2">
           <p className="text-sm font-semibold text-slate-600">Job Cost resumido</p>
           <p className="text-xs text-slate-400">
-            Por secci&oacute;n del WBS, sin la venta del lote. El total es el del proyecto.
+            By WBS section, without the lot sale. The total is the project&apos;s.
           </p>
         </div>
         <table className="min-w-[560px] text-sm">
           <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-3 py-2">#</th>
-              <th className="whitespace-nowrap px-3 py-2">Secci&oacute;n</th>
-              <th className="px-3 py-2 text-right">L&iacute;neas</th>
-              <th className="px-3 py-2 text-right">Presupuesto</th>
-              <th className="px-3 py-2 text-right">Gastado</th>
-              <th className="px-3 py-2 text-right">Remanente</th>
+              <th className="whitespace-nowrap px-3 py-2">Section</th>
+              <th className="px-3 py-2 text-right">Lines</th>
+              <th className="px-3 py-2 text-right">Budget</th>
+              <th className="px-3 py-2 text-right">Spent</th>
+              <th className="px-3 py-2 text-right">Remaining</th>
               <th className="px-3 py-2 text-right">%</th>
             </tr>
           </thead>
@@ -409,8 +409,8 @@ export function DashboardView() {
           <tfoot className="border-t-2 border-slate-800 bg-[#C8DCF0] font-bold">
             <tr>
               <td className="px-3 py-2" colSpan={2}>
-                GRAND TOTAL &mdash; GASTOS{" "}
-                <span className="font-normal">(sin la venta del lote)</span>
+                GRAND TOTAL &mdash; EXPENSES{" "}
+                <span className="font-normal">(without the lot sale)</span>
               </td>
               <td className="tabular px-3 py-2 text-right">{money$(totals.budget)}</td>
               <td className="tabular px-3 py-2 text-right">{money$(totals.spend)}</td>

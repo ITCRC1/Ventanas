@@ -1465,26 +1465,26 @@ export function JobCostFull() {
             <div className="flex items-center gap-2 rounded-md border-2 border-amber-500 bg-amber-50 px-2 py-1">
               <span className="text-xs font-semibold text-amber-900">
                 {upsertCells.isPending
-                  ? "Guardando…"
-                  : `${pend.size} ${pend.size === 1 ? "cambio" : "cambios"} por guardar`}
+                  ? "Saving…"
+                  : `${pend.size} ${pend.size === 1 ? "change" : "changes"} to save`}
               </span>
               <button
                 type="button"
                 onClick={() => void guardar()}
                 disabled={upsertCells.isPending}
                 className="rounded bg-amber-600 px-3 py-1 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
-                title="Mandalo ya, sin esperar el guardado automático"
+                title="Send it now, without waiting for the automatic save"
               >
-                💾 Guardar ya
+                💾 Save now
               </button>
               <button
                 type="button"
                 onClick={descartar}
                 disabled={upsertCells.isPending}
                 className="rounded border border-amber-600 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-                title="Deja la pantalla como estaba antes de tus cambios"
+                title="Puts the screen back the way it was before your changes"
               >
-                Descartar
+                Discard
               </button>
             </div>
           ) : null}
@@ -1507,7 +1507,7 @@ export function JobCostFull() {
               className="rounded border border-amber-600 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-100"
               title="Rewrite the weeks before the cut-off with the real LEDGER payments, each in the week it was paid. Shows a preview first."
             >
-              ⬅ Traer historial del LEDGER
+              ⬅ Pull history from the LEDGER
             </button>
           ) : null}
           {/* Tambien en la barra de arriba. Esta es la mano que lo busca. */}
@@ -1626,7 +1626,7 @@ export function JobCostFull() {
         <span className="ml-2 text-xs text-slate-400">
           {allLines.length} lines · {weekList.length} weeks
           {canSched
-            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period · lo que escribís queda en ámbar hasta que apretás 💾 Guardar · para correr las columnas desde donde estés: Shift+rueda, Alt+←/→ (Alt+Shift para un mes) o las flechas flotantes del borde derecho · para mover un BLOQUE: clic en una celda, Shift+clic en la otra punta y usá la barra de abajo (Esc lo suelta)"
+            ? " · 🔒 weeks before the Forecast cut-off are locked (history from the ledger); edit the future — type numbers/math (1000+500, =46500/3), Enter/Tab/arrows, paste from Excel; in Monthly/Quarterly a total spreads across the period · what you type stays amber until you press 💾 Save · to run the columns from wherever you are: Shift+wheel, Alt+←/→ (Alt+Shift for a whole month) or the floating arrows on the right edge · to move a BLOCK: click one cell, Shift+click the far end, then use the bar at the bottom (Esc releases it)"
             : ""}
         </span>
         {/* Fecha de corte del Forecast: el timeline desde acá cuenta como futuro */}
@@ -1725,18 +1725,18 @@ export function JobCostFull() {
         <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 print:hidden">
           <div className="flex items-center gap-2 rounded-lg border-2 border-blue-500 bg-white px-3 py-2 shadow-xl">
             <span className="text-xs font-semibold text-blue-900">
-              {bloque.f1 - bloque.f0 + 1} {bloque.f1 === bloque.f0 ? "línea" : "líneas"} ×{" "}
+              {bloque.f1 - bloque.f0 + 1} {bloque.f1 === bloque.f0 ? "line" : "lines"} ×{" "}
               {bloque.c1 - bloque.c0 + 1}{" "}
-              {bloque.c1 === bloque.c0 ? "semana" : "semanas"}
+              {bloque.c1 === bloque.c0 ? "week" : "weeks"}
               <span className="ml-2 tabular font-bold">
                 {usd(celdasDelBloque().reduce((a, x) => a + x.monto, 0))}
               </span>
             </span>
             {[
-              [-4, "⏪", "Un mes atrás"],
-              [-1, "◀", "Una semana atrás"],
-              [1, "▶", "Una semana adelante"],
-              [4, "⏩", "Un mes adelante"],
+              [-4, "⏪", "One month back"],
+              [-1, "◀", "One week back"],
+              [1, "▶", "One week forward"],
+              [4, "⏩", "One month forward"],
             ].map(([d, txt, t]) => (
               <button
                 key={String(d)}
@@ -1751,7 +1751,7 @@ export function JobCostFull() {
             <button
               type="button"
               onClick={() => setBloque(null)}
-              title="Soltar el bloque (Esc)"
+              title="Release the block (Esc)"
               className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
             >
               ✕
@@ -1768,8 +1768,8 @@ export function JobCostFull() {
           <div className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-lg backdrop-blur">
             <button
               type="button"
-              aria-label="Un mes a la izquierda"
-              title="Un mes atrás  ·  Alt+Shift+←"
+              aria-label="One month left"
+              title="One month back  ·  Alt+Shift+←"
               onClick={() => correr(-4)}
               className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
             >
@@ -1777,8 +1777,8 @@ export function JobCostFull() {
             </button>
             <button
               type="button"
-              aria-label="Una columna a la izquierda"
-              title="Una columna atrás  ·  Alt+←  ·  Shift+rueda"
+              aria-label="One column left"
+              title="One column back  ·  Alt+←  ·  Shift+wheel"
               onClick={() => correr(-1)}
               className="rounded px-2 py-1 text-base text-slate-700 hover:bg-slate-100"
             >
@@ -1786,8 +1786,8 @@ export function JobCostFull() {
             </button>
             <button
               type="button"
-              aria-label="Una columna a la derecha"
-              title="Una columna adelante  ·  Alt+→  ·  Shift+rueda"
+              aria-label="One column right"
+              title="One column forward  ·  Alt+→  ·  Shift+wheel"
               onClick={() => correr(1)}
               className="rounded px-2 py-1 text-base text-slate-700 hover:bg-slate-100"
             >
@@ -1795,8 +1795,8 @@ export function JobCostFull() {
             </button>
             <button
               type="button"
-              aria-label="Un mes a la derecha"
-              title="Un mes adelante  ·  Alt+Shift+→"
+              aria-label="One month right"
+              title="One month forward  ·  Alt+Shift+→"
               onClick={() => correr(4)}
               className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
             >
@@ -2226,7 +2226,7 @@ export function JobCostFull() {
                       <td
                         key={c.key}
                         data-print="hide"
-                        title={sinGuardar ? "Sin guardar — apretá Guardar" : undefined}
+                        title={sinGuardar ? "Unsaved — press Save" : undefined}
                         className={`p-0 text-center${cutBorder(i)}${
                           sinGuardar ? " bg-amber-100 ring-2 ring-inset ring-amber-500" : ""
                         }${enBloque ? " bg-blue-100 ring-1 ring-inset ring-blue-500" : ""}`}
@@ -2251,7 +2251,7 @@ export function JobCostFull() {
                             autoFocus
                             value={editBuf ?? ""}
                             inputMode="text"
-                            title="Escribí un número o una operación: 1000+500, 155000*0.3, =46500/3. Enter/Tab/flechas mueven; pegá desde Excel."
+                            title="Type a number or a calculation: 1000+500, 155000*0.3, =46500/3. Enter/Tab/arrows move; paste from Excel."
                             onFocus={(e) => e.currentTarget.select()}
                             onChange={(e) => setEditBuf(e.target.value)}
                             onPaste={(e) => {
@@ -2518,10 +2518,10 @@ export function JobCostFull() {
           <div className="max-h-[85vh] w-full max-w-4xl overflow-auto rounded-lg bg-white p-5 shadow-xl">
             <div className="mb-3 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-base font-semibold">Traer historial del LEDGER</h2>
+                <h2 className="text-base font-semibold">Pull history from the LEDGER</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Reescribe las semanas anteriores al corte con los pagos reales del LEDGER, cada
-                  uno en la semana en que se pagó. No toca nada desde el corte en adelante.
+                  Rewrites the weeks before the cut-off with the real LEDGER payments, each one
+                  in the week it was paid. Nothing from the cut-off onward is touched.
                 </p>
               </div>
               <button
@@ -2533,39 +2533,39 @@ export function JobCostFull() {
               </button>
             </div>
 
-            {hist.isPending ? <p className="text-sm text-slate-500">Calculando…</p> : null}
+            {hist.isPending ? <p className="text-sm text-slate-500">Calculating…</p> : null}
             {hist.error ? (
-              <p className="text-sm text-red-600">No se pudo calcular la vista previa.</p>
+              <p className="text-sm text-red-600">Could not compute the preview.</p>
             ) : null}
 
             {hist.data ? (
               <>
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs sm:grid-cols-4">
                   <div>
-                    <div className="text-slate-500">Corte</div>
+                    <div className="text-slate-500">Cut-off</div>
                     <div className="font-semibold">{hist.data.cutoff_date}</div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Se reconstruyen</div>
-                    <div className="font-semibold">{hist.data.a_reconstruir} líneas</div>
+                    <div className="text-slate-500">Rebuilt</div>
+                    <div className="font-semibold">{hist.data.a_reconstruir} lines</div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Celdas</div>
+                    <div className="text-slate-500">Cells</div>
                     <div className="font-semibold">
                       −{hist.data.celdas_a_borrar} / +{hist.data.celdas_a_escribir}
                     </div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Ajuste total</div>
+                    <div className="text-slate-500">Total adjustment</div>
                     <div className="tabular font-semibold">{m(num(hist.data.ajuste_total))}</div>
                   </div>
                 </div>
 
                 {hist.data.bloqueadas_sin_fecha > 0 ? (
                   <p className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    ⚠ {hist.data.bloqueadas_sin_fecha} línea(s) quedan intactas: tienen pagos sin
-                    fecha en el LEDGER y no hay forma de saber en qué semana van. Poneles la fecha
-                    en el tab Ledger y volvé a correr esto.
+                    ⚠ {hist.data.bloqueadas_sin_fecha} line(s) are left untouched: they have
+                    payments with no date in the LEDGER, so there is no way to know which week they
+                    belong to. Set the date in the Ledger tab and run this again.
                   </p>
                 ) : null}
 
@@ -2574,11 +2574,11 @@ export function JobCostFull() {
                     <thead className="bg-slate-100 text-left text-slate-600">
                       <tr>
                         <th className="px-2 py-1">WBS</th>
-                        <th className="px-2 py-1">Línea</th>
-                        <th className="px-2 py-1 text-right">Pintado hoy</th>
-                        <th className="px-2 py-1 text-right">Queda en</th>
-                        <th className="px-2 py-1 text-right">Cambio</th>
-                        <th className="px-2 py-1">Estado</th>
+                        <th className="px-2 py-1">Line</th>
+                        <th className="px-2 py-1 text-right">Painted today</th>
+                        <th className="px-2 py-1 text-right">Becomes</th>
+                        <th className="px-2 py-1 text-right">Change</th>
+                        <th className="px-2 py-1">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2605,7 +2605,7 @@ export function JobCostFull() {
                             {d.estado === "sin_fecha" ? "—" : m(num(d.diferencia))}
                           </td>
                           <td className="px-2 py-1 text-slate-500">
-                            {d.estado === "sin_fecha" ? "sin fecha — no se toca" : "se reconstruye"}
+                            {d.estado === "sin_fecha" ? "no date — left alone" : "rebuilt"}
                           </td>
                         </tr>
                       ))}
@@ -2631,8 +2631,8 @@ export function JobCostFull() {
                     className="rounded bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
                   >
                     {histApply.isPending
-                      ? "Aplicando…"
-                      : `Aplicar a ${hist.data.a_reconstruir} línea(s)`}
+                      ? "Applying…"
+                      : `Apply to ${hist.data.a_reconstruir} line(s)`}
                   </button>
                 </div>
               </>
