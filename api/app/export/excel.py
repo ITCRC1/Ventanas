@@ -415,7 +415,7 @@ class ExcelExporter:
         # ese "despues" con un SUMIF sobre la fila 2 de fechas, que es la unica
         # manera de hacerlo con formula viva y no con un numero pegado.
         self.future_col = col + 1
-        fcell = ws.cell(hr, self.future_col, "PLAN POST-CORTE")
+        fcell = ws.cell(hr, self.future_col, "PLAN AFTER CUT-OFF")
         fcell.fill = HDR
         fcell.font = WHITE
         fcell.alignment = Alignment(horizontal="center", wrap_text=True)
@@ -426,7 +426,7 @@ class ExcelExporter:
         # lineas que difieren por centavos—. La columna lo deja a la vista en
         # vez de que haya que buscarlo.
         self.check_col = col + 2
-        kcell = ws.cell(hr, self.check_col, "PLAN vs PRESUP.")
+        kcell = ws.cell(hr, self.check_col, "PLAN vs BUDGET")
         kcell.fill = HDR
         kcell.font = WHITE
         kcell.alignment = Alignment(horizontal="center", wrap_text=True)
@@ -887,12 +887,12 @@ class ExcelExporter:
     ) -> None:
         JC = "'Job Cost Report'"
         ws = self._comp_base(
-            f"Budget {A} — Datos",
-            f"VENTANAS — PRESUPUESTO {A} · DATOS POR LÍNEA",
-            "Las mismas líneas del Job Cost, en el mismo orden, con su bloque de "
-            "dinero completo (A..M). Lo que es dato se trae del Job Cost; lo que es "
-            "cálculo se calcula acá: Revised = G+H, Remaining = I−J, "
-            "Over/Under = L−I (positivo = por encima del presupuesto).",
+            f"Budget {A} — Data",
+            f"VENTANAS — {A} BUDGET · LINE DATA",
+            "The same lines as Job Cost Report, in the same order, with the full "
+            "money block (A..M). What is data comes from Job Cost Report; what is a "
+            "calculation is computed here: Revised = G+H, Remaining = I−J, "
+            "Over/Under = L−I (positive = above budget).",
             ["Status", "WBS", "Task Title", "Owner", "Category", "Phase",
              "Budget Original", "Budget Change", "Budget Revised",
              "Spend", "Remaining", "Forecast", "Over/Under"],
@@ -943,15 +943,15 @@ class ExcelExporter:
         JC = "'Job Cost Report'"
         ws = self._comp_base(
             f"Budget {A} — vs {B}",
-            f"VENTANAS — {A} CONTRA {B}, MES A MES",
-            f"Solo la identidad de la línea (A..D) y los doce meses: {A} al lado de "
-            f"{B}, con una columna de espacio entre mes y mes. Al final, el año "
-            f"completo y la variación. Todo es fórmula.",
+            f"VENTANAS — {A} AGAINST {B}, MONTH BY MONTH",
+            f"Just who the line is (A..D) and the twelve months: {A} beside {B}, "
+            f"with a blank column between months. It ends with the full year for "
+            f"each and the variance. Everything is a formula.",
             ["Status", "WBS", "Task Title", "Owner"],
             hr, mapa,
         )
-        MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
-               "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+        MES = ["January", "February", "March", "April", "May", "June", "July",
+               "August", "September", "October", "November", "December"]
         col0 = 5
         mescol: dict[int, tuple[int, int]] = {}
         c = col0
@@ -972,13 +972,13 @@ class ExcelExporter:
             c += 3
         T_A, T_B, T_V, T_P = c, c + 1, c + 2, c + 3
         ws.merge_cells(start_row=hr - 1, start_column=T_A, end_row=hr - 1, end_column=T_P)
-        t = ws.cell(hr - 1, T_A, "AÑO COMPLETO")
+        t = ws.cell(hr - 1, T_A, "FULL YEAR")
         t.fill = PatternFill("solid", fgColor="FF8A5A00")
         t.font = Font(bold=True, color="FFFFFFFF", size=10)
         t.alignment = Alignment(horizontal="center")
         for cc, etq, w in (
             (T_A, f"TOTAL {A}", 16), (T_B, f"TOTAL {B}", 16),
-            (T_V, "VARIANZA $", 16), (T_P, "VAR %", 10),
+            (T_V, "VARIANCE $", 16), (T_P, "VAR %", 10),
         ):
             h = ws.cell(hr, cc, etq)
             h.fill = PatternFill("solid", fgColor="FF8A5A00")
@@ -1034,15 +1034,15 @@ class ExcelExporter:
         JC = "'Job Cost Report'"
         ws = self._comp_base(
             f"Budget {A}",
-            f"VENTANAS — BUDGET {A}",
-            f"Cómo va quedando el presupuesto {A}: la identidad de la línea (A..D) "
-            f"y los doce meses del año, de corrido. El total de cada fila suma sus "
-            f"propios meses.",
+            f"VENTANAS — {A} BUDGET",
+            f"How the {A} budget is shaping up: who the line is (A..D) and the "
+            f"twelve months read straight through. Each row's total sums its own "
+            f"months.",
             ["Status", "WBS", "Task Title", "Owner"],
             hr, mapa,
         )
-        MES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
-               "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
+        MES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+               "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
         col0 = 5
         for m in range(1, 13):
             cc = col0 + m - 1
