@@ -2065,6 +2065,29 @@ export interface BankBridge {
   compromisos: { etq: string; monto: number; n: number; nota: string }[];
   intereses: number;
   cargos: number;
+  /** Lo que el contador tiene que asentar, mes a mes. Owner, 2026-11-09:
+   *  *«SOLO A NIVEL VISUAL PARA QUE EL CONTADOR PUEDA HACER EL REGISTRO
+   *  CONTABLE»* — no se reclasifica nada en la base. */
+  contador: {
+    mes: string;
+    interes: number;
+    n_interes: number;
+    cargos: number;
+    n_cargos: number;
+    comision_giro: number;
+    n_comision: number;
+  }[];
+  /** Las comisiones de giro de LAFISE que estan clasificadas como `payment` y
+   *  por eso NO entran en la linea de cargos del puente. 18 giros × $10. */
+  comisiones: {
+    cuenta: number;
+    nombre: string;
+    fecha: string | null;
+    clase: string | null;
+    descripcion: string | null;
+    monto: number;
+  }[];
+  comision_giro: number;
   /** Los tres totales del LEDGER, para cuadrarlo contra la hoja. */
   ledger: { filas: number; solicitado: number; pagado: number; diferencia: number };
   pendiente: number;

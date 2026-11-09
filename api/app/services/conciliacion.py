@@ -131,6 +131,79 @@ def construir(db: Session) -> dict[str, Any]:
     intereses = round(sum(v["credito"] for v in mov.values() if v["es_ingreso"]), 2)
     cargos = round(sum(v["debito"] for v in mov.values() if v["es_cargo"]), 2)
 
+    # ── Para el contador: el asiento, mes a mes ───────────────────────────
+    #
+    # Owner, 2026-11-09: *«SI, PERO SOLO A NIVEL VISUAL PARA QUE EL CONTADOR
+    # PUEDA HACER EL REGISTRO CONTABLE»*. O sea: no se reclasifica nada en la
+    # base — se muestra lo que hay que asentar y el contador lo asienta.
+    #
+    # ⚠️ Las comisiones de giro de LAFISE estan clasificadas como `payment` y
+    # NO como cargo, asi que no entran en `cargos` arriba. Son 18 giros × $10.
+    # Se identifican por la descripcion EXACTA del banco, no por un umbral de
+    # monto: filtrar por «descripcion que hable de comision» barreria $869,415
+    # de pagos reales cuya descripcion dice «fee» u «honorarios».
+    COMISION_GIRO = "%Comision LAFISE%"
+
+    contador = [
+        {
+            "mes": r["mes"],
+            "interes": _f(r["interes"]),
+            "n_interes": r["n_interes"],
+            "cargos": _f(r["cargos"]),
+            "n_cargos": r["n_cargos"],
+            "comision_giro": _f(r["comision"]),
+            "n_comision": r["n_comision"],
+        }
+        for r in db.execute(
+            text(
+                """
+                SELECT LEFT(t.tx_date::text, 7) AS mes,
+                       COALESCE(SUM(t.credit) FILTER (WHERE k.is_income), 0) AS interes,
+                       COUNT(*)      FILTER (WHERE k.is_income)              AS n_interes,
+                       COALESCE(SUM(t.debit)  FILTER (WHERE k.is_charge), 0) AS cargos,
+                       COUNT(*)      FILTER (WHERE k.is_charge)              AS n_cargos,
+                       COALESCE(SUM(t.debit)  FILTER (
+                           WHERE t.description ILIKE :com), 0)               AS comision,
+                       COUNT(*)      FILTER (WHERE t.description ILIKE :com) AS n_comision
+                  FROM bank_tx t
+                  LEFT JOIN bank_movement_class k ON k.code = t.class_code
+                 WHERE k.is_income OR k.is_charge OR t.description ILIKE :com
+                 GROUP BY 1 ORDER BY 1
+                """
+            ),
+            {"com": COMISION_GIRO},
+        ).mappings()
+    ]
+
+    # El detalle de las comisiones mal clasificadas, para que el contador las
+    # vea una por una antes de asentarlas.
+    comisiones = [
+        {
+            "cuenta": r["account_id"],
+            "nombre": r["name"],
+            "fecha": str(r["tx_date"]) if r["tx_date"] else None,
+            "clase": r["class_code"],
+            "descripcion": r["description"],
+            "monto": _f(r["debit"]),
+        }
+        for r in db.execute(
+            text(
+                """
+                SELECT t.account_id, a.name, t.tx_date, t.class_code,
+                       t.description, t.debit
+                  FROM bank_tx t
+                  JOIN bank_account a ON a.id = t.account_id
+                  LEFT JOIN bank_movement_class k ON k.code = t.class_code
+                 WHERE t.description ILIKE :com
+                   AND NOT COALESCE(k.is_charge, false)
+                 ORDER BY t.tx_date, t.id
+                """
+            ),
+            {"com": COMISION_GIRO},
+        ).mappings()
+    ]
+    comision_giro = round(sum(c["monto"] for c in comisiones), 2)
+
     # ── Lo solicitado y no pagado, tal como lo trae el LEDGER ─────────────
     totales = (
         db.execute(
@@ -302,6 +375,11 @@ def construir(db: Session) -> dict[str, Any]:
         "compromisos": compromisos,
         "intereses": intereses,
         "cargos": cargos,
+        # Lo que el contador tiene que asentar, mes a mes, y el detalle de las
+        # comisiones de giro que estan clasificadas como pago.
+        "contador": contador,
+        "comisiones": comisiones,
+        "comision_giro": comision_giro,
         # Los tres totales del LEDGER, para poder cuadrarlo contra la hoja.
         "ledger": {
             "filas": totales["filas"],

@@ -3,6 +3,7 @@
 import { ApiError } from "@/lib/api";
 import { money, moneyUsd } from "@/lib/format";
 import {
+  type BankBridge,
   useAbsorbWire,
   useAddWireFee,
   useBankAccounts,
@@ -816,6 +817,172 @@ function BankFeesPanel() {
   );
 }
 
+/* ── Lo que el contador tiene que asentar ────────────────────────────────── */
+
+/**
+ * Owner, 2026-11-09: *«SI, PERO SOLO A NIVEL VISUAL PARA QUE EL CONTADOR PUEDA
+ * HACER EL REGISTRO CONTABLE»*.
+ *
+ * ⚠️ Esta vista **no cambia nada en la base**. Las comisiones de giro de LAFISE
+ * siguen clasificadas como `payment`; acá se muestran aparte para que el
+ * contador las asiente, no para corregirlas por atrás. Si algún día se
+ * reclasifican, esta tabla las va a contar UNA sola vez igual: la columna de
+ * cargos cuenta por `is_charge` y la de comisiones excluye lo que ya es cargo.
+ */
+function ParaElContador({ d }: { d: BankBridge }) {
+  // Subtotales por año, para poder asentar por período en vez de mes a mes.
+  const anios = new Map<string, { interes: number; cargos: number; comision: number }>();
+  for (const r of d.contador) {
+    const a = r.mes.slice(0, 4);
+    const v = anios.get(a) ?? { interes: 0, cargos: 0, comision: 0 };
+    v.interes += r.interes;
+    v.cargos += r.cargos;
+    v.comision += r.comision_giro;
+    anios.set(a, v);
+  }
+
+  return (
+    <div>
+      <h2 className="mb-2 text-sm font-semibold text-slate-600">
+        For the accountant — not in the books yet
+        <span className="ml-2 font-normal text-slate-400">
+          — what the bank moved and the LEDGER never recorded
+        </span>
+      </h2>
+      <p className="mb-2 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        Nothing here has been reclassified or changed in the system — it is shown so the entries can
+        be recorded. <b>Interest earned</b> is income (credit); <b>bank charges</b> and{" "}
+        <b>wire commissions</b> are expense (debit). The wire commissions are filed in the system as
+        payments rather than as charges, which is why the bridge&apos;s charges line of{" "}
+        <b className="tabular">{moneyUsd(d.cargos)}</b> does not include them.
+      </p>
+
+      {/* Primero el resumen por año: es el nivel al que se asienta. */}
+      <div className="mb-2 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+            <tr>
+              <th className="px-3 py-2">Year</th>
+              <th className="px-3 py-2 text-right">Interest earned (income)</th>
+              <th className="px-3 py-2 text-right">Bank charges (expense)</th>
+              <th className="px-3 py-2 text-right">Wire commissions (expense)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {[...anios.entries()].map(([a, v]) => (
+              <tr key={a}>
+                <td className="px-3 py-1.5 font-semibold">{a}</td>
+                <td className="tabular px-3 py-1.5 text-right text-emerald-700">
+                  {v.interes ? moneyUsd(v.interes) : "—"}
+                </td>
+                <td className="tabular px-3 py-1.5 text-right text-red-700">
+                  {v.cargos ? moneyUsd(v.cargos) : "—"}
+                </td>
+                <td className="tabular px-3 py-1.5 text-right text-red-700">
+                  {v.comision ? moneyUsd(v.comision) : "—"}
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
+              <td className="px-3 py-2">TOTAL</td>
+              <td className="tabular px-3 py-2 text-right">{moneyUsd(d.intereses)}</td>
+              <td className="tabular px-3 py-2 text-right">{moneyUsd(d.cargos)}</td>
+              <td className="tabular px-3 py-2 text-right">{moneyUsd(d.comision_giro)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Y el detalle mes a mes, por si el asiento va mensual. */}
+      <details className="rounded-lg border border-slate-200 bg-white">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-600">
+          Month by month ({d.contador.length} months)
+        </summary>
+        <div className="max-h-96 overflow-auto border-t border-slate-200">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-slate-100 text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Month</th>
+                <th className="px-3 py-2 text-right">Interest</th>
+                <th className="px-3 py-2 text-right">mov.</th>
+                <th className="px-3 py-2 text-right">Charges</th>
+                <th className="px-3 py-2 text-right">mov.</th>
+                <th className="px-3 py-2 text-right">Commissions</th>
+                <th className="px-3 py-2 text-right">mov.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {d.contador.map((r) => (
+                <tr key={r.mes} className="hover:bg-slate-50">
+                  <td className="tabular px-3 py-1.5 font-semibold">{r.mes}</td>
+                  <td className="tabular px-3 py-1.5 text-right text-emerald-700">
+                    {r.interes ? moneyUsd(r.interes) : "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right text-xs text-slate-400">
+                    {r.n_interes || "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right text-red-700">
+                    {r.cargos ? moneyUsd(r.cargos) : "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right text-xs text-slate-400">
+                    {r.n_cargos || "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right text-red-700">
+                    {r.comision_giro ? moneyUsd(r.comision_giro) : "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right text-xs text-slate-400">
+                    {r.n_comision || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      {/* Las comisiones una por una: son las que el sistema tiene mal filadas. */}
+      {d.comisiones.length ? (
+        <details className="mt-2 rounded-lg border border-slate-200 bg-white">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-600">
+            The {d.comisiones.length} wire commissions, one by one —{" "}
+            <span className="tabular">{moneyUsd(d.comision_giro)}</span>
+          </summary>
+          <div className="max-h-80 overflow-auto border-t border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-100 text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Account</th>
+                  <th className="px-3 py-2">Bank description</th>
+                  <th className="px-3 py-2">Filed as</th>
+                  <th className="px-3 py-2 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {d.comisiones.map((c, i) => (
+                  <tr key={`${c.fecha}-${c.descripcion}-${i}`} className="hover:bg-slate-50">
+                    <td className="px-3 py-1.5 text-slate-500">{c.fecha ?? "—"}</td>
+                    <td className="px-3 py-1.5">{c.nombre}</td>
+                    <td className="px-3 py-1.5 text-slate-500">{c.descripcion ?? "—"}</td>
+                    <td className="px-3 py-1.5">
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
+                        {c.clase ?? "—"}
+                      </span>
+                    </td>
+                    <td className="tabular px-3 py-1.5 text-right font-semibold">
+                      {moneyUsd(c.monto)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 /* ── El puente del saldo: del banco a lo que el sistema sabe ─────────────── */
 
 /**
@@ -1089,6 +1256,9 @@ function BalanceBridge() {
           </div>
         </div>
       ) : null}
+
+      {/* ── Para el contador ─────────────────────────────────────────── */}
+      <ParaElContador d={d} />
 
       {/* ── Los pagos del banco sin fila en el LEDGER ────────────────── */}
       <div>
