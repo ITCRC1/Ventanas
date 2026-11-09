@@ -41,22 +41,23 @@ const NAV: NavItem[] = [
     hint: "Prepare and approve what's coming",
     perm: "view.planning",
   },
+  // ⚠️ Las dos van SUELTAS en la barra, no dentro de un desplegable.
+  // 2026-11-09: las agrupé bajo «Budget» y el owner no encontró la grilla
+  // —«no sé dónde lo estás poniendo»—. Donde antes había un enlace directo
+  // aparecía un menú cerrado: no hay motivo para abrirlo si uno busca una
+  // pestaña nueva. Una pantalla que hay que descubrir es una pantalla que
+  // nadie usa.
   {
-    label: "Budget",
+    href: "/budget-proposal",
+    label: "Budget Proposal",
+    hint: "The year by week, from the schedule and the LEDGER",
     perm: "report.view",
-    items: [
-      {
-        href: "/budget-proposal",
-        label: "Budget Proposal",
-        hint: "The year by week, from the schedule and the LEDGER",
-      },
-      {
-        href: "/budget-grid",
-        label: "Budget Grid",
-        hint: "Edit next year with last year beside it",
-        perm: "schedule.edit",
-      },
-    ],
+  },
+  {
+    href: "/budget-grid",
+    label: "Budget Grid",
+    hint: "Edit next year with last year beside it",
+    perm: "schedule.edit",
   },
   {
     label: "Payments",
