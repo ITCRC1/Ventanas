@@ -156,6 +156,8 @@ class ExcelExporter:
         self._sheet_ledger()
         self._sheet_dashboard()
         self._sheet_jobcost()
+        # Despues del Job Cost a proposito: relee el plano que aquel dejo.
+        self._sheet_comparativo()
         self._sheet_timeline()
         self._sheet_timeline_detail()
         self._sheet_short_payment()
@@ -169,6 +171,7 @@ class ExcelExporter:
         order = ["Timeline", "Timeline Detail", "Job Cost Report", "Dashboard",
                  "Short Payment", "LEDGER", "Credits", "Banks",
                  "US Wire Transfers", "Invoices", "Invoice Receipts", "Legend"]
+        order.insert(order.index("Job Cost Report") + 1, "2027 vs 2026")
         # ⚠️ Una hoja que no figure aca cae al final en silencio: `order.index`
         # falla y el `key` devuelve 99. Asi fue como "Invoice Receipts" -las 156
         # facturas de verdad- quedaba DESPUES del Legend, que es el cierre del
@@ -464,7 +467,14 @@ class ExcelExporter:
         def numfmt(c: int) -> str:
             return WEEKFMT if c in wcols else MONEY
 
-        # --- filas: v_wbs_financials, agrupadas por CATEGORÍA ---
+        # --- filas: v_wbs_financials, agrupadas por SECCION del WBS ---
+        #
+        # ⚠️ Antes agrupaba por CATEGORIA. Los subtotales sumaban bien pero NO
+        # EXISTEN en la pantalla: la app agrupa por seccion (JobCostFull.tsx
+        # ::sectionOf) y las categorias CRUZAN secciones —CFIA Infrastructure
+        # son la 7 y la 9, Concessions la 5 y la 8, Setena D1 la 3, 4 y 8—, asi
+        # que el dueño no podia cuadrar el papel contra la pantalla ni fila por
+        # fila ni subtotal por subtotal.
         rows = self.db.execute(
             text(
                 """
@@ -476,10 +486,21 @@ class ExcelExporter:
                 LEFT JOIN wbs_item  w  ON w.wbs_code = f.wbs_code
                 LEFT JOIN task_state ts ON ts.id = w.state_id
                 WHERE f.kind <> 'section_header'
-                ORDER BY COALESCE(f.category, 'zzz'), w.sort_order, f.wbs_code
+                ORDER BY (split_part(f.wbs_code, '.', 1))::int, w.sort_order, f.wbs_code
                 """
             )
         ).mappings().all()
+
+        # El titulo de cada seccion: la fila cuyo codigo es solo el numero.
+        sec_titulo: dict[str, str] = {
+            str(x["wbs_code"]).strip(): x["title"]
+            for x in self.db.execute(
+                text(
+                    "SELECT wbs_code, title FROM v_wbs_financials "
+                    "WHERE wbs_code ~ '^[0-9]+$'"
+                )
+            ).mappings()
+        }
 
         # Cronograma (schedule_cell): monto plan + estado por cost_code y semana.
         sched: defaultdict[str, dict[dt.date, RowMapping]] = defaultdict(dict)
@@ -495,10 +516,21 @@ class ExcelExporter:
         ).mappings():
             sched[(s["wbs_code"] or "").strip()][s["week_start"]] = s
 
-        # Agrupar líneas por categoría (orden que fija el ORDER BY de la query).
+        # Agrupar por seccion (el orden lo fija el ORDER BY de la query).
+        def _seccion(code: str) -> str:
+            seg = (code or "").split(".")[0].strip()
+            return seg if seg.isdigit() else "—"
+
         cats: dict[str, list[RowMapping]] = defaultdict(list)
         for e in rows:
-            cats[(e["category"] or "No category").strip()].append(e)
+            cats[_seccion(e["wbs_code"])].append(e)
+
+        # ⚠️ El plano de la hoja: que se escribio en cada fila. La hoja
+        # comparativa 2027 vs 2026 lo relee para salir EXACTAMENTE igual —mismo
+        # orden, mismas secciones, mismos subtotales— y apuntar sus montos a
+        # estas celdas. Sin esto, las dos hojas se desincronizan en el primer
+        # cambio y nadie se entera.
+        self.jc_plan: list[dict[str, Any]] = []
 
         def write_timeline_line(rr: int, code: str, category: str | None = None) -> None:
             """Celdas semana (valor base + COLOR DE LA CATEGORÍA, igual que el app —
@@ -553,10 +585,13 @@ class ExcelExporter:
             costs = [e for e in lines if (e["kind"] or "cost") != "proceeds"]
             sales = [e for e in lines if (e["kind"] or "cost") == "proceeds"]
 
-            # Encabezado de categoría (fila coloreada; título en col Task Title).
+            # Encabezado de sección (fila coloreada; título en col Task Title).
+            etq = f"{cat} {sec_titulo.get(cat, 'Others')}".strip().upper()
             for i in range(1, self.total_col + 1):
                 ws.cell(r, i).fill = CATF
-            ws.cell(r, 3, cat.upper()).font = BOLD
+            ws.cell(r, 2, cat)
+            ws.cell(r, 3, etq).font = BOLD
+            self.jc_plan.append({"tipo": "sec", "etq": etq, "sec": cat})
             r += 1
 
             # --- Líneas de GASTO (las de venta NO se listan) ---
@@ -567,7 +602,7 @@ class ExcelExporter:
                 ws.cell(r, 2, code)
                 ws.cell(r, 3, e["title"])
                 ws.cell(r, 4, e["owner"])
-                ws.cell(r, 5, cat)
+                ws.cell(r, 5, e["category"])
                 ws.cell(r, 6, e["phase"])
                 ws.cell(r, 7, float(e["budget_original"] or 0)).number_format = MONEY  # base
                 ws.cell(r, 8, float(e["budget_change"] or 0)).number_format = MONEY    # base
@@ -599,7 +634,17 @@ class ExcelExporter:
                 # presupuesto, y asi se pinta rojo en pantalla. Estaba al reves
                 # (I−L), asi que un sobregiro se leia como ahorro.
                 ws.cell(r, 13, f"=L{r}-I{r}").number_format = MONEY                     # Over/Under
-                write_timeline_line(r, code, cat)
+                write_timeline_line(r, code, e["category"])
+                self.jc_plan.append({
+                    "tipo": "linea",
+                    "fila": r,
+                    "status": e["status_label"],
+                    "code": code,
+                    "title": e["title"],
+                    "owner": e["owner"],
+                    "category": e["category"],
+                    "phase": e["phase"],
+                })
                 r += 1
             last_cost = r - 1
 
@@ -615,9 +660,10 @@ class ExcelExporter:
                 ws.cell(r, c).number_format = numfmt(c)
                 ws.cell(r, c).font = BOLD
             cost_totals.append(r)
+            self.jc_plan.append({"tipo": "subtotal", "etq": "TOTAL EXPENSES", "fila": r})
             r += 1
 
-            # --- TOTAL VENTA (sólo si la categoría tiene proceeds) ---
+            # --- TOTAL VENTA (sólo si la sección tiene proceeds) ---
             if sales:
                 sale_codes = [(e["wbs_code"] or "").strip() for e in sales]
                 for i in range(1, self.total_col + 1):
@@ -657,6 +703,10 @@ class ExcelExporter:
                 for c in money_cols:
                     ws.cell(r, c).font = BOLD
                 sale_totals.append(r)
+                self.jc_plan.append({
+                    "tipo": "venta", "etq": "TOTAL SALES",
+                    "fila": r, "code": ", ".join(sale_codes),
+                })
                 r += 1
 
         # --- Totales del proyecto: gasto y venta en filas SEPARADAS ---
@@ -671,11 +721,14 @@ class ExcelExporter:
                 ws.cell(rr, c).font = BOLD
 
         _total_row(r, "PROJECT TOTAL — EXPENSES", cost_totals, TOTAL)
+        self.jc_plan.append({"tipo": "gran", "etq": "PROJECT TOTAL — EXPENSES", "fila": r})
         r += 1
         if sale_totals:
             _total_row(r, "PROJECT TOTAL — SALES", sale_totals, GREEN)
+            self.jc_plan.append({"tipo": "granventa", "etq": "PROJECT TOTAL — SALES", "fila": r})
             r += 1
             _total_row(r, "NET (EXPENSES + SALES)", cost_totals + sale_totals, TOTAL)
+            self.jc_plan.append({"tipo": "gran", "etq": "NET (EXPENSES + SALES)", "fila": r})
 
         for c, width in zip(
             range(1, 14), [11, 10, 42, 14, 20, 20, 15, 14, 15, 15, 15, 15, 14], strict=False
@@ -693,6 +746,184 @@ class ExcelExporter:
                 font=Font(color="FF9C0006"),
             ),
         )
+
+    # ------------------------------------------------------------------ 2b
+
+    def _sheet_comparativo(self) -> None:
+        """2027 contra 2026, mes a mes, con las mismas filas del Job Cost.
+
+        Owner, 2026-11-09: *«usá el tab job cost, mismo formato, mismo orden,
+        nada diferente… hacelo por mes un side to side Enero 2027 versus Enero
+        2026, dejás una columna de espacio y hacés febrero… hasta Diciembre y
+        hacés un total 2027, total 2026 y varianza… todo debidamente
+        formulado. Esto es para el dueño»*.
+
+        ⚠️ **Acá no se recalcula nada.** Cada celda de mes apunta a la celda de
+        ese mes en «Job Cost Report». Si alguien corrige una semana allá, esta
+        hoja se mueve con ella. Copiar los números en vez de apuntarlos haría
+        que las dos hojas se separen en el primer ajuste, y el dueño vería dos
+        verdades distintas del mismo mes sin nada que lo avisara.
+
+        ⚠️ El orden de las filas tampoco se vuelve a calcular: se relee el plano
+        que dejó `_sheet_jobcost`, así que las secciones, las líneas y los
+        subtotales salen en el mismo orden por construcción, no por disciplina.
+        """
+        A, B = 2027, 2026          # el año nuevo a la izquierda, el viejo al lado
+        plan = getattr(self, "jc_plan", [])
+        if not plan or not all((y, m) in self.month_col for y in (A, B) for m in range(1, 13)):
+            return  # sin el Job Cost armado, o sin los dos años, no hay con qué comparar
+
+        ws = self.wb.create_sheet(f"{A} vs {B}")
+        ws.sheet_view.showGridLines = False
+        JC = "'Job Cost Report'"
+        GREEN = PatternFill("solid", fgColor="FFDFF3E3")  # fondo TOTAL VENTA
+
+        ws["A1"] = f"VENTANAS — PRESUPUESTO {A} CONTRA {B}"
+        ws["A1"].font = Font(bold=True, size=16, color="FF0F5F59")
+        ws["A2"] = (
+            f"Las mismas líneas del Job Cost, en el mismo orden. Cada mes muestra {A} "
+            f"al lado de {B}. Todo es fórmula: sale de «Job Cost Report» y se mueve con él."
+        )
+        ws["A2"].font = Font(size=10, color="FF787B86")
+
+        # --- columnas fijas: la identidad de la línea, igual que el Job Cost ---
+        FIJ = ["Status", "WBS", "Task Title", "Owner", "Category", "Phase", "Budget Revised"]
+        hr = 5
+        for i, h in enumerate(FIJ, 1):
+            c = ws.cell(hr, i, h)
+            c.fill = HDR
+            c.font = WHITE
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        # --- los doce meses: dos columnas y una de espacio ---
+        MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
+               "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+        col0 = len(FIJ) + 1
+        mescol: dict[int, tuple[int, int]] = {}   # mes -> (col del año A, col del año B)
+        c = col0
+        for m in range(1, 13):
+            mescol[m] = (c, c + 1)
+            ws.merge_cells(start_row=hr - 1, start_column=c, end_row=hr - 1, end_column=c + 1)
+            t = ws.cell(hr - 1, c, MES[m - 1].upper())
+            t.fill = PatternFill("solid", fgColor="FF0F5F59")
+            t.font = Font(bold=True, color="FFFFFFFF", size=10)
+            t.alignment = Alignment(horizontal="center")
+            for cc, anio in ((c, A), (c + 1, B)):
+                h = ws.cell(hr, cc, str(anio))
+                h.fill = HDR
+                h.font = WHITE
+                h.alignment = Alignment(horizontal="center")
+                ws.column_dimensions[gc(cc)].width = 13
+            ws.column_dimensions[gc(c + 2)].width = 2   # la columna de espacio
+            c += 3
+
+        # --- el cierre: total de cada año y la varianza ---
+        T_A, T_B, T_V, T_P = c, c + 1, c + 2, c + 3
+        ws.merge_cells(start_row=hr - 1, start_column=T_A, end_row=hr - 1, end_column=T_P)
+        t = ws.cell(hr - 1, T_A, "AÑO COMPLETO")
+        t.fill = PatternFill("solid", fgColor="FF8A5A00")
+        t.font = Font(bold=True, color="FFFFFFFF", size=10)
+        t.alignment = Alignment(horizontal="center")
+        for cc, etq, w in (
+            (T_A, f"TOTAL {A}", 16), (T_B, f"TOTAL {B}", 16),
+            (T_V, "VARIANZA $", 16), (T_P, "VAR %", 10),
+        ):
+            h = ws.cell(hr, cc, etq)
+            h.fill = PatternFill("solid", fgColor="FF8A5A00")
+            h.font = WHITE
+            h.alignment = Alignment(horizontal="center", wrap_text=True)
+            ws.column_dimensions[gc(cc)].width = w
+        ws.row_dimensions[hr].height = 26
+        ult = T_P
+
+        def _meses(rr: int, jc_fila: int) -> None:
+            """Los 24 montos de la fila, apuntados a la celda del Job Cost."""
+            for m, (ca, cb) in mescol.items():
+                for cc, anio in ((ca, A), (cb, B)):
+                    jc_col = self.month_col[(anio, m)][0]
+                    cel = ws.cell(rr, cc, f"={JC}!{gc(jc_col)}{jc_fila}")
+                    cel.number_format = MONEY
+
+        def _cierre(rr: int) -> None:
+            """Total de cada año, la diferencia y el porcentaje."""
+            for cc, anio in ((T_A, A), (T_B, B)):
+                ref = ",".join(
+                    f"{gc(mescol[m][0 if anio == A else 1])}{rr}" for m in range(1, 13)
+                )
+                cel = ws.cell(rr, cc, f"=SUM({ref})")
+                cel.number_format = MONEY
+                cel.font = Font(bold=True)
+            v = ws.cell(rr, T_V, f"={gc(T_A)}{rr}-{gc(T_B)}{rr}")
+            v.number_format = MONEY
+            v.font = Font(bold=True)
+            # Sin base no hay porcentaje: una celda vacía dice la verdad, un 0%
+            # o un #DIV/0! no.
+            p = ws.cell(rr, T_P, f'=IFERROR({gc(T_V)}{rr}/ABS({gc(T_B)}{rr}),"")')
+            p.number_format = "0.0%"
+
+        # --- el cuerpo: se relee el plano del Job Cost, fila por fila ---
+        r = hr + 1
+        filas_linea: list[int] = []
+        for p in plan:
+            tipo = p["tipo"]
+            if tipo == "sec":
+                for i in range(1, ult + 1):
+                    ws.cell(r, i).fill = CATF
+                ws.cell(r, 2, p["sec"])
+                ws.cell(r, 3, p["etq"]).font = BOLD
+                r += 1
+                continue
+            relleno = {
+                "linea": None,
+                "subtotal": TOTAL,
+                "venta": GREEN,
+                "gran": TOTAL,
+                "granventa": GREEN,
+            }[tipo]
+            if relleno is not None:
+                for i in range(1, ult + 1):
+                    ws.cell(r, i).fill = relleno
+            if tipo == "linea":
+                ws.cell(r, 1, p["status"])
+                ws.cell(r, 2, p["code"])
+                ws.cell(r, 3, p["title"])
+                ws.cell(r, 4, p["owner"])
+                ws.cell(r, 5, p["category"])
+                ws.cell(r, 6, p["phase"])
+                filas_linea.append(r)
+            else:
+                if p.get("code"):
+                    ws.cell(r, 2, p["code"])
+                ws.cell(r, 3, p["etq"]).font = BOLD
+            # El presupuesto revisado, para leer el mes contra algo.
+            ws.cell(r, 7, f"={JC}!I{p['fila']}").number_format = MONEY
+            _meses(r, p["fila"])
+            _cierre(r)
+            if tipo != "linea":
+                for cc in [7, *[x for m in mescol.values() for x in m], T_A, T_B, T_V]:
+                    ws.cell(r, cc).font = BOLD
+            r += 1
+
+        # Rojo donde 2027 gasta más que 2026 — que es lo que el dueño busca.
+        ws.conditional_formatting.add(
+            f"{gc(T_V)}{hr + 1}:{gc(T_V)}{r - 1}",
+            CellIsRule(
+                operator="greaterThan",
+                formula=["0"],
+                fill=PatternFill("solid", fgColor="FFF4CCCC"),
+                font=Font(color="FF9C0006"),
+            ),
+        )
+
+        for c2, w in zip(range(1, 8), [11, 10, 42, 14, 20, 20, 16], strict=False):
+            ws.column_dimensions[gc(c2)].width = w
+        ws.freeze_panes = ws.cell(hr + 1, col0)
+        ws.auto_filter.ref = f"A{hr}:{gc(ult)}{r - 1}"
+        ws.print_title_rows = f"{hr}:{hr}"
+        ws.page_setup.orientation = "landscape"
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
 
     def _sheet_timeline(self) -> None:
         """Hoja "Timeline": réplica FORMULADA de la vista del app (Timeline.tsx).
@@ -2608,6 +2839,14 @@ class ExcelExporter:
             "   carry no exchange rate, so there is no single figure to give.",
             "   Check = Subtotal + Tax − Total. Red means the XML does not add",
             "   up to what it declares; the declared Total is what counts.",
+            "",
+            "2027 vs 2026",
+            "   The same lines as Job Cost Report, in the same order, with each",
+            "      month side by side: 2027 next to 2026, a blank column, then the",
+            "      next month. It ends with the full year for each and the variance.",
+            "   Nothing is recalculated here: every month cell points at that",
+            "      month's cell in Job Cost Report, so correcting a week there",
+            "      moves this tab with it. Red in VARIANZA = 2027 spends more.",
             "",
             "THE OTHER TABS",
             "   Invoices — the invoice-capture module. Empty today: it has no",
