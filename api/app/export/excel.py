@@ -23,7 +23,7 @@ from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.formatting.rule import CellIsRule
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter as gc
 from openpyxl.worksheet.properties import Outline
 from openpyxl.worksheet.table import Table, TableStyleInfo
@@ -32,6 +32,37 @@ from sqlalchemy.engine.row import RowMapping
 from sqlalchemy.orm import Session
 
 from app.core.holding import HOLDING_BANK
+
+# La divisoria entre bloques de columnas. Owner, 2026-11-09, marcandolas a mano
+# sobre la hoja: con decenas de columnas de semana y mes pegadas una a otra, el
+# ojo pierde donde empieza cada bloque.
+DIVISORIA = Side(style="medium", color="FF1F4E79")
+
+
+def _divisorias(ws, cols, hr: int, ultima: int | None = None) -> None:
+    """Pinta una raya vertical a la IZQUIERDA de cada columna de `cols`.
+
+    ⚠️ Corre AL FINAL, con la hoja ya escrita, y CONSERVA los bordes que cada
+    celda tenia. Un Border nuevo pisa el anterior entero: armarlo de cero
+    borraria el top/bottom de las filas de subtotal, y eso no se nota mirando
+    —el libro abre igual de bien, solo que sin la linea que hace legible el
+    subtotal—.
+
+    ⚠️ Las bandas de seccion estan combinadas y openpyxl no deja estilar una
+    MergedCell en todas las versiones; si tira, se salta esa celda. Da igual:
+    la banda ya es una franja de color de lado a lado.
+    """
+    fin = ws.max_row if ultima is None else ultima
+    for c in sorted({int(x) for x in cols if x and int(x) > 1}):
+        for r in range(hr, fin + 1):
+            cel = ws.cell(r, c)
+            b = cel.border
+            try:
+                cel.border = Border(
+                    left=DIVISORIA, right=b.right, top=b.top, bottom=b.bottom
+                )
+            except AttributeError:
+                continue
 
 STATES = [
     ("not_started", "Not Started", "CCCCCC"),
@@ -171,8 +202,12 @@ class ExcelExporter:
         order = ["Timeline", "Timeline Detail", "Job Cost Report", "Dashboard",
                  "Short Payment", "LEDGER", "Credits", "Banks",
                  "US Wire Transfers", "Invoices", "Invoice Receipts", "Legend"]
-        for i, n2 in enumerate(["Budget 2027 — Datos", "Budget 2027 — vs 2026",
-                                "Budget 2027"]):
+        # ⚠️ Los nombres NO se escriben de nuevo aca: los guarda
+        # `_sheet_comparativo` al crearlos. Antes esta lista decia «Budget 2027
+        # — Datos» y la hoja se llamaba «— Data»; no coincidian, el `key` de
+        # abajo devolvia 99 y las TRES hojas de Budget caian despues del
+        # Legend. Con el año quemado, ademas, volveria a pasar en 2028.
+        for i, n2 in enumerate(getattr(self, "comp_hojas", [])):
             order.insert(order.index("Job Cost Report") + 1 + i, n2)
         # ⚠️ Una hoja que no figure aca cae al final en silencio: `order.index`
         # falla y el `key` devuelve 99. Asi fue como "Invoice Receipts" -las 156
@@ -279,6 +314,8 @@ class ExcelExporter:
             strict=False,
         ):
             ws.column_dimensions[gc(c)].width = w
+        # Codigo | la factura | los montos | donde se pago.
+        _divisorias(ws, [2, 6, 9], 3)
         ws.freeze_panes = "B4"
         # ⚠️ L15 del audit: tabla de Excel de verdad, no un autofiltro suelto.
         # Una fila escrita debajo entra sola al rango —y por lo tanto a los
@@ -745,6 +782,15 @@ class ExcelExporter:
             ws.column_dimensions[gc(c)].width = width
         # Congelar DESPUES de la ultima columna de dinero (M), como la app: al
         # correr el cronograma hasta 2027 se sigue viendo contra que presupuesto.
+        # Bloques: presupuesto | gasto y pronostico | el tiempo | el KPI. Y
+        # dentro del tiempo, una raya al empezar cada mes —no cada semana: con
+        # cientos de columnas, una linea en cada una no separa, ensucia—.
+        _divisorias(
+            ws,
+            [7, 10, 14, *[a for (_c, a, _b) in self.month_col.values()],
+             getattr(self, "pct_col", 0)],
+            hr,
+        )
         ws.freeze_panes = ws.cell(hr + 1, 14)
         ws.conditional_formatting.add(
             f"K{hr + 1}:K{r}",
@@ -781,6 +827,9 @@ class ExcelExporter:
         plan = getattr(self, "jc_plan", [])
         if not plan or not all((y, m) in self.month_col for y in (A, B) for m in range(1, 13)):
             return
+        # Los nombres, UNA sola vez, para que `build()` los ordene por el mismo
+        # texto con que se crearon y no por una copia escrita a mano.
+        self.comp_hojas = [f"Budget {A} — Data", f"Budget {A} — vs {B}", f"Budget {A}"]
 
         # El plano, resuelto una sola vez: en que fila cae cada cosa y que suma
         # cada total. Las tres hojas usan ESTE mapa, por eso coinciden fila a
@@ -871,7 +920,12 @@ class ExcelExporter:
                 for i in range(len(["a", "b", "c"]) + 4, ult + 1):
                     ws.cell(e["fila"], i).font = BOLD
 
-    def _comp_cerrar(self, ws: Any, hr: int, ult: int, ultima: int, congelar: int) -> None:
+    def _comp_cerrar(
+        self, ws: Any, hr: int, ult: int, ultima: int, congelar: int,
+        divis: list[int] | None = None,
+    ) -> None:
+        if divis:
+            _divisorias(ws, divis, hr, ultima)
         ws.freeze_panes = ws.cell(hr + 1, congelar)
         ws.auto_filter.ref = f"A{hr}:{gc(ult)}{ultima}"
         ws.print_title_rows = f"{hr}:{hr}"
@@ -933,7 +987,7 @@ class ExcelExporter:
                 font=Font(color="FF9C0006"),
             ),
         )
-        self._comp_cerrar(ws, hr, 13, ultima, 7)
+        self._comp_cerrar(ws, hr, 13, ultima, 7, divis=[7, 10, 13])
 
     # --- hoja 2: A..D y el mes a mes, 2027 contra 2026 ----------------------
 
@@ -1024,7 +1078,10 @@ class ExcelExporter:
                 font=Font(color="FF9C0006"),
             ),
         )
-        self._comp_cerrar(ws, hr, T_P, ultima, col0)
+        self._comp_cerrar(
+            ws, hr, T_P, ultima, col0,
+            divis=[col0, *[a for (a, _b) in mescol.values()], T_A],
+        )
 
     # --- hoja 3: como va quedando el Budget del año ------------------------
 
@@ -1077,7 +1134,10 @@ class ExcelExporter:
             cel.number_format = MONEY
             cel.font = BOLD
         self._comp_pintar(ws, mapa, tot)
-        self._comp_cerrar(ws, hr, tot, ultima, col0)
+        self._comp_cerrar(
+            ws, hr, tot, ultima, col0,
+            divis=[*range(col0, tot), tot],
+        )
 
     def _sheet_timeline(self) -> None:
         """Hoja "Timeline": réplica FORMULADA de la vista del app (Timeline.tsx).
@@ -1367,6 +1427,7 @@ class ExcelExporter:
         # ancho de columnas izquierdas + congelar identidad/presupuesto.
         for c, wd in zip(range(1, 8), [22, 26, 15, 14, 14, 14, 15], strict=False):
             ws.column_dimensions[gc(c)].width = wd
+        _divisorias(ws, [FIXED + 1, *[a for (_c, a, _b) in month_col.values()]], hr)
         ws.freeze_panes = ws.cell(hr + 1, FIXED + 1)
 
     def _sheet_timeline_detail(self) -> None:
@@ -1670,6 +1731,8 @@ class ExcelExporter:
             range(1, FIX + 1), [16, 12, 12, 12, 42, 14, 14, 13, 13, 13, 14], strict=False
         ):
             ws.column_dimensions[gc(c)].width = wdt
+        # Identidad | presupuesto | el tiempo.
+        _divisorias(ws, [6, FIX + 1], hr)
         ws.freeze_panes = ws.cell(hr + 1, FIX + 1)
 
     # ------------------------------------------------------------------ 5
@@ -2999,7 +3062,7 @@ class ExcelExporter:
             "      wide to read. The three carry the SAME lines, in the same",
             "      order, on the SAME row numbers as Job Cost Report: jumping",
             "      between tabs never loses the line you were on.",
-            "   Budget 2027 — Datos: the money block, A..M, same columns and",
+            "   Budget 2027 — Data: the money block, A..M, same columns and",
             "      same labels as Job Cost Report.",
             "   Budget 2027 — vs 2026: who the line is (A..D) and the twelve",
             "      months, 2027 beside 2026, a blank column between months.",
