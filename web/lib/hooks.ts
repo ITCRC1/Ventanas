@@ -380,6 +380,7 @@ export function useUpsertCells() {
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: ["schedule", "cells"] }),
+        // Arrastra tambien a la propuesta: su llave empieza con "wbs".
         qc.invalidateQueries({ queryKey: ["wbs"] }),
       ]),
   });
@@ -2063,7 +2064,19 @@ export interface BudgetProposal {
 
 export function useBudgetProposal(anio: number) {
   return useQuery({
-    queryKey: ["budget-proposal", anio],
+    // ⚠️ La llave ARRANCA con "wbs" a proposito. TanStack invalida por PREFIJO,
+    // asi que cualquier `invalidateQueries(["wbs"])` arrastra tambien a la
+    // propuesta — y hay dieciocho lugares en este archivo que ya la invalidan
+    // cuando cambia un monto, una fecha, el corte o el LEDGER.
+    //
+    // La alternativa era agregar `budget-proposal` a esos dieciocho onSuccess.
+    // Habria andado hoy y se habria roto en el diecinueve: el proximo que
+    // escriba una mutacion no tiene por que acordarse de esta pantalla. Asi la
+    // dependencia queda declarada donde se lee, no repartida donde se escribe.
+    //
+    // Y es cierta: la propuesta se deriva del WBS y del cronograma. Si esos
+    // numeros cambian, esta consulta esta vieja.
+    queryKey: ["wbs", "budget-proposal", anio],
     queryFn: () => api.get<BudgetProposal>(`/budget-proposal?anio=${anio}`),
   });
 }

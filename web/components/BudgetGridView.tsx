@@ -41,6 +41,27 @@ import type { WbsFinancials } from "@/lib/types";
 
 const MES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
+// ⚠️ Un solo ancho para TODOS los meses, de los dos años. El más grande que hay
+// que mostrar es Property Acquisition: 15,000,000 son diez caracteres más el
+// separador. Con anchos distintos por columna, los números dejan de alinearse
+// entre meses y comparar dos columnas deja de ser leer y pasa a ser calcular.
+const ANCHO_MES = 96;
+
+// Las columnas fijas y dónde arranca cada una. Se congelan juntas: el pedido
+// era poder leer presupuesto, gasto y variación sin perderlas al correr los
+// meses hacia diciembre.
+const FIJAS = [
+  { k: "wbs", etq: "WBS", w: 68 },
+  { k: "task", etq: "Task", w: 230 },
+  { k: "rev", etq: "Budget Revised", w: 104 },
+  { k: "exp", etq: "Total Expense", w: 104 },
+  { k: "var", etq: "Variance", w: 100 },
+] as const;
+const IZQ: number[] = FIJAS.reduce<number[]>(
+  (a, c, i) => [...a, i === 0 ? 0 : a[i - 1] + FIJAS[i - 1].w],
+  [],
+);
+
 type Pend = { wbs_id: number; week_start: string; planned_amount: number | null; state_id?: number };
 
 function usd(n: number): string {
@@ -288,6 +309,26 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
     });
   }
 
+  /** Una celda de la zona congelada. El `left` sale de IZQ, no a ojo. */
+  const Fija = ({
+    i,
+    fondo,
+    children,
+    cls = "",
+  }: {
+    i: number;
+    fondo: string;
+    children?: React.ReactNode;
+    cls?: string;
+  }) => (
+    <td
+      style={{ left: IZQ[i], width: FIJAS[i].w, minWidth: FIJAS[i].w }}
+      className={`sticky z-10 px-2 ${fondo} ${i < 2 ? "" : "tabular text-right"} ${cls}`}
+    >
+      {children}
+    </td>
+  );
+
   if (fin.isLoading || celdas.isLoading || semanas.isLoading)
     return <p className="text-sm text-slate-500">Loading the grid…</p>;
 
@@ -448,13 +489,23 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
         <table className="border-collapse text-[11px]">
           <thead className="sticky top-0 z-20">
             <tr className="bg-[#0F5F59] text-white">
-              <th className="sticky left-0 z-30 bg-[#0F5F59] px-2 py-1 text-left">WBS</th>
-              <th className="sticky left-[70px] z-30 bg-[#0F5F59] px-2 py-1 text-left">Task</th>
+              {FIJAS.map((c, i) => (
+                <th
+                  key={c.k}
+                  rowSpan={2}
+                  style={{ left: IZQ[i], width: c.w, minWidth: c.w }}
+                  className={`sticky z-30 bg-[#0F5F59] px-2 py-1 align-bottom ${
+                    i < 2 ? "text-left" : "text-right"
+                  }`}
+                >
+                  {c.etq}
+                </th>
+              ))}
               {MES.map((m, i) => (
                 <th
                   key={m}
                   colSpan={2}
-                  className={`border-l border-white/30 px-1 py-1 text-center ${
+                  className={`border-l-2 border-white/40 px-1 py-1 text-center ${
                     bloqueado(i + 1) ? "text-white/50" : ""
                   }`}
                 >
@@ -467,12 +518,21 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
               <th className="bg-[#8A5A00] px-2 py-1 text-right">VAR</th>
             </tr>
             <tr className="bg-[#1F4E79] text-white">
-              <th className="sticky left-0 z-30 bg-[#1F4E79]" />
-              <th className="sticky left-[70px] z-30 bg-[#1F4E79]" />
               {MES.map((m) => (
                 <Fragment key={m}>
-                  <th className="border-l border-white/30 px-1 text-right text-[10px]">{anio}</th>
-                  <th className="px-1 text-right text-[10px] text-white/60">{base}</th>
+                  {/* El año que se EDITA, resaltado; el anterior, apagado. */}
+                  <th
+                    style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                    className="border-l-2 border-white/40 bg-[#2962FF] px-1 text-right text-[10px] font-bold"
+                  >
+                    {anio} ✎
+                  </th>
+                  <th
+                    style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                    className="px-1 text-right text-[10px] font-normal text-white/50"
+                  >
+                    {base}
+                  </th>
                 </Fragment>
               ))}
               <th colSpan={3} className="bg-[#8A5A00]" />
@@ -482,7 +542,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
             {grupos.map(([sec, ls]) => (
               <Fragment key={sec}>
                 <tr className="bg-[#EAF0FA]">
-                  <td colSpan={5 + 24} className="px-2 py-1 font-semibold text-teal-900">
+                  <td colSpan={FIJAS.length + 24 + 3} className="px-2 py-1 font-semibold text-teal-900">
                     {sec} {(titulos.get(sec) ?? "").toUpperCase()}
                   </td>
                 </tr>
@@ -491,12 +551,32 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                   const tb = anual(l.id, base);
                   return (
                     <tr key={l.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="sticky left-0 z-10 bg-white px-2 font-mono text-[10px]">
+                      <Fija i={0} fondo="bg-white" cls="font-mono text-[10px]">
                         {l.wbs_code}
-                      </td>
-                      <td className="sticky left-[70px] z-10 whitespace-nowrap bg-white px-2">
-                        {l.title}
-                      </td>
+                      </Fija>
+                      <Fija i={1} fondo="bg-white" cls="truncate">
+                        <span title={l.title}>{l.title}</span>
+                      </Fija>
+                      {/* ⚠️ Presupuesto, gasto y variación salen de
+                          `v_wbs_financials`, la misma vista que alimenta el Job
+                          Cost. No se recalculan acá: si se calcularan aparte,
+                          esta pantalla y aquella podrían decir cosas distintas
+                          de la misma línea. */}
+                      <Fija i={2} fondo="bg-slate-50" cls="text-slate-600">
+                        {usd(Number(l.budget_revised))}
+                      </Fija>
+                      <Fija i={3} fondo="bg-slate-50" cls="text-slate-600">
+                        {usd(Number(l.spend))}
+                      </Fija>
+                      <Fija
+                        i={4}
+                        fondo="bg-slate-50"
+                        cls={
+                          Number(l.remaining) < 0 ? "font-semibold text-red-700" : "text-slate-700"
+                        }
+                      >
+                        {usd(Number(l.remaining))}
+                      </Fija>
                       {MES.map((m, i) => {
                         const mes = i + 1;
                         const v = total(l.id, anio, mes);
@@ -507,10 +587,19 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                         const activa = sel?.wbs === l.id && sel?.mes === mes;
                         return (
                           <Fragment key={m}>
+                            {/* El año que se EDITA va en azul claro; el
+                                anterior, en gris. Antes los dos eran blancos y
+                                había que leer el encabezado para saber en cuál
+                                se estaba escribiendo. */}
                             <td
-                              className={`border-l border-slate-200 p-0 text-right ${
-                                lock ? "bg-slate-100 text-slate-400" : ""
-                              } ${sucia ? "bg-amber-100 ring-1 ring-inset ring-amber-500" : ""}`}
+                              style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                              className={`border-l-2 border-slate-300 p-0 text-right ${
+                                lock
+                                  ? "bg-slate-200 text-slate-400"
+                                  : sucia
+                                    ? "bg-amber-100 ring-1 ring-inset ring-amber-500"
+                                    : "bg-[#EEF4FF]"
+                              }`}
                             >
                               {activa && buf !== null ? (
                                 <input
@@ -559,7 +648,7 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                                     anotarMes(l.id, mes, buf);
                                     setBuf(null);
                                   }}
-                                  className="w-[86px] bg-white px-1 py-0.5 text-right text-[11px] outline-none ring-2 ring-inset ring-[#2962FF]"
+                                  className="w-full bg-white px-1 py-0.5 text-right text-[11px] outline-none ring-2 ring-inset ring-[#2962FF]"
                                 />
                               ) : (
                                 <button
@@ -570,14 +659,17 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                                     setSel({ wbs: l.id, mes });
                                     setBuf(v ? String(v) : "");
                                   }}
-                                  className="tabular w-[86px] px-1 py-0.5 text-right disabled:cursor-not-allowed"
+                                  className="tabular w-full px-1 py-0.5 text-right disabled:cursor-not-allowed"
                                   title={lock ? "History from the LEDGER — locked" : undefined}
                                 >
                                   {usd(v)}
                                 </button>
                               )}
                             </td>
-                            <td className="tabular bg-slate-50/70 px-1 text-right text-[10px] text-slate-500">
+                            <td
+                              style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                              className="tabular bg-slate-50 px-1 text-right text-[10px] text-slate-400"
+                            >
                               {usd(vb)}
                             </td>
                           </Fragment>
@@ -598,13 +690,25 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
                   );
                 })}
                 <tr className="bg-[#DCE6F4] font-semibold">
-                  <td className="sticky left-0 z-10 bg-[#DCE6F4] px-2" />
-                  <td className="sticky left-[70px] z-10 whitespace-nowrap bg-[#DCE6F4] px-2">
+                  <Fija i={0} fondo="bg-[#DCE6F4]" />
+                  <Fija i={1} fondo="bg-[#DCE6F4]" cls="whitespace-nowrap">
                     Subtotal {sec}
-                  </td>
+                  </Fija>
+                  <Fija i={2} fondo="bg-[#DCE6F4]">
+                    {usd(ls.reduce((a, l) => a + Number(l.budget_revised), 0))}
+                  </Fija>
+                  <Fija i={3} fondo="bg-[#DCE6F4]">
+                    {usd(ls.reduce((a, l) => a + Number(l.spend), 0))}
+                  </Fija>
+                  <Fija i={4} fondo="bg-[#DCE6F4]">
+                    {usd(ls.reduce((a, l) => a + Number(l.remaining), 0))}
+                  </Fija>
                   {MES.map((m, i) => (
                     <Fragment key={m}>
-                      <td className="tabular border-l border-slate-300 px-1 text-right">
+                      <td
+                        style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                        className="tabular border-l-2 border-slate-400 bg-[#E3EDFF] px-1 text-right"
+                      >
                         {usd(ls.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
                       </td>
                       <td className="tabular px-1 text-right text-[10px] text-slate-500">
@@ -625,13 +729,25 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
               </Fragment>
             ))}
             <tr className="bg-[#0F5F59] font-bold text-white">
-              <td className="sticky left-0 z-10 bg-[#0F5F59] px-2" />
-              <td className="sticky left-[70px] z-10 whitespace-nowrap bg-[#0F5F59] px-2">
+              <Fija i={0} fondo="bg-[#0F5F59]" />
+              <Fija i={1} fondo="bg-[#0F5F59]" cls="whitespace-nowrap">
                 PROJECT TOTAL
-              </td>
+              </Fija>
+              <Fija i={2} fondo="bg-[#0F5F59]">
+                {usd(lineas.reduce((a, l) => a + Number(l.budget_revised), 0))}
+              </Fija>
+              <Fija i={3} fondo="bg-[#0F5F59]">
+                {usd(lineas.reduce((a, l) => a + Number(l.spend), 0))}
+              </Fija>
+              <Fija i={4} fondo="bg-[#0F5F59]">
+                {usd(lineas.reduce((a, l) => a + Number(l.remaining), 0))}
+              </Fija>
               {MES.map((m, i) => (
                 <Fragment key={m}>
-                  <td className="tabular border-l border-white/30 px-1 text-right">
+                  <td
+                    style={{ width: ANCHO_MES, minWidth: ANCHO_MES }}
+                    className="tabular border-l-2 border-white/40 px-1 text-right"
+                  >
                     {usd(lineas.reduce((s, l) => s + total(l.id, anio, i + 1), 0))}
                   </td>
                   <td className="tabular px-1 text-right text-[10px] text-white/70">
