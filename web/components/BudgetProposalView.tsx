@@ -97,17 +97,42 @@ export function BudgetProposalView() {
 
   const t = d.totales;
   const mostradas = porCat.reduce((s, [, ls]) => s + ls.length, 0);
-  const TABS: [Vista, string, string][] = [
-    ["datos", "Line Data", "Budget, spent, and how the remaining splits"],
-    ["meses", "Month by Month", `The ${anio} proposal, January to December`],
-    ["anio", `Budget ${anio}`, "How the year is shaping up, by section"],
+  // ⚠️ El editable va SEGUNDO, no último. Es el que se usa a diario; dejarlo al
+  // final lo escondía detrás de tres vistas de solo lectura.
+  //
+  // Y cada uno lleva su color: antes el que no estaba activo era gris sobre
+  // blanco y no se leía como un botón —el owner no los encontraba—. El de
+  // edición va en azul porque es el único que ESCRIBE: conviene que se
+  // distinga de un vistazo de los que solo muestran.
+  const TABS: [Vista, string, string, string][] = [
+    [
+      "datos",
+      "Line Data",
+      "Budget, spent, and how the remaining splits",
+      "bg-teal-600 ring-teal-700",
+    ],
     ...(puedeEditar
-      ? ([["grid", "✎ Grid (edit)", `Edit ${anio} with ${anio - 1} beside it`]] as [
-          Vista,
-          string,
-          string,
-        ][])
+      ? ([
+          [
+            "grid",
+            `✎ Edit ${anio}`,
+            `Edit ${anio} with ${anio - 1} beside it`,
+            "bg-[#2962FF] ring-[#1E53E5]",
+          ],
+        ] as [Vista, string, string, string][])
       : []),
+    [
+      "meses",
+      "Month by Month",
+      `The ${anio} proposal, January to December`,
+      "bg-teal-600 ring-teal-700",
+    ],
+    [
+      "anio",
+      `Budget ${anio}`,
+      "How the year is shaping up, by section",
+      "bg-[#1F4E79] ring-[#163C5E]",
+    ],
   ];
 
   return (
@@ -173,7 +198,14 @@ export function BudgetProposalView() {
             </div>
           ))}
         </div>
-        <p className="border-t border-teal-200 px-3 py-1.5 text-[11px] text-slate-600">
+        {/* Mientras se edita, este parrafo solo roba alto: explica como se
+            arma la PROPUESTA, no como se escribe la grilla —que tiene su propia
+            ayuda arriba de la tabla—. */}
+        <p
+          className={`border-t border-teal-200 px-3 py-1.5 text-[11px] text-slate-600 ${
+            vista === "grid" ? "hidden" : ""
+          }`}
+        >
           The <b>Job Cost is the standard</b>: each line&apos;s remaining splits across the four
           tranches and they have to add up to it &mdash; that is what <b>Unplaced</b> checks. The
           proposal is <b>overdue + carry-over + plan</b>, and whatever did not happen is parked in
@@ -182,25 +214,28 @@ export function BudgetProposalView() {
         </p>
       </div>
 
-      {/* Los tres sub-tabs. Las tres vistas leen el mismo payload. */}
-      <div className="flex flex-wrap items-end gap-1 border-b border-slate-200">
-        {TABS.map(([k, etq, ayuda]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setVista(k)}
-            title={ayuda}
-            className={`-mb-px rounded-t border border-b-0 px-3 py-1.5 text-xs font-semibold ${
-              vista === k
-                ? "border-slate-200 bg-white text-teal-900"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            {etq}
-          </button>
-        ))}
+      {/* Los sub-tabs. Todas las vistas leen el mismo payload. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {TABS.map(([k, etq, ayuda, color]) => {
+          const activo = vista === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setVista(k)}
+              title={ayuda}
+              className={`rounded-md px-4 py-2 text-sm font-bold transition ${
+                activo
+                  ? `${color} text-white shadow ring-2 ring-offset-1`
+                  : "bg-slate-100 text-slate-700 ring-1 ring-slate-300 hover:bg-slate-200"
+              }`}
+            >
+              {etq}
+            </button>
+          );
+        })}
         {vista === "meses" ? (
-          <label className="ml-auto mb-1 flex items-center gap-1 text-[11px] text-slate-600">
+          <label className="ml-auto flex items-center gap-1 text-xs text-slate-600">
             <input
               type="checkbox"
               checked={porSemana}

@@ -485,7 +485,15 @@ export function BudgetGridView({ anio: anioProp }: { anio?: number } = {}) {
         {cutoff ? ` (${cutoff})` : ""} are history from the LEDGER and are locked.
       </p>
 
-      <div className="max-h-[66vh] overflow-auto rounded-lg border border-slate-200 bg-white">
+      {/* ⚠️ El alto se calcula contra la VENTANA, no un 66vh fijo.
+          Con 66vh y casi 40vh de encabezados arriba, la pagina quedaba con una
+          franja de scroll de ocho puntos: inservible. El owner la marco en
+          rojo. Ahora la grilla ocupa lo que queda y una sola barra —la suya—
+          recorre las 104 filas. */}
+      <div
+        className="overflow-auto rounded-lg border border-slate-200 bg-white"
+        style={{ height: "calc(100vh - 300px)", minHeight: 320 }}
+      >
         <table className="border-collapse text-[11px]">
           <thead className="sticky top-0 z-20">
             <tr className="bg-[#0F5F59] text-white">
