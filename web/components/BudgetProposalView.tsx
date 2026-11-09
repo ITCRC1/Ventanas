@@ -142,13 +142,24 @@ export function BudgetProposalView() {
     return out;
   }, [d?.semanas]);
 
+  /** Las lineas agrupadas por SECCION del WBS -- las mismas once del Job Cost,
+   *  0 a 10, en el mismo orden y con los mismos nombres.
+   *
+   *  ⚠️ Antes agrupaba por `category`, que daba OCHO grupos con otros nombres
+   *  («Overhead», «CFIA Condo», «Setena D1»...). Mismos datos, dos arboles
+   *  distintos: saltar del Job Cost a este tab obligaba a recomponer el mapa de
+   *  cabeza, y el owner lo pidio explicito -- «ni mas ni menos».
+   *
+   *  El orden sale del payload, que ya viene ordenado por seccion: un Map de JS
+   *  conserva el orden de insercion, asi que no hace falta reordenar aca. */
   const porCat = useMemo(() => {
     const m = new Map<string, BudgetProposalRow[]>();
     for (const f of d?.filas ?? []) {
       if (soloConMonto && f.propuesta_total < 0.5 && f.remaining < 0.5) continue;
-      const a = m.get(f.category);
+      const k = f.seccion === null ? "—" : `${f.seccion} ${f.seccion_titulo}`.trim();
+      const a = m.get(k);
       if (a) a.push(f);
-      else m.set(f.category, [f]);
+      else m.set(k, [f]);
     }
     return [...m.entries()];
   }, [d?.filas, soloConMonto]);
@@ -434,7 +445,12 @@ function Desglose({
                 <tr key={f.wbs_code} className="border-b border-slate-50">
                   <td className="px-3 py-0.5 font-mono text-xs">{f.wbs_code}</td>
                   <td className="px-3 py-0.5">{f.title}</td>
-                  <td className="px-3 py-0.5 text-slate-400">{f.category}</td>
+                  {/* La columna dice «Section», asi que muestra la SECCION del
+                      WBS y no la categoria. Decian cosas distintas desde que el
+                      tab paso a agrupar por seccion. */}
+                  <td className="px-3 py-0.5 text-slate-400">
+                    {f.seccion === null ? "—" : `${f.seccion} ${f.seccion_titulo}`.trim()}
+                  </td>
                   <td className="tabular px-3 py-0.5 text-right font-semibold">{usd(v)}</td>
                   <td className="tabular px-3 py-0.5 text-right text-slate-400">
                     {total ? `${Math.round((v / total) * 1000) / 10}%` : "—"}

@@ -2032,6 +2032,13 @@ export function useLedgerOptions(q: string, enabled = true) {
 // --- Propuesta de presupuesto anual -----------------------------------------
 
 export interface BudgetProposalRow {
+  /** La seccion del WBS: el numero antes del primer punto. Es como agrupa el
+   *  Job Cost y, desde el 2026-11-09, tambien el Budget Proposal. Viene de la
+   *  fuente y NO se deriva del codigo en cada vista: que cada una lo hiciera
+   *  por su cuenta es como se llega a que un codigo raro caiga en grupos
+   *  distintos segun la pantalla. */
+  seccion: number | null;
+  seccion_titulo: string;
   wbs_code: string;
   title: string;
   category: string;

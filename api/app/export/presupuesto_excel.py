@@ -206,9 +206,16 @@ def propuesta_a_xlsx(d: dict[str, Any]) -> bytes:
     # con "int object is not subscriptable".
     totales = d["totales"]
 
+    # ⚠️ Por SECCION del WBS, no por `category`: las mismas once del Job Cost
+    # (0 a 10). El payload ya viene ordenado por seccion y un dict de Python
+    # conserva el orden de insercion, asi que las hojas salen en ese orden sin
+    # reordenar nada. Antes esto agrupaba por categoria y el Excel mostraba ocho
+    # grupos que no existian en el Job Cost.
     por_cat: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for f in filas:
-        por_cat[f["category"]].append(f)
+        sec = f.get("seccion")
+        clave = "\u2014" if sec is None else f"{sec} {f.get('seccion_titulo') or ''}".strip()
+        por_cat[clave].append(f)
 
     # El plano: en qué fila cae cada cosa. Se resuelve UNA vez y todas las hojas
     # lo usan, por eso coinciden fila a fila por construcción.

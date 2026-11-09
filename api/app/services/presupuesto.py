@@ -84,14 +84,37 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
             """
             SELECT f.wbs_code, f.title, f.category, f.phase, f.owner, f.state,
                    f.budget_original, f.budget_change, f.budget_revised,
-                   f.spend, f.remaining
+                   f.spend, f.remaining,
+                   -- ⚠️ CASE y no `::int` a secas: hay codigos de WBS que son
+                   -- texto (Blue, Green, "Other Items"...). Son la leyenda del
+                   -- Job Cost guardada como filas; `kind = 'cost'` ya las deja
+                   -- fuera, pero el cast reventaba si alguna se colaba.
+                   CASE WHEN split_part(f.wbs_code, '.', 1) ~ '^[0-9]+$'
+                        THEN split_part(f.wbs_code, '.', 1)::int END AS seccion
             FROM v_wbs_financials f
             LEFT JOIN wbs_item w ON w.wbs_code = f.wbs_code
             WHERE f.kind = 'cost'
-            ORDER BY COALESCE(f.category, 'zzz'), w.sort_order, f.wbs_code
+            -- El MISMO orden del Job Cost: por seccion y, dentro, el del WBS.
+            ORDER BY seccion NULLS LAST, w.sort_order, f.wbs_code
             """
         )
     ).mappings().all()
+
+    # ── El titulo de cada seccion ─────────────────────────────────────────
+    # Sale de la fila cuyo codigo es el numero pelado: "0" -> "Property Holding
+    # Expenses". Va en consulta aparte porque la seccion 6 es `proceeds` (la
+    # venta) y el filtro `kind = 'cost'` de arriba la dejaria sin nombre.
+    titulos = {
+        str(r["wbs_code"]): r["title"]
+        for r in db.execute(
+            text(
+                """
+                SELECT wbs_code, title FROM v_wbs_financials
+                 WHERE wbs_code ~ '^[0-9]+$'
+                """
+            )
+        ).mappings()
+    }
 
     # ── El cronograma, partido en los tres tramos ──────────────────────────
     corte = db.execute(text("SELECT cutoff_date FROM settings LIMIT 1")).scalar()
@@ -175,6 +198,12 @@ def construir(db: Session, anio: int) -> dict[str, Any]:
                 "wbs_code": code,
                 "title": ln["title"],
                 "category": ln["category"] or "Sin categoría",
+                # La seccion del WBS y su nombre: con esto las cuatro vistas y
+                # el Excel agrupan igual que el Job Cost sin derivar nada.
+                "seccion": ln["seccion"],
+                "seccion_titulo": titulos.get(str(ln["seccion"]), "")
+                if ln["seccion"] is not None
+                else "",
                 "phase": ln["phase"],
                 "owner": ln["owner"],
                 "state": ln["state"],
