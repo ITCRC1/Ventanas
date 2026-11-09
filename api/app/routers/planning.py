@@ -581,5 +581,12 @@ def export_xlsx(
     )
     nombre = f"Planning_{win[0]}_{win[-1]}.xlsx" if win else "Planning.xlsx"
     return Response(
-        data, media_type=_XLSX, headers={"Content-Disposition": f'attachment; filename="{nombre}"'}
+        data,
+        media_type=_XLSX,
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
+            # ⚠️ Se arma de cero en cada llamada: sin esto el navegador
+            # puede servir una copia guardada y mostrar datos de ayer.
+            "Cache-Control": "no-store, max-age=0",
+        },
     )

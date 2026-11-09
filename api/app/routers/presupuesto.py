@@ -8,6 +8,7 @@ distintas y nadie sepa cuál creer.
 from __future__ import annotations
 
 import datetime as dt
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, Response
@@ -42,8 +43,17 @@ def propuesta(anio: int | None = None, db: Session = Depends(get_db)) -> dict[st
 def exportar(anio: int | None = None, db: Session = Depends(get_db)) -> Response:
     y = _anio(anio)
     data = propuesta_a_xlsx(svc.construir(db, y))
+    # ⚠️ La fecha en el nombre y `no-store`, por lo mismo que el Master File: el
+    # libro se arma de cero en cada llamada, pero sin esta cabecera el navegador
+    # puede servir una copia guardada y mostrar el presupuesto de ayer sin que
+    # nada avise. Y con el nombre siempre igual, Windows apila "(9)", "(10)"… y
+    # no hay manera de saber cual es el de hoy.
+    nombre = f"Presupuesto_{y}_Ventanas_{date.today():%Y-%m-%d}.xlsx"
     return Response(
         data,
         media_type=_XLSX,
-        headers={"Content-Disposition": f'attachment; filename="Presupuesto_{y}_Ventanas.xlsx"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
+            "Cache-Control": "no-store, max-age=0",
+        },
     )

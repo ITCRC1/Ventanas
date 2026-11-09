@@ -350,7 +350,14 @@ def lines_xlsx(disb_id: int, db: Session = Depends(get_db)) -> Response:
     data = lines_to_xlsx(d, [dict(r) for r in rows])
     name = f"ShortPayment_{d.disb_no}.{d.disb_sub}.xlsx"
     return Response(
-        data, media_type=_XLSX, headers={"Content-Disposition": f'attachment; filename="{name}"'}
+        data,
+        media_type=_XLSX,
+        headers={
+            "Content-Disposition": f'attachment; filename="{name}"',
+            # ⚠️ Se arma de cero en cada llamada: sin esto el navegador
+            # puede servir una copia guardada y mostrar datos de ayer.
+            "Cache-Control": "no-store, max-age=0",
+        },
     )
 
 
@@ -448,7 +455,16 @@ def breakdown_pdf(
     d, rows, show_bank = _breakdown_ctx(db, user, disb_id)
     pdf = render_pdf(breakdown_html(d, rows, show_bank=show_bank))
     name = f"Breakdown_{d.disb_no}.{d.disb_sub}.pdf"
-    return Response(pdf, media_type=_PDF, headers={"Content-Disposition": f'inline; filename="{name}"'})
+    return Response(
+        pdf,
+        media_type=_PDF,
+        headers={
+            "Content-Disposition": f'inline; filename="{name}"',
+            # ⚠️ Se arma de cero en cada llamada: sin esto el navegador
+            # puede servir una copia guardada y mostrar datos de ayer.
+            "Cache-Control": "no-store, max-age=0",
+        },
+    )
 
 
 @disb.get("/{disb_id}/instruction.pdf")
@@ -469,7 +485,16 @@ def instruction_pdf(
         )
     pdf = render_pdf(instruction_html(d, tpl, rows, show_bank=show_bank))
     name = f"Instruccion_{d.disb_no}.{d.disb_sub}.pdf"
-    return Response(pdf, media_type=_PDF, headers={"Content-Disposition": f'inline; filename="{name}"'})
+    return Response(
+        pdf,
+        media_type=_PDF,
+        headers={
+            "Content-Disposition": f'inline; filename="{name}"',
+            # ⚠️ Se arma de cero en cada llamada: sin esto el navegador
+            # puede servir una copia guardada y mostrar datos de ayer.
+            "Cache-Control": "no-store, max-age=0",
+        },
+    )
 
 
 for _sub in (pay, rec, cred, disb):

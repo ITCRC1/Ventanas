@@ -104,7 +104,12 @@ def export_report(name: str, db: Session = Depends(get_db)) -> Response:
     archivo = f"Ventanas_{name.replace('-', '_')}.xlsx"
     return Response(
         blob, media_type=_XLSX,
-        headers={"Content-Disposition": f'attachment; filename="{archivo}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{archivo}"',
+            # ⚠️ Se arma de cero en cada llamada: sin esto el navegador
+            # puede servir una copia guardada y mostrar datos de ayer.
+            "Cache-Control": "no-store, max-age=0",
+        },
     )
 
 
