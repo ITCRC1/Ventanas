@@ -789,12 +789,18 @@ class ExcelExporter:
         ws["A1"].font = Font(bold=True, size=16, color="FF0F5F59")
         ws["A2"] = (
             f"Las mismas líneas del Job Cost, en el mismo orden. Cada mes muestra {A} "
-            f"al lado de {B}. Todo es fórmula: sale de «Job Cost Report» y se mueve con él."
+            f"al lado de {B}; al final, el {A} de corrido. Variance = Over/Under del "
+            f"Job Cost (Forecast − Revised: positivo = por encima del presupuesto). "
+            f"Todo es fórmula: sale de «Job Cost Report» y se mueve con él."
         )
         ws["A2"].font = Font(size=10, color="FF787B86")
 
         # --- columnas fijas: la identidad de la línea, igual que el Job Cost ---
-        FIJ = ["Status", "WBS", "Task Title", "Owner", "Category", "Phase", "Budget Revised"]
+        # Las mismas columnas de plata que el Job Cost, apuntadas a sus celdas:
+        # Budget Revised (I), Total Spend (J) y Variance = Over/Under (M).
+        FIJ = ["Status", "WBS", "Task Title", "Owner", "Category", "Phase",
+               "Budget Revised", "Total Spend", "Variance"]
+        FIJ_JC = {7: "I", 8: "J", 9: "M"}   # columna de esta hoja -> columna del Job Cost
         hr = 5
         for i, h in enumerate(FIJ, 1):
             c = ws.cell(hr, i, h)
@@ -840,8 +846,36 @@ class ExcelExporter:
             h.font = WHITE
             h.alignment = Alignment(horizontal="center", wrap_text=True)
             ws.column_dimensions[gc(cc)].width = w
+        # --- 2027 mes a mes, solo. Pedido del owner: «al final del side to side
+        # formulado pon como se veria mes por mes solo 2027». Se lee el año de
+        # corrido, sin la comparacion al lado.
+        ws.column_dimensions[gc(T_P + 1)].width = 2      # espacio antes del bloque
+        solo0 = T_P + 2
+        solocol: dict[int, int] = {}
+        ws.merge_cells(
+            start_row=hr - 1, start_column=solo0, end_row=hr - 1, end_column=solo0 + 12
+        )
+        t = ws.cell(hr - 1, solo0, f"{A} MES A MES")
+        t.fill = PatternFill("solid", fgColor="FF1F4E79")
+        t.font = Font(bold=True, color="FFFFFFFF", size=10)
+        t.alignment = Alignment(horizontal="center")
+        for m in range(1, 13):
+            cc = solo0 + m - 1
+            solocol[m] = cc
+            h = ws.cell(hr, cc, MES[m - 1][:3].upper())
+            h.fill = PatternFill("solid", fgColor="FF1F4E79")
+            h.font = WHITE
+            h.alignment = Alignment(horizontal="center")
+            ws.column_dimensions[gc(cc)].width = 13
+        solo_tot = solo0 + 12
+        h = ws.cell(hr, solo_tot, f"AÑO {A}")
+        h.fill = PatternFill("solid", fgColor="FF1F4E79")
+        h.font = WHITE
+        h.alignment = Alignment(horizontal="center", wrap_text=True)
+        ws.column_dimensions[gc(solo_tot)].width = 16
+
         ws.row_dimensions[hr].height = 26
-        ult = T_P
+        ult = solo_tot
 
         def _meses(rr: int, jc_fila: int) -> None:
             """Los 24 montos de la fila, apuntados a la celda del Job Cost."""
@@ -867,6 +901,15 @@ class ExcelExporter:
             # o un #DIV/0! no.
             p = ws.cell(rr, T_P, f'=IFERROR({gc(T_V)}{rr}/ABS({gc(T_B)}{rr}),"")')
             p.number_format = "0.0%"
+            # El 2027 solo: apunta a la columna de 2027 de ESTA misma hoja, no al
+            # Job Cost. Asi el dueño ve a simple vista que es el mismo numero que
+            # tiene al lado del 2026, no otro que podria diferir.
+            for m, cc in solocol.items():
+                cel = ws.cell(rr, cc, f"={gc(mescol[m][0])}{rr}")
+                cel.number_format = MONEY
+            tt = ws.cell(rr, solo_tot, f"={gc(T_A)}{rr}")
+            tt.number_format = MONEY
+            tt.font = Font(bold=True)
 
         # --- el cuerpo: se relee el plano del Job Cost, fila por fila ---
         r = hr + 1
@@ -902,12 +945,18 @@ class ExcelExporter:
                 if p.get("code"):
                     ws.cell(r, 2, p["code"])
                 ws.cell(r, 3, p["etq"]).font = BOLD
-            # El presupuesto revisado, para leer el mes contra algo.
-            ws.cell(r, 7, f"={JC}!I{p['fila']}").number_format = MONEY
+            # Presupuesto, gastado y variacion: las mismas celdas del Job Cost.
+            for cc, jcl in FIJ_JC.items():
+                ws.cell(r, cc, f"={JC}!{jcl}{p['fila']}").number_format = MONEY
             _meses(r, p["fila"])
             _cierre(r)
             if tipo != "linea":
-                for cc in [7, *[x for m in mescol.values() for x in m], T_A, T_B, T_V]:
+                for cc in [
+                    *FIJ_JC,
+                    *[x for m in mescol.values() for x in m],
+                    T_A, T_B, T_V,
+                    *solocol.values(), solo_tot,
+                ]:
                     ws.cell(r, cc).font = BOLD
             r += 1
 
@@ -922,7 +971,9 @@ class ExcelExporter:
             ),
         )
 
-        for c2, w in zip(range(1, 8), [11, 10, 42, 14, 20, 20, 16], strict=False):
+        for c2, w in zip(
+            range(1, 10), [11, 10, 42, 14, 20, 20, 16, 16, 15], strict=False
+        ):
             ws.column_dimensions[gc(c2)].width = w
         ws.freeze_panes = ws.cell(hr + 1, col0)
         ws.auto_filter.ref = f"A{hr}:{gc(ult)}{r - 1}"
@@ -2851,6 +2902,12 @@ class ExcelExporter:
             "   The same lines as Job Cost Report, in the same order, with each",
             "      month side by side: 2027 next to 2026, a blank column, then the",
             "      next month. It ends with the full year for each and the variance.",
+            "   Budget Revised, Total Spend and Variance come straight from Job",
+            "      Cost Report (I, J and M). Variance = Over/Under there:",
+            "      Forecast − Revised, so positive means above budget.",
+            "   After the year columns there is a second block, 2027 MES A MES:",
+            "      the same twelve months read straight, without 2026 beside",
+            "      them. Each cell points at the 2027 column on its own left.",
             "   Nothing is recalculated here: every month cell points at that",
             "      month's cell in Job Cost Report, so correcting a week there",
             "      moves this tab with it. Red in VARIANZA = 2027 spends more.",
