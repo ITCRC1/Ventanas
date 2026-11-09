@@ -27,6 +27,7 @@ from app.routers import (
     public,
     reports,
     schedule,
+    tablero,
     us_wires,
     wbs,
 )
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(reports.router, prefix=p)
     app.include_router(export.router, prefix=p)
     app.include_router(blog.router, prefix=p)
+    app.include_router(tablero.router, prefix=p)
 
     @app.get("/")
     def root() -> dict[str, str]:

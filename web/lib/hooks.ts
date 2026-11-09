@@ -15,6 +15,7 @@ import type {
   CreditAdjustment,
   CreditBalance,
   CreditMovement,
+  DashboardSummary,
   Disbursement,
   DisbursementDetail,
   EscrowDraw,
@@ -94,6 +95,17 @@ export function useFinancials() {
   return useQuery({
     queryKey: ["wbs", "financials"],
     queryFn: () => api.get<WbsFinancials[]>("/wbs/financials"),
+  });
+}
+
+/** El tablero del inversionista: un solo viaje para los cuatro bloques. */
+export function useDashboard() {
+  return useQuery({
+    // La llave arranca con "wbs" a proposito: las invalidaciones de ["wbs"] que
+    // ya existen en la app refrescan tambien el tablero. Sin eso, editar una
+    // linea en Job Cost dejaria el Dashboard mostrando lo de antes.
+    queryKey: ["wbs", "dashboard"],
+    queryFn: () => api.get<DashboardSummary>("/dashboard/summary"),
   });
 }
 

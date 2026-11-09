@@ -479,3 +479,84 @@ export interface EscrowDraw {
   pagado: string;
   pendiente_pago: string;
 }
+
+/** El tablero del inversionista. Sale de `services/tablero.py` y la pantalla no
+ *  recalcula nada: si el navegador hiciera la cuenta, el dia que el backend
+ *  cambie una formula las dos cifras se separan y nadie sabe cual creer. */
+export interface DashboardSummary {
+  fecha: string;
+  dias_caja: number;
+  costo: {
+    budget_original: number;
+    budget_change: number;
+    budget_revised: number;
+    crecimiento_pct: number;
+    pagado: number;
+    comprometido: number;
+    por_pagar: number;
+    sin_comprometer: number;
+    remanente: number;
+    anticipated_final_cost: number;
+    variacion_vs_original: number;
+  };
+  adelantados: {
+    exposicion_sin_contrato_pct: number;
+    exposicion_sin_contrato: number;
+    crecimiento_presupuesto_pct: number;
+    contingencia: {
+      existe: boolean;
+      lineas: number;
+      presupuesto: number;
+      consumida: number;
+      queda: number;
+    };
+    atencion_lineas: number;
+    atencion_remanente: number;
+    caja_hoy: number;
+    caja_pide_90: number;
+    caja_faltante: number;
+  };
+  avance: {
+    pct_por_costo: number;
+    pct_por_hito: number;
+    por_estado: { estado: string; lineas: number; presupuesto: number; gastado: number }[];
+    curva: {
+      mes: string;
+      plan: number;
+      real: number;
+      plan_acum: number;
+      real_acum: number | null;
+    }[];
+  };
+  pendiente: {
+    secciones: {
+      category: string;
+      lineas: number;
+      budget_revised: number;
+      spend: number;
+      committed: number;
+      remaining: number;
+      por_pagar: number;
+      sin_comprometer: number;
+      pct: number;
+    }[];
+    llamados: { desde: string; monto: number }[];
+    permisos: {
+      wbs_code: string;
+      title: string;
+      state: string | null;
+      budget_revised: number;
+      spend: number;
+    }[];
+    atencion: {
+      wbs_code: string;
+      title: string;
+      category: string | null;
+      budget_revised: number;
+      spend: number;
+      remaining: number;
+    }[];
+  };
+  aporte_duenos: number;
+  venta: { wbs_code: string; title: string; esperado: number; realizado: number }[];
+}
