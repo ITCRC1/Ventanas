@@ -1,12 +1,13 @@
 "use client";
 
 import { ApiError } from "@/lib/api";
-import { money } from "@/lib/format";
+import { money, moneyUsd } from "@/lib/format";
 import {
   useAbsorbWire,
   useAddWireFee,
   useBankAccounts,
   useBankChargesMonthly,
+  useBankBridge,
   useBankChargesPending,
   useBankFees,
   useBankFeesByYear,
@@ -815,140 +816,348 @@ function BankFeesPanel() {
   );
 }
 
+/* ── El puente del saldo: del banco a lo que el sistema sabe ─────────────── */
+
+/**
+ * Owner, 2026-11-09: *«pegar el saldo del banco con los short payments
+ * solicitados y no pagados, con los ingresos de intereses no registrados y los
+ * gastos por intereses no registrados»* · *«debe ser un sub tab del banco»*.
+ *
+ * ⚠️ Las partidas van SEPARADAS por confianza y no sumadas en una columna. Al
+ * medirlas, tres de las cuatro resultaron ser huecos de carga y no obligaciones:
+ * las 25 tandas «pedidas y no pagadas» arrancan en diciembre de 2024 y ninguna
+ * aparece en el LEDGER, con $14.3M ya pagados en el proyecto. Un puente que las
+ * presentara como equivalentes diria que faltan $3.5 millones.
+ */
+function BalanceBridge() {
+  const q = useBankBridge();
+  if (q.isLoading) return <p className="text-sm text-slate-500">Loading the bridge…</p>;
+  if (q.isError)
+    return <p className="text-sm text-red-600">Could not load it: {(q.error as Error).message}</p>;
+  const d = q.data;
+  if (!d) return null;
+
+  const duro = d.partidas.filter((p) => p.confianza === "dato");
+  const hueco = d.partidas.filter((p) => p.confianza === "hueco");
+
+  return (
+    <div className="space-y-4">
+      {/* ── De dónde sale el saldo ───────────────────────────────────── */}
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">
+          Where the balance comes from
+          <span className="ml-2 font-normal text-slate-400">
+            — the last balance the bank itself reported on each account
+          </span>
+        </h2>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Account</th>
+                <th className="px-3 py-2">As of</th>
+                <th className="px-3 py-2 text-right">Balance</th>
+                <th className="px-3 py-2">Statement says</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {d.cuentas.map((c) => (
+                <tr key={c.id}>
+                  <td className="px-3 py-1.5">{c.nombre}</td>
+                  <td className="px-3 py-1.5 text-slate-500">{c.fecha ?? "—"}</td>
+                  <td className="tabular px-3 py-1.5 text-right font-semibold">
+                    {moneyUsd(c.saldo)}
+                  </td>
+                  <td className="px-3 py-1.5 text-slate-400">
+                    {c.extracto_fecha
+                      ? `${moneyUsd(c.saldo_extracto)} at ${c.extracto_fecha}`
+                      : "no statement loaded"}
+                  </td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-slate-800 bg-[#B8E8D2] font-bold">
+                <td className="px-3 py-2" colSpan={2}>
+                  BANK BALANCE
+                </td>
+                <td className="tabular px-3 py-2 text-right">{moneyUsd(d.saldo_banco)}</td>
+                <td className="px-3 py-2" />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── El puente ────────────────────────────────────────────────── */}
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">
+          The bridge
+          <span className="ml-2 font-normal text-slate-400">
+            — what the bank moved and the LEDGER never recorded
+          </span>
+        </h2>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-slate-100">
+              <tr className="bg-slate-50 font-semibold">
+                <td className="px-3 py-2">Bank balance</td>
+                <td className="px-3 py-2 text-right text-slate-400">—</td>
+                <td className="tabular px-3 py-2 text-right">{moneyUsd(d.saldo_banco)}</td>
+              </tr>
+              {duro.map((p) => (
+                <tr key={p.etq}>
+                  <td className="px-3 py-1.5">
+                    {p.etq}
+                    <div className="text-xs text-slate-400">{p.nota}</div>
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-xs text-slate-400">{p.n} mov.</td>
+                  <td
+                    className={`tabular px-3 py-1.5 text-right ${p.monto < 0 ? "text-emerald-700" : "text-red-700"}`}
+                  >
+                    {moneyUsd(p.monto)}
+                  </td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-slate-700 bg-[#D8F4E6] font-bold">
+                <td className="px-3 py-2">BALANCE AFTER WHAT THE BANK ALREADY MOVED</td>
+                <td className="px-3 py-2" />
+                <td className="tabular px-3 py-2 text-right">{moneyUsd(d.saldo_ajustado)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Y lo que NO se suma, con el porqué ───────────────────────── */}
+      {hueco.length ? (
+        <div className="rounded-lg border-2 border-alerta bg-amber-50 p-3">
+          <h2 className="mb-1 text-sm font-semibold text-amber-900">
+            Asked for, but not added to the bridge
+          </h2>
+          {hueco.map((p) => (
+            <div key={p.etq} className="mt-2 text-sm text-amber-900">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold">{p.etq}</span>
+                <span className="tabular font-bold">{moneyUsd(p.monto)}</span>
+              </div>
+              <p className="mt-0.5 text-xs">{p.nota}</p>
+            </div>
+          ))}
+          <p className="mt-3 border-t border-amber-300 pt-2 text-xs text-amber-900">
+            Counting it anyway would put the balance at{" "}
+            <b className="tabular">{moneyUsd(d.saldo_si_todo_cuenta)}</b>. That is not a cash
+            position — it is the same reporting gap the Dashboard flags on «Billed, not marked
+            paid»: the data entry stops before the status moves. Close those batches and this line
+            goes away on its own.
+          </p>
+        </div>
+      ) : null}
+
+      {/* ── Los pagos del banco sin fila en el LEDGER ────────────────── */}
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">
+          Bank payments with no LEDGER row
+          <span className="ml-2 font-normal text-slate-400">
+            — the «no invoice / Pending» rows in the tray
+          </span>
+        </h2>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Account</th>
+                <th className="px-3 py-2 text-right">Movements</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {d.sin_ledger.map((x) => (
+                <tr key={x.cuenta}>
+                  <td className="px-3 py-1.5">{x.nombre}</td>
+                  <td className="tabular px-3 py-1.5 text-right text-slate-500">{x.n}</td>
+                  <td className="tabular px-3 py-1.5 text-right">{moneyUsd(x.monto)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* ⚠️ Decir el total sumado seria enganoso: los $10.4M de Playa
+            Ventanas I son los giros de los duenos vistos desde el otro lado, no
+            gastos sin registrar. Por eso va por cuenta y sin gran total. */}
+        <p className="mt-1 text-xs text-slate-500">
+          Shown per account and with no grand total on purpose: the largest line is the owners&apos;
+          wires seen from the sending side, not unrecorded spend. Matching them is what the «Bank
+          Reconciliation» tab is for.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function BankView() {
   const me = useMe();
   const canEdit = me.data?.permissions.includes("bank.view") ?? false;
   const recon = useWireReconciliation();
   const charges = useBankChargesMonthly();
   const pending = useBankChargesPending();
+  // Sub-tabs: el owner pidio el puente «como un sub tab del banco», y la
+  // pantalla ya venia con seis secciones apiladas una abajo de la otra.
+  const [vista, setVista] = useState<"cuentas" | "puente">("cuentas");
 
   return (
     <div className="space-y-5">
-      <RegisterWire />
-
-      <AccountStatement canEdit={canEdit} />
-
-      <UsWireTransfers />
-
-      <div>
-        <h2 className="mb-2 text-sm font-semibold text-slate-600">
-          Wire reconciliation (requested → sent → fees → net)
-        </h2>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="w-full min-w-[1040px] text-sm">
-            <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Value date</th>
-                <th className="px-3 py-2">Ref.</th>
-                <th className="px-3 py-2">Disb.</th>
-                <th className="px-3 py-2 text-right">Requested</th>
-                <th className="px-3 py-2 text-right">Sent</th>
-                <th className="px-3 py-2 text-right">Diff. req.−sent</th>
-                <th className="px-3 py-2 text-right">Fees</th>
-                <th className="px-3 py-2 text-right">Net received</th>
-                <th className="px-3 py-2 text-right">Unexplained</th>
-                <th className="px-3 py-2 text-right">% fee</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {(recon.data ?? []).map((w) => (
-                <WireRow key={w.id} w={w} canEdit={canEdit} />
-              ))}
-              {recon.data?.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="px-3 py-6 text-center text-slate-400">
-                    No wires registered.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {(
+          [
+            ["cuentas", "Accounts and wires", "Statements, wires, fees and charges"],
+            ["puente", "Balance bridge", "From the bank balance to what the system knows"],
+          ] as ["cuentas" | "puente", string, string][]
+        ).map(([k, etq, ayuda]) => (
+          <button
+            key={k}
+            type="button"
+            title={ayuda}
+            onClick={() => setVista(k)}
+            className={`rounded-md px-4 py-2 text-sm font-bold transition ${
+              vista === k
+                ? "bg-brand-700 text-white shadow ring-2 ring-brand-800 ring-offset-1"
+                : "bg-slate-100 text-slate-700 ring-1 ring-slate-300 hover:bg-slate-200"
+            }`}
+          >
+            {etq}
+          </button>
+        ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-slate-600">
-            Charges and interest by month
-          </h2>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">Account</th>
-                  <th className="px-3 py-2">Month</th>
-                  <th className="px-3 py-2 text-right">Charges</th>
-                  <th className="px-3 py-2 text-right">Interest</th>
-                  <th className="px-3 py-2 text-right">Net</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(charges.data ?? []).map((c) => (
-                  <tr key={`${c.cuenta}-${c.mes}`}>
-                    <td className="px-3 py-1.5 text-slate-600">{c.cuenta}</td>
-                    <td className="px-3 py-1.5 text-slate-500">{c.mes}</td>
-                    <td className="tabular px-3 py-1.5 text-right text-red-600">
-                      {money(c.total_cargos)}
-                    </td>
-                    <td className="tabular px-3 py-1.5 text-right text-emerald-700">
-                      {money(c.intereses)}
-                    </td>
-                    <td className="tabular px-3 py-1.5 text-right">{money(c.neto)}</td>
-                  </tr>
-                ))}
-                {charges.data?.length === 0 ? (
+      {vista === "puente" ? <BalanceBridge /> : null}
+      {vista === "puente" ? null : (
+        <>
+          <RegisterWire />
+
+          <AccountStatement canEdit={canEdit} />
+
+          <UsWireTransfers />
+
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-slate-600">
+              Wire reconciliation (requested → sent → fees → net)
+            </h2>
+            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+              <table className="w-full min-w-[1040px] text-sm">
+                <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
                   <tr>
-                    <td colSpan={5} className="px-3 py-5 text-center text-slate-400">
-                      No charges registered.
-                    </td>
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">Value date</th>
+                    <th className="px-3 py-2">Ref.</th>
+                    <th className="px-3 py-2">Disb.</th>
+                    <th className="px-3 py-2 text-right">Requested</th>
+                    <th className="px-3 py-2 text-right">Sent</th>
+                    <th className="px-3 py-2 text-right">Diff. req.−sent</th>
+                    <th className="px-3 py-2 text-right">Fees</th>
+                    <th className="px-3 py-2 text-right">Net received</th>
+                    <th className="px-3 py-2 text-right">Unexplained</th>
+                    <th className="px-3 py-2 text-right">% fee</th>
+                    <th className="px-3 py-2" />
                   </tr>
-                ) : null}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(recon.data ?? []).map((w) => (
+                    <WireRow key={w.id} w={w} canEdit={canEdit} />
+                  ))}
+                  {recon.data?.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="px-3 py-6 text-center text-slate-400">
+                        No wires registered.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-slate-600">Charges to recover</h2>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">Account</th>
-                  <th className="px-3 py-2">Month</th>
-                  <th className="px-3 py-2 text-right">Total charges</th>
-                  <th className="px-3 py-2 text-right">To recover</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(pending.data ?? []).map((c) => (
-                  <tr key={`${c.cuenta}-${c.mes}`}>
-                    <td className="px-3 py-1.5 text-slate-600">{c.cuenta}</td>
-                    <td className="px-3 py-1.5 text-slate-500">{c.mes}</td>
-                    <td className="tabular px-3 py-1.5 text-right">{money(c.total_cargos)}</td>
-                    <td className="tabular px-3 py-1.5 text-right font-medium text-amber-600">
-                      {money(c.por_recuperar ?? 0)}
-                    </td>
-                  </tr>
-                ))}
-                {pending.data?.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-5 text-center text-slate-400">
-                      Nothing pending to recover.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-slate-600">
+                Charges and interest by month
+              </h2>
+              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Account</th>
+                      <th className="px-3 py-2">Month</th>
+                      <th className="px-3 py-2 text-right">Charges</th>
+                      <th className="px-3 py-2 text-right">Interest</th>
+                      <th className="px-3 py-2 text-right">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(charges.data ?? []).map((c) => (
+                      <tr key={`${c.cuenta}-${c.mes}`}>
+                        <td className="px-3 py-1.5 text-slate-600">{c.cuenta}</td>
+                        <td className="px-3 py-1.5 text-slate-500">{c.mes}</td>
+                        <td className="tabular px-3 py-1.5 text-right text-red-600">
+                          {money(c.total_cargos)}
+                        </td>
+                        <td className="tabular px-3 py-1.5 text-right text-emerald-700">
+                          {money(c.intereses)}
+                        </td>
+                        <td className="tabular px-3 py-1.5 text-right">{money(c.neto)}</td>
+                      </tr>
+                    ))}
+                    {charges.data?.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-5 text-center text-slate-400">
+                          No charges registered.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-slate-600">Charges to recover</h2>
+              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Account</th>
+                      <th className="px-3 py-2">Month</th>
+                      <th className="px-3 py-2 text-right">Total charges</th>
+                      <th className="px-3 py-2 text-right">To recover</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(pending.data ?? []).map((c) => (
+                      <tr key={`${c.cuenta}-${c.mes}`}>
+                        <td className="px-3 py-1.5 text-slate-600">{c.cuenta}</td>
+                        <td className="px-3 py-1.5 text-slate-500">{c.mes}</td>
+                        <td className="tabular px-3 py-1.5 text-right">{money(c.total_cargos)}</td>
+                        <td className="tabular px-3 py-1.5 text-right font-medium text-amber-600">
+                          {money(c.por_recuperar ?? 0)}
+                        </td>
+                      </tr>
+                    ))}
+                    {pending.data?.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-5 text-center text-slate-400">
+                          Nothing pending to recover.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <BankFeesPanel />
+          <BankFeesPanel />
 
-      <UnclassifiedTray />
+          <UnclassifiedTray />
+        </>
+      )}
     </div>
   );
 }

@@ -218,12 +218,21 @@ def construir(db: Session, dias: int = DIAS_CAJA) -> dict[str, Any]:
         db.execute(
             text(
                 """
-                SELECT COALESCE(SUM(s.closing_balance), 0)
+                -- ⚠️ El saldo sale del ULTIMO MOVIMIENTO, no del extracto.
+                -- La cuenta operativa tiene DOS extractos con el mismo
+                -- `period_to` (2026-11-06): uno declara 49,673.41 y el otro
+                -- 48,209.76, porque el primero termina en el movimiento del
+                -- 11-05 y el segundo trae tres mas del 11-06. Tomar «el
+                -- extracto mas reciente» desempataba al azar y el tablero
+                -- mostraba 1,463.65 de mas. El banco pone el saldo en cada
+                -- linea; ese es el dato.
+                SELECT COALESCE(SUM(t.balance), 0)
                   FROM bank_account a
                   LEFT JOIN LATERAL (
-                      SELECT closing_balance FROM bank_statement
-                       WHERE account_id = a.id ORDER BY period_to DESC LIMIT 1
-                  ) s ON TRUE
+                      SELECT balance FROM bank_tx
+                       WHERE account_id = a.id AND balance IS NOT NULL
+                       ORDER BY tx_date DESC, id DESC LIMIT 1
+                  ) t ON TRUE
                  WHERE a.is_active AND a.currency = 'USD'
                 """
             )

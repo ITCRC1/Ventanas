@@ -99,6 +99,14 @@ export function useFinancials() {
 }
 
 /** El tablero del inversionista: un solo viaje para los cuatro bloques. */
+/** El puente del saldo bancario: un solo viaje. */
+export function useBankBridge() {
+  return useQuery({
+    queryKey: ["bank", "bridge"],
+    queryFn: () => api.get<BankBridge>("/bank/bridge"),
+  });
+}
+
 export function useDashboard() {
   return useQuery({
     // La llave arranca con "wbs" a proposito: las invalidaciones de ["wbs"] que
@@ -2030,6 +2038,42 @@ export function useLedgerOptions(q: string, enabled = true) {
 }
 
 // --- Propuesta de presupuesto anual -----------------------------------------
+
+/** El puente del saldo bancario. Sale de `services/conciliacion.py`.
+ *
+ *  `confianza` separa lo que el banco informa y esta medido ("dato") de lo que
+ *  casi seguro es carga incompleta ("hueco"). Mezclarlas es como se arma un
+ *  numero que asusta y que nadie puede usar: tres de las cuatro partidas que se
+ *  pidieron resultaron ser huecos. */
+export interface BankBridge {
+  fecha: string;
+  cuentas: {
+    id: number;
+    nombre: string;
+    moneda: string;
+    fecha: string | null;
+    saldo: number;
+    saldo_extracto: number;
+    extracto_fecha: string | null;
+  }[];
+  saldo_banco: number;
+  saldo_por_extracto: number;
+  partidas: {
+    etq: string;
+    monto: number;
+    n: number;
+    confianza: "dato" | "hueco";
+    nota: string;
+  }[];
+  intereses: number;
+  cargos: number;
+  pedido: number;
+  pedido_viejo: number;
+  tandas: { status: string; disb: string; mes: string | null; monto: number; en_ledger: number }[];
+  sin_ledger: { cuenta: number; nombre: string; n: number; monto: number }[];
+  saldo_ajustado: number;
+  saldo_si_todo_cuenta: number;
+}
 
 export interface BudgetProposalRow {
   /** La seccion del WBS: el numero antes del primer punto. Es como agrupa el

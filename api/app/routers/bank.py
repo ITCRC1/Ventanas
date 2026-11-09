@@ -31,6 +31,7 @@ from app.schemas.bank import (
 )
 from app.services import bank as svc
 from app.services import bank_recon as rsvc
+from app.services import conciliacion as conc
 
 router = APIRouter(
     prefix="/bank",
@@ -266,3 +267,14 @@ def fees_recap(
     out = rrepo.fees_recap(db, acc, asof)
     out["account_id"] = acc
     return out
+
+
+@router.get("/bridge")
+def puente(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """El puente del saldo: del banco a lo que el sistema sabe.
+
+    El cálculo vive en `services/conciliacion.py`. Acá no hay aritmética a
+    propósito: si el router calculara algo, ese algo no estaría en ningún otro
+    lado y un día las dos cifras dirían cosas distintas.
+    """
+    return conc.construir(db)
