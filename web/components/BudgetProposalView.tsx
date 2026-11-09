@@ -39,6 +39,57 @@ const MES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT
 
 type Vista = "datos" | "meses" | "anio" | "grid";
 
+/** Los tramos del remanente: qué son, de dónde salen y cómo se leen por línea.
+ *
+ * ⚠️ `de` NO es decoración: es el único lugar donde queda escrito, para quien
+ * lea la pantalla, por qué un monto vale lo que vale. Un número que no se puede
+ * abrir es un número que hay que creer, y este reporte va al dueño.
+ *
+ * `linea` devuelve lo que esa línea aporta al tramo. La suma de los aportes
+ * TIENE que dar el total de arriba — el panel lo muestra y así se puede
+ * verificar sin salir de la pantalla. */
+const TRAMOS = {
+  remanente: {
+    etq: "Job Cost remaining",
+    de: "Budget Revised − Spend, línea por línea, de v_wbs_financials: la misma vista que alimenta el Job Cost. Es lo que queda por gastar.",
+    linea: (f: BudgetProposalRow) => f.remaining,
+    cls: "text-slate-900",
+  },
+  vencido: {
+    etq: "Overdue (week already passed)",
+    de: "Plata que el cronograma puso en una semana que ya pasó (posterior al corte del Forecast pero anterior a hoy) y que sigue sin gastarse. No desapareció: hay que reubicarla.",
+    linea: (f: BudgetProposalRow) => f.vencido,
+    cls: "text-red-700",
+  },
+  arrastre: {
+    etq: "Carry-over from this year",
+    de: "Lo que el cronograma tiene de hoy a fin del año en curso. Se arrastra al presupuesto porque todavía no se gastó.",
+    linea: (f: BudgetProposalRow) => f.arrastre,
+    cls: "text-amber-700",
+  },
+  plan: {
+    etq: "Plan",
+    de: "Lo que el cronograma ya tiene dentro del año que se presupuesta. Sale de schedule_cell, semana por semana.",
+    linea: (f: BudgetProposalRow) => f.plan_total,
+    cls: "text-slate-900",
+  },
+  posterior: {
+    etq: "After",
+    de: "Lo que el cronograma pone en años siguientes. No entra en la propuesta de este año, pero se muestra para que el remanente cierre.",
+    linea: (f: BudgetProposalRow) => f.posterior,
+    cls: "text-slate-500",
+  },
+  sin_ubicar: {
+    etq: "Unplaced",
+    de: "Remanente − (vencido + arrastre + plan + posterior). Tiene que ser cero: si no lo es, hay plata pendiente que el cronograma no pone en NINGÚN año, y entonces el presupuesto está incompleto.",
+    linea: (f: BudgetProposalRow) =>
+      f.remaining - (f.vencido + f.arrastre + f.plan_total + f.posterior),
+    cls: "text-emerald-700",
+  },
+} as const;
+
+type Tramo = keyof typeof TRAMOS;
+
 function usd(n: number | null | undefined): string {
   if (!n) return "—";
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -60,6 +111,7 @@ export function BudgetProposalView() {
   const [soloConMonto, setSoloConMonto] = useState(false);
   const [vista, setVista] = useState<Vista>("datos");
   const [porSemana, setPorSemana] = useState(false);
+  const [abierto, setAbierto] = useState<Tramo | null>(null);
   const q = useBudgetProposal(anio);
   const d = q.data;
   // ⚠️ La grilla ESCRIBE. El resto de esta pantalla es de solo lectura, asi
@@ -178,25 +230,41 @@ export function BudgetProposalView() {
           </div>
         </div>
 
-        {/* Los cuatro tramos del remanente, y el control de que cierren. */}
+        {/* Los cuatro tramos del remanente, y el control de que cierren.
+            Cada uno se abre: muestra de dónde sale y qué líneas lo componen. */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-teal-200 bg-white/60 px-3 py-2 text-[11px] sm:grid-cols-6">
-          {[
-            ["Job Cost remaining", t.remanente, "text-slate-900"],
-            ["Overdue (week already passed)", t.vencido, "text-red-700"],
-            ["Carry-over from this year", t.arrastre, "text-amber-700"],
-            [`Plan ${anio}`, t.plan, "text-slate-900"],
-            [`After ${anio}`, t.posterior, "text-slate-500"],
+          {(
             [
-              "Unplaced",
-              t.sin_ubicar,
-              Math.abs(t.sin_ubicar) > 5 ? "text-red-700" : "text-emerald-700",
-            ],
-          ].map(([et, v, cls]) => (
-            <div key={String(et)}>
-              <div className="uppercase tracking-wide text-slate-400">{et}</div>
-              <div className={`tabular font-bold ${cls}`}>{usd(Number(v))}</div>
-            </div>
-          ))}
+              ["remanente", t.remanente],
+              ["vencido", t.vencido],
+              ["arrastre", t.arrastre],
+              ["plan", t.plan],
+              ["posterior", t.posterior],
+              ["sin_ubicar", t.sin_ubicar],
+            ] as [Tramo, number][]
+          ).map(([k, v]) => {
+            const tr = TRAMOS[k];
+            const et =
+              k === "plan" || k === "posterior" ? `${tr.etq} ${anio}` : tr.etq;
+            const cls =
+              k === "sin_ubicar" && Math.abs(v) > 5 ? "text-red-700" : tr.cls;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setAbierto(abierto === k ? null : k)}
+                title="Click to see where it comes from and which lines make it up"
+                className={`rounded px-1 py-0.5 text-left transition hover:bg-teal-100/70 ${
+                  abierto === k ? "bg-teal-100 ring-1 ring-teal-400" : ""
+                }`}
+              >
+                <div className="uppercase tracking-wide text-slate-400">
+                  {et} <span className="text-teal-600">▾</span>
+                </div>
+                <div className={`tabular font-bold ${cls}`}>{usd(v)}</div>
+              </button>
+            );
+          })}
         </div>
         {/* Mientras se edita, este parrafo solo roba alto: explica como se
             arma la PROPUESTA, no como se escribe la grilla —que tiene su propia
@@ -213,6 +281,16 @@ export function BudgetProposalView() {
           changes nothing.
         </p>
       </div>
+
+      {abierto ? (
+        <Desglose
+          tramo={abierto}
+          anio={anio}
+          filas={d.filas}
+          total={d.totales[abierto === "remanente" ? "remanente" : abierto]}
+          onCerrar={() => setAbierto(null)}
+        />
+      ) : null}
 
       {/* Los sub-tabs. Todas las vistas leen el mismo payload. */}
       <div className="flex flex-wrap items-center gap-2">
@@ -265,6 +343,104 @@ export function BudgetProposalView() {
           <BudgetGridView anio={anio} />
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── El desglose de un tramo: de dónde sale y qué líneas lo componen ────── */
+
+function Desglose({
+  tramo,
+  anio,
+  filas,
+  total,
+  onCerrar,
+}: {
+  tramo: Tramo;
+  anio: number;
+  filas: BudgetProposalRow[];
+  total: number;
+  onCerrar: () => void;
+}) {
+  const tr = TRAMOS[tramo];
+  const aportes = filas
+    .map((f) => ({ f, v: Math.round(tr.linea(f) * 100) / 100 }))
+    .filter((x) => Math.abs(x.v) > 0.005)
+    .sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+  const suma = Math.round(aportes.reduce((s, x) => s + x.v, 0) * 100) / 100;
+  // ⚠️ Si la suma de los aportes no da el total de arriba, lo decimos. Es el
+  // único control que tiene quien lee: sin esto, el panel sería una lista
+  // bonita que nadie puede contrastar contra nada.
+  const cuadra = Math.abs(suma - total) < 0.5;
+
+  return (
+    <div className="rounded-lg border border-teal-300 bg-white">
+      <div className="flex flex-wrap items-center gap-2 border-b border-teal-200 bg-teal-50 px-3 py-2">
+        <span className="text-sm font-bold text-teal-900">
+          {tramo === "plan" || tramo === "posterior" ? `${tr.etq} ${anio}` : tr.etq}
+        </span>
+        <span className="tabular text-sm font-bold text-teal-900">{usd(total)}</span>
+        <span className="text-[11px] text-teal-700">
+          {aportes.length} line{aportes.length === 1 ? "" : "s"}
+        </span>
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="ml-auto rounded px-2 py-0.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+        >
+          ✕ Close
+        </button>
+      </div>
+      <p className="border-b border-slate-100 px-3 py-2 text-[11px] text-slate-600">
+        <b>Where it comes from:</b> {tr.de}
+      </p>
+      {aportes.length === 0 ? (
+        <p className="px-3 py-3 text-[11px] text-slate-500">
+          No line contributes to this tranche — that is why it reads {usd(total)}.
+        </p>
+      ) : (
+        <div className="max-h-[42vh] overflow-auto">
+          <table className="w-full text-[11px]">
+            <thead className="sticky top-0 bg-slate-100 text-left text-slate-500">
+              <tr>
+                <th className="px-3 py-1">WBS</th>
+                <th className="px-3 py-1">Task</th>
+                <th className="px-3 py-1">Section</th>
+                <th className="px-3 py-1 text-right">Amount</th>
+                <th className="px-3 py-1 text-right">% of total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aportes.map(({ f, v }) => (
+                <tr key={f.wbs_code} className="border-b border-slate-50">
+                  <td className="px-3 py-0.5 font-mono text-[10px]">{f.wbs_code}</td>
+                  <td className="px-3 py-0.5">{f.title}</td>
+                  <td className="px-3 py-0.5 text-slate-400">{f.category}</td>
+                  <td className="tabular px-3 py-0.5 text-right font-semibold">{usd(v)}</td>
+                  <td className="tabular px-3 py-0.5 text-right text-slate-400">
+                    {total ? `${Math.round((v / total) * 1000) / 10}%` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="sticky bottom-0 border-t-2 border-slate-700 bg-[#DCE6F4] font-bold">
+              <tr>
+                <td className="px-3 py-1" colSpan={3}>
+                  SUM OF THE {aportes.length} LINES
+                </td>
+                <td className="tabular px-3 py-1 text-right">{usd(suma)}</td>
+                <td
+                  className={`px-3 py-1 text-right text-[10px] ${
+                    cuadra ? "text-emerald-700" : "text-red-700"
+                  }`}
+                >
+                  {cuadra ? "✓ matches" : `≠ by ${usd(Math.round((suma - total) * 100) / 100)}`}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
