@@ -13,23 +13,51 @@
 //   POSTERIOR  más adelante
 // y la propuesta es VENCIDO + ARRASTRE + PLAN. El control "sin ubicar" avisa si
 // queda remanente que el cronograma no pone en ningún año.
+//
+// ⚠️ TRES SUB-TABS, no una tabla de sesenta columnas.
+//
+// Owner, 2026-11-08: *«quiero que haya varios sub tabs dentro del tab para
+// hacerlo fácil de leer»*. Antes esto era el bloque de plata y las 52 semanas
+// en la misma tabla: había que barrer a lo ancho para leer una línea, y el
+// encabezado de mes quedaba lejos de la cifra. Ahora:
+//
+//   Datos      lo que la línea tiene y cómo se reparte el remanente
+//   Mes a mes  enero a diciembre (o por semana, si hace falta el detalle)
+//   Budget     cómo va quedando el año, por sección
+//
+// Las tres leen el MISMO payload y respetan el filtro de líneas cerradas, así
+// que no pueden contradecirse: no hay tres cálculos, hay tres vistas.
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
 import { type BudgetProposalRow, useBudgetProposal } from "@/lib/hooks";
 
 const MES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SET", "OCT", "NOV", "DIC"];
 
+type Vista = "datos" | "meses" | "anio";
+
 function usd(n: number | null | undefined): string {
   if (!n) return "—";
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+/** Los doce meses de una línea, sumando sus semanas. */
+function porMes(f: BudgetProposalRow): number[] {
+  const m = Array(12).fill(0) as number[];
+  for (const [w, v] of Object.entries(f.propuesta ?? {})) {
+    const i = Number(w.slice(5, 7)) - 1;
+    if (i >= 0 && i < 12) m[i] += Number(v) || 0;
+  }
+  return m;
 }
 
 export function BudgetProposalView() {
   const ahora = new Date().getFullYear();
   const [anio, setAnio] = useState(ahora + 1);
   const [soloConMonto, setSoloConMonto] = useState(false);
+  const [vista, setVista] = useState<Vista>("datos");
+  const [porSemana, setPorSemana] = useState(false);
   const q = useBudgetProposal(anio);
   const d = q.data;
 
@@ -61,6 +89,11 @@ export function BudgetProposalView() {
 
   const t = d.totales;
   const mostradas = porCat.reduce((s, [, ls]) => s + ls.length, 0);
+  const TABS: [Vista, string, string][] = [
+    ["datos", "Datos", "Presupuesto, gastado y cómo se reparte el remanente"],
+    ["meses", "Mes a mes", `La propuesta ${anio}, de enero a diciembre`],
+    ["anio", `Budget ${anio}`, "Cómo va quedando el año, por sección"],
+  ];
 
   return (
     <div className="space-y-3">
@@ -113,7 +146,11 @@ export function BudgetProposalView() {
             ["Arrastre de este año", t.arrastre, "text-amber-700"],
             [`Plan ${anio}`, t.plan, "text-slate-900"],
             [`Posterior a ${anio}`, t.posterior, "text-slate-500"],
-            ["Sin ubicar", t.sin_ubicar, Math.abs(t.sin_ubicar) > 5 ? "text-red-700" : "text-emerald-700"],
+            [
+              "Sin ubicar",
+              t.sin_ubicar,
+              Math.abs(t.sin_ubicar) > 5 ? "text-red-700" : "text-emerald-700",
+            ],
           ].map(([et, v, cls]) => (
             <div key={String(et)}>
               <div className="uppercase tracking-wide text-slate-400">{et}</div>
@@ -129,140 +166,335 @@ export function BudgetProposalView() {
         </p>
       </div>
 
+      {/* Los tres sub-tabs. Las tres vistas leen el mismo payload. */}
+      <div className="flex flex-wrap items-end gap-1 border-b border-slate-200">
+        {TABS.map(([k, etq, ayuda]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setVista(k)}
+            title={ayuda}
+            className={`-mb-px rounded-t border border-b-0 px-3 py-1.5 text-xs font-semibold ${
+              vista === k
+                ? "border-slate-200 bg-white text-teal-900"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            {etq}
+          </button>
+        ))}
+        {vista === "meses" ? (
+          <label className="ml-auto mb-1 flex items-center gap-1 text-[11px] text-slate-600">
+            <input
+              type="checkbox"
+              checked={porSemana}
+              onChange={(e) => setPorSemana(e.target.checked)}
+            />
+            Ver por semana
+          </label>
+        ) : null}
+      </div>
+
       <div className="max-h-[68vh] overflow-auto rounded-lg border border-slate-200 bg-white">
-        <table className="border-collapse text-[11px]">
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-[#0F5F59] text-white">
-              <th className="sticky left-0 z-20 bg-[#0F5F59] px-2 py-1 text-left">WBS</th>
-              <th className="px-2 py-1 text-left">Tarea</th>
-              <th className="px-2 py-1 text-right">Presup.</th>
-              <th className="px-2 py-1 text-right">Gastado</th>
-              <th className="px-2 py-1 text-right">Remanente</th>
-              <th className="bg-[#8C2F2F] px-2 py-1 text-right">Vencido</th>
-              <th className="bg-[#8A5A00] px-2 py-1 text-right">Arrastre</th>
-              <th className="px-2 py-1 text-right">Plan {d.anio}</th>
-              <th className="px-2 py-1 text-right">Posterior</th>
-              <th className="bg-[#1A7F4B] px-2 py-1 text-right">PROPUESTA</th>
-              {bandas.map((b) => (
-                <th
-                  key={`${b.mes}-${b.desde}`}
-                  colSpan={b.hasta - b.desde + 1}
-                  className="border-l border-white/30 px-1 py-1 text-center text-[10px]"
-                >
-                  {MES[b.mes]}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {porCat.map(([cat, ls]) => {
-              const sum = (k: keyof BudgetProposalRow) =>
-                ls.reduce((s, f) => s + (Number(f[k]) || 0), 0);
-              return (
-                <>
-                  <tr key={cat} className="bg-[#EAF0FA]">
-                    <td colSpan={10 + d.semanas.length} className="px-2 py-1 font-semibold text-teal-900">
-                      {cat.toUpperCase()}
-                    </td>
-                  </tr>
-                  {ls.map((f) => {
-                    const cerrada = f.remaining < 0.5 && f.propuesta_total < 0.5;
-                    return (
-                      <tr
-                        key={f.wbs_code}
-                        className={`border-b border-slate-100 hover:bg-slate-50 ${
-                          cerrada ? "text-slate-400" : ""
-                        }`}
-                      >
-                        <td
-                          className={`sticky left-0 z-10 px-2 font-mono text-[10px] ${
-                            cerrada ? "bg-slate-50" : "bg-white"
-                          }`}
-                        >
-                          {f.wbs_code}
-                        </td>
-                        <td className="px-2">
-                          {f.title}
-                          {f.ritmo_ledger ? (
-                            <span
-                              className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800"
-                              title={`El LEDGER paga ${usd(f.ritmo_ledger)} por mes en esta línea. Informativo: no mueve el presupuesto.`}
-                            >
-                              ledger {usd(f.ritmo_ledger)}/mes
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="tabular px-2 text-right text-slate-500">
-                          {usd(f.budget_revised)}
-                        </td>
-                        <td className="tabular px-2 text-right text-slate-500">{usd(f.spend)}</td>
-                        <td className="tabular px-2 text-right font-semibold">
-                          {usd(f.remaining)}
-                        </td>
-                        <td className="tabular bg-red-50 px-2 text-right font-semibold text-red-700">
-                          {usd(f.vencido)}
-                        </td>
-                        <td className="tabular bg-amber-50 px-2 text-right text-amber-800">
-                          {usd(f.arrastre)}
-                        </td>
-                        <td className="tabular px-2 text-right">{usd(f.plan_total)}</td>
-                        <td className="tabular px-2 text-right text-slate-500">
-                          {usd(f.posterior)}
-                        </td>
-                        <td className="tabular bg-emerald-50 px-2 text-right font-bold text-emerald-900">
-                          {usd(f.propuesta_total)}
-                        </td>
-                        {d.semanas.map((w) => {
-                          const v = f.propuesta[w];
-                          return (
-                            <td
-                              key={w}
-                              className="tabular px-1 text-center text-[10px]"
-                              title={v ? `${w} · ${usd(v)}` : undefined}
-                            >
-                              {v ? Math.round(v / 1000) + "K" : ""}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                  <tr key={`${cat}-sub`} className="bg-[#DCE6F4] font-semibold">
-                    <td className="sticky left-0 z-10 bg-[#DCE6F4] px-2" />
-                    <td className="px-2">Subtotal {cat}</td>
-                    <td className="tabular px-2 text-right">{usd(sum("budget_revised"))}</td>
-                    <td className="tabular px-2 text-right">{usd(sum("spend"))}</td>
-                    <td className="tabular px-2 text-right">{usd(sum("remaining"))}</td>
-                    <td className="tabular px-2 text-right text-red-700">{usd(sum("vencido"))}</td>
-                    <td className="tabular px-2 text-right text-amber-800">
-                      {usd(sum("arrastre"))}
-                    </td>
-                    <td className="tabular px-2 text-right">{usd(sum("plan_total"))}</td>
-                    <td className="tabular px-2 text-right">{usd(sum("posterior"))}</td>
-                    <td className="tabular px-2 text-right text-emerald-900">
-                      {usd(sum("propuesta_total"))}
-                    </td>
-                    <td colSpan={d.semanas.length} />
-                  </tr>
-                </>
-              );
-            })}
-            <tr className="bg-[#0F5F59] font-bold text-white">
-              <td className="sticky left-0 z-10 bg-[#0F5F59] px-2" />
-              <td className="px-2">TOTAL {d.anio}</td>
-              <td className="tabular px-2 text-right">{usd(t.budget_revised)}</td>
-              <td className="tabular px-2 text-right">{usd(t.spend)}</td>
-              <td className="tabular px-2 text-right">{usd(t.remanente)}</td>
-              <td className="tabular px-2 text-right">{usd(t.vencido)}</td>
-              <td className="tabular px-2 text-right">{usd(t.arrastre)}</td>
-              <td className="tabular px-2 text-right">{usd(t.plan)}</td>
-              <td className="tabular px-2 text-right">{usd(t.posterior)}</td>
-              <td className="tabular px-2 text-right">{usd(t.propuesta)}</td>
-              <td colSpan={d.semanas.length} />
-            </tr>
-          </tbody>
-        </table>
+        {vista === "datos" ? (
+          <TablaDatos d={d} porCat={porCat} />
+        ) : vista === "meses" ? (
+          <TablaMeses d={d} porCat={porCat} bandas={bandas} porSemana={porSemana} />
+        ) : (
+          <TablaAnio d={d} porCat={porCat} />
+        )}
       </div>
     </div>
+  );
+}
+
+/* ── 1 · Datos: lo que la línea tiene y cómo se reparte el remanente ─────── */
+
+function TablaDatos({
+  d,
+  porCat,
+}: {
+  d: NonNullable<ReturnType<typeof useBudgetProposal>["data"]>;
+  porCat: [string, BudgetProposalRow[]][];
+}) {
+  const t = d.totales;
+  const COLS = [
+    ["Presup.", "budget_revised", "text-slate-500"],
+    ["Gastado", "spend", "text-slate-500"],
+    ["Remanente", "remaining", "font-semibold"],
+    ["Vencido", "vencido", "bg-red-50 font-semibold text-red-700"],
+    ["Arrastre", "arrastre", "bg-amber-50 text-amber-800"],
+    [`Plan ${d.anio}`, "plan_total", ""],
+    ["Posterior", "posterior", "text-slate-500"],
+    ["PROPUESTA", "propuesta_total", "bg-emerald-50 font-bold text-emerald-900"],
+  ] as const;
+
+  return (
+    <table className="w-full border-collapse text-[11px]">
+      <thead className="sticky top-0 z-10">
+        <tr className="bg-[#0F5F59] text-white">
+          <th className="px-2 py-1 text-left">WBS</th>
+          <th className="px-2 py-1 text-left">Tarea</th>
+          {COLS.map(([etq]) => (
+            <th key={etq} className="px-2 py-1 text-right">
+              {etq}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {porCat.map(([cat, ls]) => {
+          const sum = (k: string) => ls.reduce((s, f) => s + (Number(f[k as never]) || 0), 0);
+          return (
+            <Fragment key={cat}>
+              <tr className="bg-[#EAF0FA]">
+                <td colSpan={2 + COLS.length} className="px-2 py-1 font-semibold text-teal-900">
+                  {cat.toUpperCase()}
+                </td>
+              </tr>
+              {ls.map((f) => {
+                const cerrada = f.remaining < 0.5 && f.propuesta_total < 0.5;
+                return (
+                  <tr
+                    key={f.wbs_code}
+                    className={`border-b border-slate-100 hover:bg-slate-50 ${
+                      cerrada ? "text-slate-400" : ""
+                    }`}
+                  >
+                    <td className="px-2 font-mono text-[10px]">{f.wbs_code}</td>
+                    <td className="px-2">
+                      {f.title}
+                      {f.ritmo_ledger ? (
+                        <span
+                          className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800"
+                          title={`El LEDGER paga ${usd(f.ritmo_ledger)} por mes en esta línea. Informativo: no mueve el presupuesto.`}
+                        >
+                          ledger {usd(f.ritmo_ledger)}/mes
+                        </span>
+                      ) : null}
+                    </td>
+                    {COLS.map(([etq, k, cls]) => (
+                      <td key={etq} className={`tabular px-2 text-right ${cls}`}>
+                        {usd(Number(f[k as never]))}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+              <tr className="bg-[#DCE6F4] font-semibold">
+                <td className="px-2" />
+                <td className="px-2">Subtotal {cat}</td>
+                {COLS.map(([etq, k]) => (
+                  <td key={etq} className="tabular px-2 text-right">
+                    {usd(sum(k))}
+                  </td>
+                ))}
+              </tr>
+            </Fragment>
+          );
+        })}
+        <tr className="bg-[#0F5F59] font-bold text-white">
+          <td className="px-2" />
+          <td className="px-2">TOTAL {d.anio}</td>
+          {[
+            t.budget_revised,
+            t.spend,
+            t.remanente,
+            t.vencido,
+            t.arrastre,
+            t.plan,
+            t.posterior,
+            t.propuesta,
+          ].map((v, i) => (
+            <td key={COLS[i][0]} className="tabular px-2 text-right">
+              {usd(v)}
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+/* ── 2 · Mes a mes: enero a diciembre, o la semana si hace falta ─────────── */
+
+function TablaMeses({
+  d,
+  porCat,
+  bandas,
+  porSemana,
+}: {
+  d: NonNullable<ReturnType<typeof useBudgetProposal>["data"]>;
+  porCat: [string, BudgetProposalRow[]][];
+  bandas: { mes: number; desde: number; hasta: number }[];
+  porSemana: boolean;
+}) {
+  const ncols = porSemana ? d.semanas.length : 12;
+  const celdas = (f: BudgetProposalRow) =>
+    porSemana ? d.semanas.map((w) => Number(f.propuesta[w]) || 0) : porMes(f);
+  const suma = (ls: BudgetProposalRow[]) =>
+    ls.reduce(
+      (acc, f) => celdas(f).map((v, i) => (acc[i] ?? 0) + v),
+      Array(ncols).fill(0) as number[],
+    );
+
+  return (
+    <table className="border-collapse text-[11px]">
+      <thead className="sticky top-0 z-10">
+        <tr className="bg-[#0F5F59] text-white">
+          <th className="sticky left-0 z-20 bg-[#0F5F59] px-2 py-1 text-left">WBS</th>
+          <th className="px-2 py-1 text-left">Tarea</th>
+          {porSemana ? (
+            bandas.map((b) => (
+              <th
+                key={`${b.mes}-${b.desde}`}
+                colSpan={b.hasta - b.desde + 1}
+                className="border-l border-white/30 px-1 py-1 text-center text-[10px]"
+              >
+                {MES[b.mes]}
+              </th>
+            ))
+          ) : (
+            MES.map((m) => (
+              <th key={m} className="border-l border-white/20 px-2 py-1 text-right">
+                {m}
+              </th>
+            ))
+          )}
+          <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        {porCat.map(([cat, ls]) => (
+          <Fragment key={cat}>
+            <tr className="bg-[#EAF0FA]">
+              <td colSpan={3 + ncols} className="px-2 py-1 font-semibold text-teal-900">
+                {cat.toUpperCase()}
+              </td>
+            </tr>
+            {ls.map((f) => {
+              const vs = celdas(f);
+              const cerrada = f.remaining < 0.5 && f.propuesta_total < 0.5;
+              return (
+                <tr
+                  key={f.wbs_code}
+                  className={`border-b border-slate-100 hover:bg-slate-50 ${
+                    cerrada ? "text-slate-400" : ""
+                  }`}
+                >
+                  <td
+                    className={`sticky left-0 z-10 px-2 font-mono text-[10px] ${
+                      cerrada ? "bg-slate-50" : "bg-white"
+                    }`}
+                  >
+                    {f.wbs_code}
+                  </td>
+                  <td className="whitespace-nowrap px-2">{f.title}</td>
+                  {vs.map((v, i) => (
+                    <td
+                      key={i}
+                      className={`tabular px-2 text-right ${porSemana ? "text-[10px]" : ""}`}
+                    >
+                      {v ? usd(v) : ""}
+                    </td>
+                  ))}
+                  <td className="tabular bg-amber-50 px-2 text-right font-bold">
+                    {usd(f.propuesta_total)}
+                  </td>
+                </tr>
+              );
+            })}
+            <tr className="bg-[#DCE6F4] font-semibold">
+              <td className="sticky left-0 z-10 bg-[#DCE6F4] px-2" />
+              <td className="whitespace-nowrap px-2">Subtotal {cat}</td>
+              {suma(ls).map((v, i) => (
+                <td key={i} className="tabular px-2 text-right">
+                  {v ? usd(v) : ""}
+                </td>
+              ))}
+              <td className="tabular px-2 text-right">
+                {usd(ls.reduce((s, f) => s + f.propuesta_total, 0))}
+              </td>
+            </tr>
+          </Fragment>
+        ))}
+        <tr className="bg-[#0F5F59] font-bold text-white">
+          <td className="sticky left-0 z-10 bg-[#0F5F59] px-2" />
+          <td className="whitespace-nowrap px-2">TOTAL {d.anio}</td>
+          {suma(porCat.flatMap(([, ls]) => ls)).map((v, i) => (
+            <td key={i} className="tabular px-2 text-right">
+              {v ? usd(v) : ""}
+            </td>
+          ))}
+          <td className="tabular px-2 text-right">{usd(d.totales.propuesta)}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+/* ── 3 · Budget: cómo va quedando el año, por sección ────────────────────── */
+
+function TablaAnio({
+  d,
+  porCat,
+}: {
+  d: NonNullable<ReturnType<typeof useBudgetProposal>["data"]>;
+  porCat: [string, BudgetProposalRow[]][];
+}) {
+  const t = d.totales;
+  const filas = porCat.map(([cat, ls]) => ({
+    cat,
+    n: ls.length,
+    meses: ls.reduce(
+      (acc, f) => porMes(f).map((v, i) => acc[i] + v),
+      Array(12).fill(0) as number[],
+    ),
+    total: ls.reduce((s, f) => s + f.propuesta_total, 0),
+  }));
+  const gran = filas.reduce(
+    (acc, r) => acc.map((v, i) => v + r.meses[i]),
+    Array(12).fill(0) as number[],
+  );
+
+  return (
+    <table className="w-full border-collapse text-[11px]">
+      <thead className="sticky top-0 z-10">
+        <tr className="bg-[#1F4E79] text-white">
+          <th className="px-2 py-1 text-left">Sección</th>
+          <th className="px-2 py-1 text-right">Líneas</th>
+          {MES.map((m) => (
+            <th key={m} className="border-l border-white/20 px-2 py-1 text-right">
+              {m}
+            </th>
+          ))}
+          <th className="bg-[#8A5A00] px-2 py-1 text-right">TOTAL {d.anio}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {filas.map((r) => (
+          <tr key={r.cat} className="border-b border-slate-100 hover:bg-slate-50">
+            <td className="px-2 py-1 font-semibold text-teal-900">{r.cat.toUpperCase()}</td>
+            <td className="tabular px-2 text-right text-slate-400">{r.n}</td>
+            {r.meses.map((v, i) => (
+              <td key={i} className="tabular px-2 text-right">
+                {v ? usd(v) : ""}
+              </td>
+            ))}
+            <td className="tabular bg-amber-50 px-2 text-right font-bold">{usd(r.total)}</td>
+          </tr>
+        ))}
+        <tr className="bg-[#1F4E79] font-bold text-white">
+          <td className="px-2 py-1">TOTAL {d.anio}</td>
+          <td className="tabular px-2 text-right">{filas.reduce((s, r) => s + r.n, 0)}</td>
+          {gran.map((v, i) => (
+            <td key={i} className="tabular px-2 text-right">
+              {v ? usd(v) : ""}
+            </td>
+          ))}
+          <td className="tabular px-2 text-right">{usd(t.propuesta)}</td>
+        </tr>
+      </tbody>
+    </table>
   );
 }
