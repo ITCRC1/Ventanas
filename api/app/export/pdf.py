@@ -77,6 +77,12 @@ h1 { font-size: 12px; margin: 0 0 1px; }
 .sub { color: #666; font-size: 8px; margin: 0 0 5px; }
 table.bd { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.bd th, table.bd td {
+  /* ⚠️ `box-sizing: border-box` NO es cosmetico: sin el, con `table-layout:
+     fixed` los anchos en % valen para el CONTENIDO y el padding (3px por lado)
+     mas el borde se SUMAN encima. Diez columnas x ~7.4px son ~74px de mas
+     sobre una pagina util de ~1003px, y lo que se caia del borde derecho era
+     justo la ultima columna: el TOTAL salia como «$34,». */
+  box-sizing: border-box;
   border: 0.7px solid #7a7a7a; padding: 1px 3px; font-size: 7.5px;
   vertical-align: middle; word-wrap: break-word; overflow-wrap: anywhere;
 }
@@ -88,7 +94,13 @@ td.desc { text-align: left; }
 td.vendor { text-align: left; font-weight: bold; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.mid { text-align: center; vertical-align: middle; }
-td.grand { text-align: right; vertical-align: middle; font-weight: bold; font-size: 9px; white-space: nowrap; }
+/* ⚠️ `table.bd td.grand` y no `td.grand`: `table.bd th, table.bd td` ya fija
+   7.5px y le gana por especificidad (0,1,2 contra 0,1,1). El gran total venia
+   saliendo del mismo tamano que el resto desde que se escribio esta hoja. */
+table.bd td.grand {
+  text-align: right; vertical-align: middle; font-weight: bold;
+  font-size: 9px; white-space: nowrap;
+}
 tr.total td { background: #d7e5f5; font-weight: bold; }
 tr.credit td { color: #005C40; }
 """
@@ -132,8 +144,17 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
     account = (_HOLDING_SEND["iban"] if is_send else first("account")) if show_bank else ""
 
     # Cabecera: primera celda roja "To be sent …", resto centradas.
-    # Sin columna "Reason" (iba vacía). Anchos con holgura (suman 98%); TOTAL más
-    # ancho para que el monto se lea completo y en una línea.
+    # Sin columna "Reason" (iba vacía).
+    #
+    # ⚠️ Los anchos suman EXACTAMENTE 100 y eso solo funciona con el
+    # `box-sizing: border-box` del CSS: sin él, el padding y el borde de cada
+    # celda se suman por fuera y la última columna se cae de la página. Owner,
+    # 2026-11-10: *«me sale cortado el monto»* — salía «$34,».
+    #
+    # Si se toca un ancho, hay que compensarlo en otro. Y el TOTAL se lleva 13%
+    # —no 10%— porque es el único número en negrita y a 9px: con la tipografía
+    # del PDF (DejaVu, más ancha que Arial) 10% quedaba al límite, y «al límite»
+    # es como se vuelve a cortar en cuanto un monto pasa del millón.
     # Vendor va PRIMERO, a pedido (2026-11-07): es a quien se le paga, y en el
     # PDF no aparecia por ningun lado — habia que abrir la app para saberlo.
     # No se confunde con Beneficiary: ese es el titular de la cuenta que recibe
@@ -142,17 +163,31 @@ def _breakdown_table(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) 
     # primera mitad de "Type" (Overhead / Personnel). Una columna que repite el
     # mismo valor diez veces no informa y le estaba robando ancho a las dos que
     # si importan — quien cobra y por que.
+    # Una sola lista: el ancho y el rótulo juntos. Tenerlos sueltos en diez
+    # cadenas es como se llega a que sumen 103 sin que nadie lo note.
+    cols: list[tuple[int, str]] = [
+        (17, "Vendor"),
+        (18, _sent_when(disb)),
+        (7, "Amount"),
+        (9, "Type"),
+        (10, "Name"),
+        (5, "Transfer"),
+        (6, "Bank Name"),
+        (7, "Beneficiary"),
+        (8, "Account"),
+        (13, "TOTAL"),
+    ]
+    total_ancho = sum(w for w, _ in cols)
+    if total_ancho != 100:
+        raise ValueError(
+            f"Los anchos del Breakdown suman {total_ancho}%, no 100%: "
+            "la última columna se cae de la página."
+        )
     heads = [
-        '<th class="first" style="width:18%">Vendor</th>',
-        f'<th style="width:20%">{escape(_sent_when(disb))}</th>',
-        '<th style="width:7%">Amount</th>',
-        '<th style="width:9%">Type</th>',
-        '<th style="width:10%">Name</th>',
-        '<th style="width:5%">Transfer</th>',
-        '<th style="width:6%">Bank Name</th>',
-        '<th style="width:7%">Beneficiary</th>',
-        '<th style="width:8%">Account</th>',
-        '<th style="width:10%">TOTAL</th>',
+        f'<th class="first" style="width:{w}%">{escape(t)}</th>'
+        if i == 0
+        else f'<th style="width:{w}%">{escape(t)}</th>'
+        for i, (w, t) in enumerate(cols)
     ]
     head = "".join(heads)
 
