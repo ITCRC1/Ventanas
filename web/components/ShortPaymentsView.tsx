@@ -1016,7 +1016,10 @@ export function ShortPaymentsView() {
               </div>
             </div>
             <div className={`${TABLA} m-3 border-0`}>
-              <table className="w-full min-w-[1000px] text-sm">
+              {/* ⚠️ Rayas verticales finísimas entre columnas. Sin los bordes
+                  de cada celda (ver CELL_PLANA), son las que hacen que esto se
+                  lea como una grilla y no como palabras sueltas. */}
+              <table className="w-full min-w-[1000px] text-sm [&_td:last-child]:border-r-0 [&_td]:border-r [&_td]:border-slate-100 [&_th:last-child]:border-r-0 [&_th]:border-r [&_th]:border-slate-200">
                 <thead className={THEAD}>
                   <tr>
                     <th className={TH}>#</th>
