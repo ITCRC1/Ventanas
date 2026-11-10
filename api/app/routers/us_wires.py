@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
 from app.deps import get_db
 from app.models.us_wire import UsWireRow
@@ -26,7 +26,11 @@ class LafiseBalanceIn(BaseModel):
 router = APIRouter(
     prefix="/us-wires",
     tags=["us-wires"],
-    dependencies=[Depends(require_permission("bank.view"))],
+    # `bank.view` sigue siendo el permiso de DATO; ademas, la pantalla.
+    dependencies=[
+        Depends(require_permission("bank.view")),
+        Depends(require_any_permission("view.banking.wires")),
+    ],
 )
 
 

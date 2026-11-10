@@ -41,3 +41,38 @@ def require_permission(code: str) -> Callable[..., CurrentUser]:
         return user
 
     return _dependency
+
+
+def require_any_permission(*codes: str) -> Callable[..., CurrentUser]:
+    """Exige AL MENOS UNO de `codes`.
+
+    Owner, 2026-11-10: *«si, quiero esconder pantallas»* — o sea que la API
+    tambien cierre, no solo el menu.
+
+    ⚠️ Hace falta «alguno de» y no «este»: **la mayoria de los endpoints los
+    comparten varias pantallas**. Medido sobre el codigo, `/wbs/financials` lo
+    piden OCHO pantallas y `/schedule/cells` siete. Exigir el permiso de una
+    sola le rompe la pantalla a quien tiene las otras — y el 403 aparece como
+    una tabla vacia, que es la forma mas cara de romper algo: parece un dato,
+    no un error.
+
+    Por eso cada router pide la union de los permisos de las pantallas que de
+    verdad lo usan, y los catalogos compartidos (`/wbs`, `/schedule`,
+    `/categories`, `/phases`, `/payees`) no piden ninguno: no son una pantalla,
+    y cerrarlos esconde cero sin romper de a varias.
+    """
+
+    def _dependency(
+        user: CurrentUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> CurrentUser:
+        if not set(codes) & user_permissions(db, user.role_id):
+            raise Problem(
+                status_code=403,
+                title="Permiso denegado",
+                detail="Su rol no tiene ninguno de los permisos: "
+                + ", ".join(f"«{c}»" for c in codes),
+            )
+        return user
+
+    return _dependency

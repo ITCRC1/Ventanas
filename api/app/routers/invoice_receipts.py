@@ -18,9 +18,9 @@ from sqlalchemy.orm import Session
 
 from app.core import text as text_util
 from app.core.config import Settings, get_settings
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
-from app.deps import get_current_user, get_db
+from app.deps import get_db
 from app.repositories import disbursement as disb_repo
 from app.schemas.disbursement import LineIn
 from app.services import disbursement as disb_svc
@@ -29,7 +29,21 @@ from app.services import invoice_mail, invoice_scheduler
 router = APIRouter(
     prefix="/invoice-receipts",
     tags=["invoice-receipts"],
-    dependencies=[Depends(get_current_user)],
+    # Lo comparten las SEIS pantallas de Invoices y ademas /planning,
+    # que usa `open-short-payment`.
+    dependencies=[
+        Depends(
+            require_any_permission(
+                "view.invoices.receipts",
+        "view.invoices.applied",
+        "view.invoices.match",
+        "view.invoices.ledger",
+        "view.invoices.manual",
+        "view.invoices.dehc",
+                "view.planning",
+            )
+        )
+    ],
 )
 
 _can_view = Depends(require_permission("report.view"))

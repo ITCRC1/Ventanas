@@ -18,9 +18,9 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
-from app.deps import get_current_user, get_db
+from app.deps import get_db
 from app.export.planning_excel import planning_to_xlsx
 from app.repositories import disbursement as disb_repo
 from app.repositories import schedule as sched_repo
@@ -30,7 +30,12 @@ from app.schemas.schedule import CellBulkItem
 from app.services import disbursement as disb_svc
 from app.services import schedule as sched_service
 
-router = APIRouter(prefix="/planning", tags=["planning"], dependencies=[Depends(get_current_user)])
+router = APIRouter(
+    prefix="/planning",
+    tags=["planning"],
+    # Solo /planning lo consume.
+    dependencies=[Depends(require_any_permission("view.planning"))],
+)
 
 _can_view = Depends(require_permission("report.view"))
 _can_edit = Depends(require_permission("schedule.edit"))

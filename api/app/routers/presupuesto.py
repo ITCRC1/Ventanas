@@ -14,15 +14,16 @@ from typing import Any
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
-from app.deps import get_current_user, get_db
+from app.core.permissions import require_any_permission, require_permission
+from app.deps import get_db
 from app.export.presupuesto_excel import propuesta_a_xlsx
 from app.services import presupuesto as svc
 
 router = APIRouter(
     prefix="/budget-proposal",
     tags=["presupuesto"],
-    dependencies=[Depends(get_current_user)],
+    # Solo /budget-proposal lo consume.
+    dependencies=[Depends(require_any_permission("view.budget"))],
 )
 
 _can_view = Depends(require_permission("report.view"))

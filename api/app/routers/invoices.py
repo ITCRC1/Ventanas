@@ -5,9 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
-from app.deps import get_current_user, get_db
+from app.deps import get_db
 from app.models.invoice import Invoice
 from app.schemas.invoice import (
     InvoiceDetail,
@@ -19,7 +19,12 @@ from app.schemas.invoice import (
 )
 from app.services import invoice as svc
 
-router = APIRouter(prefix="/invoices", tags=["facturas"], dependencies=[Depends(get_current_user)])
+router = APIRouter(
+    prefix="/invoices",
+    tags=["facturas"],
+    # Solo /invoices (manual) lo consume.
+    dependencies=[Depends(require_any_permission("view.invoices.manual"))],
+)
 
 _can_edit = Depends(require_permission("ledger.edit"))
 

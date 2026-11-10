@@ -9,7 +9,11 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.permissions import require_permission, user_permissions
+from app.core.permissions import (
+    require_any_permission,
+    require_permission,
+    user_permissions,
+)
 from app.core.problems import Problem
 from app.deps import CurrentUser, get_current_user, get_db
 from app.export.disb_excel import lines_to_xlsx, parse_lines_xlsx
@@ -101,7 +105,12 @@ def create_recurring(data: RecurringIn, db: Session = Depends(get_db)) -> Recurr
 
 
 # --- Crédito ----------------------------------------------------------------
-cred = APIRouter(prefix="/credit")
+# Lo consumen la pantalla Credits y tambien Disbursements, que muestra el
+# saldo de credito al armar la tanda.
+cred = APIRouter(
+    prefix="/credit",
+    dependencies=[Depends(require_any_permission("view.credits", "view.disbursements"))],
+)
 
 
 @cred.get("/balance", response_model=CreditBalance)
@@ -143,7 +152,18 @@ def delete_adjustment(adj_id: int, db: Session = Depends(get_db)) -> Response:
 
 
 # --- Desembolsos ------------------------------------------------------------
-disb = APIRouter(prefix="/disbursements")
+# ⚠️ Lo comparten TRES pantallas: Short Term Payments, Disbursements y
+# Planning (que lista las tandas para mandarles lineas).
+disb = APIRouter(
+    prefix="/disbursements",
+    dependencies=[
+        Depends(
+            require_any_permission(
+                "view.payments", "view.disbursements", "view.planning"
+            )
+        )
+    ],
+)
 
 
 @disb.get("", response_model=list[DisbursementOut])

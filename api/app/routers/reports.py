@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
 from app.deps import get_db
 from app.export import report_xlsx
@@ -26,7 +26,12 @@ from app.reports_catalog import GROUPS, REPORTS
 router = APIRouter(
     prefix="/reports",
     tags=["reportes"],
-    dependencies=[Depends(require_permission("report.view"))],
+    # `report.view` sigue siendo el permiso de DATO; ademas, la pantalla.
+    # ⚠️ /ledger tambien pide `/reports/disbursement-trace`.
+    dependencies=[
+        Depends(require_permission("report.view")),
+        Depends(require_any_permission("view.reporting", "view.ledger")),
+    ],
 )
 
 # Nombre de vista por reporte. La whitelist evita inyección y documenta qué se

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
 from app.deps import CurrentUser, get_current_user, get_db
 from app.models.bank import BankAccount, WireFee, WireTransfer
@@ -36,7 +36,12 @@ from app.services import conciliacion as conc
 router = APIRouter(
     prefix="/bank",
     tags=["bancos"],
-    dependencies=[Depends(require_permission("bank.view"))],
+    # `bank.view` sigue siendo el permiso de DATO; ademas, la pantalla.
+    # Banks y Bank Reconciliation comparten todo el prefijo /bank.
+    dependencies=[
+        Depends(require_permission("bank.view")),
+        Depends(require_any_permission("view.banking", "view.banking.recon")),
+    ],
 )
 
 

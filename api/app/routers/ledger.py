@@ -11,9 +11,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.db import set_audit_batch
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
-from app.deps import get_current_user, get_db
+from app.deps import get_db
 from app.models.ledger import LedgerEntry
 from app.repositories import ledger as repo
 from app.repositories import schedule as sched_repo
@@ -29,7 +29,12 @@ from app.schemas.ledger import (
 )
 from app.services import ledger as service
 
-router = APIRouter(prefix="/ledger", tags=["ledger"], dependencies=[Depends(get_current_user)])
+router = APIRouter(
+    prefix="/ledger",
+    tags=["ledger"],
+    # ⚠️ /payments tambien pide `/ledger/run-month`.
+    dependencies=[Depends(require_any_permission("view.ledger", "view.payments"))],
+)
 
 _can_edit = Depends(require_permission("ledger.edit"))
 _can_report = Depends(require_permission("report.view"))

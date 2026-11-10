@@ -36,14 +36,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_any_permission, require_permission
 from app.core.problems import Problem
-from app.deps import CurrentUser, get_current_user, get_db
+from app.deps import CurrentUser, get_db
 
 router = APIRouter(
     prefix="/blog",
     tags=["bitacora"],
-    dependencies=[Depends(get_current_user)],
+    # Leer la bitacora. Escribir sigue pidiendo `blog.post`.
+    dependencies=[Depends(require_any_permission("view.blog"))],
 )
 
 

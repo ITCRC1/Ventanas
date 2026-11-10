@@ -12,14 +12,15 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
-from app.deps import get_current_user, get_db
+from app.core.permissions import require_any_permission, require_permission
+from app.deps import get_db
 from app.services import tablero as svc
 
 router = APIRouter(
     prefix="/dashboard",
     tags=["tablero"],
-    dependencies=[Depends(get_current_user)],
+    # Solo /dashboard lo consume.
+    dependencies=[Depends(require_any_permission("view.dashboard"))],
 )
 
 _can_view = Depends(require_permission("report.view"))
