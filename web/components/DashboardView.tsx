@@ -43,8 +43,6 @@ import { useDashboard } from "@/lib/hooks";
 import type { DashboardSummary } from "@/lib/types";
 import { type ReactNode, useState } from "react";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Legend,
@@ -528,35 +526,82 @@ function Avance({ d }: { d: DashboardSummary }) {
 /* ── 4 · Qué falta ───────────────────────────────────────────────────────── */
 
 function Pendiente({ d }: { d: DashboardSummary }) {
-  const secs = d.pendiente.secciones.filter((s) => s.remaining > 0.5);
-  const barras = secs.map((s) => ({
-    name: s.category.length > 18 ? `${s.category.slice(0, 17)}…` : s.category,
-    committed: s.por_pagar,
-    open: s.sin_comprometer,
-  }));
+  // ⚠️ Acá habia una barra horizontal apilada por seccion y NO decia nada
+  // (owner, 2026-11-10: «esto no dice nada»). Tres razones, y las tres son de
+  // la forma, no del dato:
+  //
+  //   · los nombres se cortaban a 18 caracteres («7 ITEMS FOR CONVE…») y el eje
+  //     ademas salteaba una de cada dos etiquetas, asi que ni se sabia cual era;
+  //   · una seccion se lleva 4.56M de los 6.47M que faltan -- el 70%--, y con
+  //     esa escala las otras diez quedan en slivers de dos pixeles;
+  //   · la serie verde son 259,724 repartidos entre once secciones: invisible.
+  //
+  // Una tabla ordenada por remanente muestra los nombres enteros, pone el
+  // numero al lado y la barrita da el peso relativo sin pelear con un eje.
+  const secs = [...d.pendiente.secciones]
+    .filter((s) => s.remaining > 0.5)
+    .sort((x, y) => y.remaining - x.remaining);
+  const mayor = secs.length ? secs[0].remaining : 0;
+  const totalRem = secs.reduce((a, s) => a + s.remaining, 0);
+
   return (
     <div className="space-y-4">
-      <Titulo t="What is left" sub="— and how much of it is already locked in" />
+      <Titulo t="What is left" sub="— by section, largest first" />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
-          <p className="mb-2 text-sm font-semibold text-slate-600">
-            Remaining by section — approved vs still to commit
-          </p>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={barras} layout="vertical" margin={{ left: 8, right: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => compactMoney(v)} />
-              <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10 }} />
-              <Tooltip
-                formatter={(v: number | string) => moneyUsd(v as number)}
-                contentStyle={{ fontSize: 11 }}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="committed" name="Approved, pending payment" stackId="a" fill={VERDE} />
-              <Bar dataKey="open" name="Still to be committed" stackId="a" fill={AMBAR} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white lg:col-span-2">
+          <table className="w-full text-xs">
+            <thead className="border-b border-slate-200 bg-slate-50 text-left text-slate-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">Section</th>
+                <th className="px-3 py-2 text-right font-semibold">Budget</th>
+                <th className="px-3 py-2 text-right font-semibold">Paid</th>
+                <th className="px-3 py-2 text-right font-semibold">Pending payment</th>
+                <th className="px-3 py-2 text-right font-semibold">Still to commit</th>
+                <th className="px-3 py-2 text-right font-semibold">Remaining</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {secs.map((s) => (
+                <tr key={s.category} className="hover:bg-slate-50/60">
+                  <td className="px-3 py-1.5">
+                    <div>{s.category}</div>
+                    {/* El peso de la seccion, sin eje: ancho proporcional a la mayor. */}
+                    <div className="mt-1 h-1 w-full rounded bg-slate-100">
+                      <div
+                        className="h-1 rounded bg-brand-600"
+                        style={{ width: `${mayor ? (s.remaining / mayor) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right text-slate-500">
+                    {moneyUsd(s.budget_revised)}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right text-slate-500">
+                    {moneyUsd(s.spend)}
+                    <span className="ml-1 text-slate-400">{s.pct.toFixed(0)}%</span>
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right">
+                    {s.por_pagar > 0.5 ? moneyUsd(s.por_pagar) : "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right">
+                    {s.sin_comprometer > 0.5 ? moneyUsd(s.sin_comprometer) : "—"}
+                  </td>
+                  <td className="tabular px-3 py-1.5 text-right font-semibold">
+                    {moneyUsd(s.remaining)}
+                    <span className="ml-1 font-normal text-slate-400">
+                      {totalRem ? ((s.remaining / totalRem) * 100).toFixed(0) : 0}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-slate-700 bg-slate-50 font-bold">
+                <td className="px-3 py-2">TOTAL</td>
+                <td className="px-3 py-2" colSpan={4} />
+                <td className="tabular px-3 py-2 text-right">{moneyUsd(totalRem)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -634,59 +679,115 @@ function Pendiente({ d }: { d: DashboardSummary }) {
         </table>
       </div>
 
-      {/* Permisos y líneas marcadas: lo que hay que destrabar. */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <p className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
-            Permits and approvals
-            <span className="ml-2 font-normal text-slate-400">
-              — the gate on a ground-up project
-            </span>
-          </p>
-          <div className="max-h-56 overflow-auto">
-            <table className="w-full text-xs">
-              <tbody>
-                {d.pendiente.permisos.map((p) => (
-                  <tr key={p.wbs_code} className="border-b border-slate-50">
-                    <td className="px-3 py-1 font-mono text-xs text-blue-700">{p.wbs_code}</td>
-                    <td className="px-3 py-1">{p.title}</td>
-                    <td className="px-3 py-1 text-slate-400">{p.state ?? "—"}</td>
-                    <td className="tabular px-3 py-1 text-right">{moneyUsd(p.budget_revised)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* ⚠️ Estos dos paneles tampoco decian nada (owner, 2026-11-10), y por el
+          mismo motivo: listaban TODO en vez de lo que hay que mirar.
 
-        <div className="overflow-hidden rounded-lg border border-amber-300 bg-white">
-          <p className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-            Flagged Attention
-            <span className="ml-2 font-normal text-amber-700">— the team already marked these</span>
-          </p>
-          <div className="max-h-56 overflow-auto">
-            <table className="w-full text-xs">
-              <tbody>
-                {d.pendiente.atencion.length === 0 ? (
-                  <tr>
-                    <td className="px-3 py-3 text-slate-400">Nothing flagged.</td>
-                  </tr>
-                ) : (
-                  d.pendiente.atencion.map((l) => (
-                    <tr key={l.wbs_code} className="border-b border-slate-50">
-                      <td className="px-3 py-1 font-mono text-xs text-blue-700">{l.wbs_code}</td>
-                      <td className="px-3 py-1">{l.title}</td>
-                      <td className="tabular px-3 py-1 text-right font-semibold">
-                        {moneyUsd(l.remaining)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          · «Permits and approvals» traia 15 filas y TRECE decian «Approved».
+            El dato eran las dos que faltan, perdidas entre trece iguales.
+          · «Flagged Attention» traia 12 lineas y CUATRO no tienen nada que
+            gastar -- los $0, el — y el ($0) de la pantalla. Una marca sobre una
+            linea sin remanente no le dice nada a nadie.
+
+          Ahora cada panel abre con el recuento y lista solo lo que queda por
+          resolver. Lo que ya esta cerrado se cuenta, no se enumera. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Destrabar
+          titulo="Permits and approvals"
+          nota="— what is still in process"
+          total={d.pendiente.permisos.length}
+          cerradoRotulo="approved"
+          filas={d.pendiente.permisos
+            .filter((p) => (p.state ?? "").toLowerCase() !== "approved")
+            .map((p) => ({
+              code: p.wbs_code,
+              title: p.title,
+              estado: p.state ?? "no status",
+              monto: p.budget_revised,
+            }))}
+          vacio="All permits on the list are approved."
+        />
+
+        <Destrabar
+          titulo="Flagged for review"
+          nota="— marked by the team, with budget still to spend"
+          total={d.pendiente.atencion.length}
+          cerradoRotulo="with nothing left to spend"
+          ambar
+          filas={d.pendiente.atencion
+            .filter((l) => l.remaining > 0.5)
+            .sort((x, y) => y.remaining - x.remaining)
+            .map((l) => ({ code: l.wbs_code, title: l.title, monto: l.remaining }))}
+          vacio="Nothing flagged with budget left."
+        />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Un panel de «lo que falta destrabar».
+ *
+ * ⚠️ La regla que lo define: **se enumera lo abierto y se cuenta lo cerrado.**
+ * Los dos paneles que reemplaza listaban todo, y en los dos casos la mayoría de
+ * las filas decían lo mismo — trece «Approved» seguidos, o cuatro líneas con
+ * cero por gastar. Una lista donde casi todo dice lo mismo no es información:
+ * es trabajo de lectura que el dueño tiene que hacer para encontrar las dos que
+ * importan.
+ */
+function Destrabar({
+  titulo,
+  nota,
+  total,
+  cerradoRotulo,
+  filas,
+  vacio,
+  ambar,
+}: {
+  titulo: string;
+  nota: string;
+  /** Cuántas había en total, para poder decir cuántas ya están cerradas. */
+  total: number;
+  cerradoRotulo: string;
+  filas: { code: string; title: string; estado?: string; monto: number }[];
+  vacio: string;
+  ambar?: boolean;
+}) {
+  const cerradas = total - filas.length;
+  return (
+    <div
+      className={`overflow-hidden rounded-lg border bg-white ${ambar ? "border-amber-300" : "border-slate-200"}`}
+    >
+      <p
+        className={`flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2 text-sm font-semibold ${
+          ambar
+            ? "border-amber-200 bg-amber-50 text-amber-900"
+            : "border-slate-200 bg-slate-50 text-slate-600"
+        }`}
+      >
+        {titulo}
+        <span className={`font-normal ${ambar ? "text-amber-700" : "text-slate-400"}`}>{nota}</span>
+        <span className="tabular ml-auto font-normal text-slate-500">
+          {filas.length} of {total} · {cerradas} {cerradoRotulo}
+        </span>
+      </p>
+      {filas.length === 0 ? (
+        <p className="px-3 py-3 text-xs text-slate-400">{vacio}</p>
+      ) : (
+        <table className="w-full text-xs">
+          <tbody className="divide-y divide-slate-50">
+            {filas.map((f) => (
+              <tr key={f.code}>
+                <td className="px-3 py-1.5 font-mono text-xs text-blue-700">{f.code}</td>
+                <td className="px-3 py-1.5">{f.title}</td>
+                {f.estado ? <td className="px-3 py-1.5 text-slate-400">{f.estado}</td> : null}
+                <td className="tabular px-3 py-1.5 text-right font-semibold">
+                  {f.monto > 0.5 ? moneyUsd(f.monto) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
