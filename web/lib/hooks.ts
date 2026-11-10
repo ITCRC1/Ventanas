@@ -501,6 +501,8 @@ export function useUpdateLine() {
         payee_id?: number | null;
         payee_name?: string | null;
         transfer?: string | null;
+        // El proyecto de la linea. Se manda el id; la pantalla muestra el codigo.
+        wbs_id?: number | null;
       };
     }) => api.patch(`/disbursements/${v.disbId}/lines/${v.lineId}`, v.body),
     onSuccess: (_r, { disbId }) => invalidateDisb(qc, disbId),

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -26,6 +26,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
+
+if TYPE_CHECKING:  # solo para el tipo: en runtime la relacion va por nombre
+    from app.models.wbs import WbsItem
 
 
 class DisbStatus(Base):
@@ -126,10 +129,23 @@ class DisbursementLine(Base):
     # Beneficiario ya resuelto: el front muestra y edita el NOMBRE, no el id
     # (ver LineUpdate.payee_name). lazy="joined" evita el N+1 al listar lineas.
     payee: Mapped[Payee | None] = relationship(lazy="joined")
+    # Proyecto (WBS). Mismo patron que `payee`: la columna guarda el id pero el
+    # front muestra y edita el CODIGO, que es lo que el dueno reconoce. Va por
+    # nombre de clase porque WbsItem vive en otro modulo y importarlo de verdad
+    # cerraria el circulo wbs -> disbursement -> wbs.
+    wbs: Mapped[WbsItem | None] = relationship("WbsItem", lazy="joined")
 
     @property
     def payee_name(self) -> str | None:
         return self.payee.name if self.payee is not None else None
+
+    @property
+    def wbs_code(self) -> str | None:
+        return self.wbs.wbs_code if self.wbs is not None else None
+
+    @property
+    def wbs_title(self) -> str | None:
+        return self.wbs.title if self.wbs is not None else None
 
 
 class CreditApplication(Base):

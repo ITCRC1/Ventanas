@@ -162,6 +162,10 @@ export interface DisbLine {
   amount: string;
   currency: string;
   wbs_id: number | null;
+  // El proyecto ya resuelto: la pantalla muestra y edita el CODIGO, no el id.
+  // Owner, 2026-11-10: «lo unico que falta es el # de proyecto».
+  wbs_code: string | null;
+  wbs_title: string | null;
   category_id: number | null;
   phase_id: number | null;
   reason: string | null;

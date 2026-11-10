@@ -1,8 +1,9 @@
 "use client";
 
-import { api, ApiError } from "@/lib/api";
-import { money } from "@/lib/format";
+import { ApiError, api } from "@/lib/api";
+import { money, rawNum, usd2 } from "@/lib/format";
 import {
+  type WbsSuggestion,
   useAddLine,
   useApplyCredit,
   useApprovals,
@@ -22,45 +23,30 @@ import {
   useSubmitDisbursement,
   useUpdateDisbursement,
   useUpdateLine,
+  useWbsList,
+  useWbsSuggestions,
 } from "@/lib/hooks";
-import type { DisbLine, DisbursementDetail, Payee } from "@/lib/types";
+import type { DisbLine, DisbursementDetail, Payee, Wbs } from "@/lib/types";
+import {
+  BTN,
+  BTN_EXCEL,
+  BTN_NEUTRO,
+  BTN_PDF,
+  BTN_REABRIR,
+  CELL,
+  ESTADO_ROTULO,
+  TH,
+  chipEstado,
+  rotuloEstado,
+} from "@/lib/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
-  submitted: "Submitted to corporate",
-  approved: "Approved",
-  funded: "Wire received",
-  transferred: "Transferred to LAFISE",
-  settled: "Settled",
-  cancelled: "Cancelled",
-};
-
-const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-600 ring-slate-200",
-  submitted: "bg-amber-50 text-amber-700 ring-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  funded: "bg-sky-50 text-sky-700 ring-sky-200",
-  transferred: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-  settled: "bg-slate-100 text-slate-600 ring-slate-200",
-  cancelled: "bg-red-50 text-red-700 ring-red-200",
-};
+const STATUS_LABEL = ESTADO_ROTULO;
 
 function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
-        STATUS_STYLE[status] ?? STATUS_STYLE.draft
-      }`}
-    >
-      {STATUS_LABEL[status] ?? status}
-    </span>
-  );
+  return <span className={chipEstado(status)}>{rotuloEstado(status)}</span>;
 }
-
-const BTN = "rounded-md border px-3 py-1.5 text-xs font-medium transition";
-const TH = "px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500";
 
 function monthLabel(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -160,19 +146,68 @@ function PayeeSetup({ payees }: { payees: Payee[] }) {
   );
 }
 
-const CELL = "w-full rounded border border-slate-300 bg-white px-1.5 py-0.5 text-sm";
+// ⚠️ `usd2` y `rawNum` viven en lib/format: los usa también la pestaña Payments
+// y dos copias se separan sin que nadie lo note.
 
-// Monto con $ y 2 decimales (centrado en la columna Amount, pedido del owner).
-const usd2 = (v: string | number | null) => {
-  const n = typeof v === "string" ? Number(v) : (v ?? 0);
-  if (Number.isNaN(n)) return "";
-  const s = `$${Math.abs(n).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-  return n < 0 ? `(${s})` : s;
-};
-const rawNum = (v: string) => v.replace(/[^0-9.-]/g, "");
+// El # de proyecto de una línea. Owner, 2026-11-10: *«lo unico que falta es el
+// # de proyecto»*.
+//
+// ⚠️ Se escribe el CÓDIGO, no el id: es lo que el dueño reconoce. Un código que
+// no existe en el catálogo NO se guarda — se revierte en pantalla y el campo se
+// pinta en rojo mientras tanto, porque un WBS inventado manda la plata a una
+// línea del Job Cost que nadie va a encontrar.
+function WbsField({
+  ln,
+  wbsList,
+  suggestion,
+  save,
+}: {
+  ln: DisbLine;
+  wbsList: Wbs[];
+  suggestion?: WbsSuggestion;
+  save: (body: { wbs_id: number | null }) => void;
+}) {
+  const [code, setCode] = useState(ln.wbs_code ?? "");
+  const match = wbsList.find((w) => w.wbs_code === code.trim());
+  // La sugerencia es una propuesta, no un default: solo si la línea sigue vacía.
+  const ofrecer = suggestion && !ln.wbs_code && !code.trim();
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <input
+        list="disb-wbs"
+        value={code}
+        placeholder="WBS"
+        title={match?.title ?? ln.wbs_title ?? "Project number"}
+        onChange={(e) => setCode(e.target.value)}
+        onBlur={() => {
+          const v = code.trim();
+          if (v === (ln.wbs_code ?? "")) return;
+          if (v === "") return save({ wbs_id: null });
+          const w = wbsList.find((x) => x.wbs_code === v);
+          if (!w) return setCode(ln.wbs_code ?? ""); // no existe → revertir
+          save({ wbs_id: w.id });
+        }}
+        className={`w-20 rounded border px-1.5 py-0.5 text-center font-mono text-sm ${
+          code && !match ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
+        }`}
+      />
+      {ofrecer && suggestion ? (
+        <button
+          type="button"
+          title={`${suggestion.wbs_title ?? ""} — ${suggestion.reason}. Click to use it.`}
+          onClick={() => {
+            setCode(suggestion.wbs_code);
+            save({ wbs_id: suggestion.wbs_id });
+          }}
+          className="w-20 rounded bg-amber-100 px-1 py-0.5 font-mono text-xs text-amber-800 hover:bg-amber-200"
+        >
+          ≈ {suggestion.wbs_code}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 // Encabezado editable de un desembolso en borrador: período, fecha de envío y
 // notas. El número oficial (#) se corrige desde la pestaña Short Payment.
@@ -228,7 +263,17 @@ function HeaderEditor({ d }: { d: DisbursementDetail }) {
 
 // Fila de línea editable inline (borrador). Guarda onBlur; el total lo recomputa
 // el trigger de la base y la vista refetchea.
-function EditableLineRow({ ln, disbId }: { ln: DisbLine; disbId: number }) {
+function EditableLineRow({
+  ln,
+  disbId,
+  wbsList,
+  suggestion,
+}: {
+  ln: DisbLine;
+  disbId: number;
+  wbsList: Wbs[];
+  suggestion?: WbsSuggestion;
+}) {
   const upd = useUpdateLine();
   const del = useDeleteLine();
   const [desc, setDesc] = useState(ln.description);
@@ -242,6 +287,9 @@ function EditableLineRow({ ln, disbId }: { ln: DisbLine; disbId: number }) {
   return (
     <tr className="hover:bg-slate-50/60">
       <td className="w-8 px-2 py-1 text-xs text-slate-400">{ln.line_no}</td>
+      <td className="px-1">
+        <WbsField ln={ln} wbsList={wbsList} suggestion={suggestion} save={save} />
+      </td>
       <td className="px-1">
         <input
           className={CELL}
@@ -372,8 +420,20 @@ export function DisbursementsView() {
   const d = detail.data;
   const isDraft = d?.status === "draft";
   const editable = isDraft && canCreate; // borrador + permiso → edición inline
-  // Columnas que abarca la etiqueta del pie: # Desc Vendor Nota Beneficiario.
-  const labelCols = 5;
+  // Columnas que abarca la etiqueta del pie: # WBS Desc Vendor Nota Beneficiario.
+  const labelCols = 6;
+
+  // El proyecto de cada línea. Owner, 2026-11-10: *«lo unico que falta es el #
+  // de proyecto»*. ⚠️ Hoy 216 de 222 líneas lo tienen vacío, así que la columna
+  // sola se vería en blanco: por eso trae la MISMA sugerencia que ya usa la
+  // pestaña Payments, y se acepta con un clic.
+  const wbsList = useWbsList();
+  const sug = useWbsSuggestions(d?.id ?? 0, Boolean(d && editable));
+  const sugByLine = useMemo(() => {
+    const m = new Map<number, WbsSuggestion>();
+    for (const x of sug.data ?? []) m.set(x.line_id, x);
+    return m;
+  }, [sug.data]);
   // Reabrir (des-enviar / des-aprobar) para corregir: aprobado exige aprobar.
   const canReopen =
     (d?.status === "submitted" && canSubmit) || (d?.status === "approved" && canApprove);
@@ -383,6 +443,15 @@ export function DisbursementsView() {
       <datalist id="disb-payees">
         {(payees.data ?? []).map((p) => (
           <option key={p.id} value={p.name} />
+        ))}
+      </datalist>
+      {/* Codigos de proyecto: el valor es el codigo y el rotulo el titulo, para
+          que se pueda buscar por cualquiera de los dos. */}
+      <datalist id="disb-wbs">
+        {(wbsList.data ?? []).map((w) => (
+          <option key={w.id} value={w.wbs_code}>
+            {w.title}
+          </option>
         ))}
       </datalist>
       {/* Lista */}
@@ -466,28 +535,26 @@ export function DisbursementsView() {
                 <button
                   type="button"
                   onClick={() => void api.abrir(`/disbursements/${d.id}/breakdown.pdf`)}
-                  className={`${BTN} border-emerald-600 text-emerald-700 hover:bg-emerald-50`}
+                  className={BTN_PDF}
                 >
                   Breakdown PDF
                 </button>
                 <button
                   type="button"
                   onClick={() => void api.abrir(`/disbursements/${d.id}/instruction.pdf`)}
-                  className={`${BTN} border-emerald-600 text-emerald-700 hover:bg-emerald-50`}
+                  className={BTN_PDF}
                 >
                   Instruction PDF
                 </button>
                 <button
                   type="button"
                   onClick={() => void api.abrir(`/disbursements/${d.id}/lines.xlsx`, true)}
-                  className={`${BTN} border-indigo-600 text-indigo-700 hover:bg-indigo-50`}
+                  className={BTN_EXCEL}
                 >
                   ⬇ Excel
                 </button>
                 {editable ? (
-                  <label
-                    className={`${BTN} cursor-pointer border-indigo-600 text-indigo-700 hover:bg-indigo-50 ${uploading ? "opacity-50" : ""}`}
-                  >
+                  <label className={`${BTN_EXCEL} cursor-pointer ${uploading ? "opacity-50" : ""}`}>
                     {uploading ? "Uploading…" : "⬆ Upload Excel"}
                     <input
                       type="file"
@@ -506,7 +573,7 @@ export function DisbursementsView() {
                 {canReopen ? (
                   <button
                     type="button"
-                    className={`${BTN} border-amber-500 text-amber-700 hover:bg-amber-50`}
+                    className={BTN_REABRIR}
                     disabled={reopen.isPending}
                     onClick={() => {
                       if (
@@ -538,6 +605,7 @@ export function DisbursementsView() {
                   <thead className="border-b border-slate-200 bg-slate-100 text-left">
                     <tr>
                       <th className={TH}>#</th>
+                      <th className={TH}>Project</th>
                       <th className={TH}>Description</th>
                       <th className={TH}>Vendor</th>
                       <th className={TH}>Note</th>
@@ -549,10 +617,22 @@ export function DisbursementsView() {
                   <tbody className="divide-y divide-slate-100">
                     {d.lines.map((ln) =>
                       editable ? (
-                        <EditableLineRow key={ln.id} ln={ln} disbId={d.id} />
+                        <EditableLineRow
+                          key={ln.id}
+                          ln={ln}
+                          disbId={d.id}
+                          wbsList={wbsList.data ?? []}
+                          suggestion={sugByLine.get(ln.id)}
+                        />
                       ) : (
                         <tr key={ln.id} className="hover:bg-slate-50/60">
                           <td className="w-8 px-2 py-1.5 text-xs text-slate-400">{ln.line_no}</td>
+                          <td
+                            className="px-2 py-1.5 text-center font-mono text-slate-600"
+                            title={ln.wbs_title ?? ""}
+                          >
+                            {ln.wbs_code ?? <span className="text-slate-300">—</span>}
+                          </td>
                           <td className="px-2 py-1.5 text-slate-700">{ln.description}</td>
                           <td className="px-2 py-1.5 text-slate-500">{ln.vendor ?? ""}</td>
                           <td className="px-2 py-1.5 text-slate-500">{ln.reason ?? ""}</td>
@@ -590,7 +670,7 @@ export function DisbursementsView() {
                   <div className="flex flex-wrap items-end gap-2">
                     <button
                       type="button"
-                      className={`${BTN} border-slate-300 bg-white text-slate-700 hover:bg-slate-100`}
+                      className={BTN_NEUTRO}
                       disabled={preload.isPending}
                       title="Brings the 4 fixed monthly lines (Development Team, Admin Fee + FC, CCSS, Alexi)"
                       onClick={() => preload.mutate({ id: d.id })}

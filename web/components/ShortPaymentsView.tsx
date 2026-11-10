@@ -1,6 +1,7 @@
 "use client";
 
-import { api, ApiError } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
+import { rawNum, usd2 } from "@/lib/format";
 import {
   useAddShortLine,
   useCategories,
@@ -21,30 +22,26 @@ import {
 } from "@/lib/hooks";
 import type { WbsSuggestion } from "@/lib/hooks";
 import type { Category, Payee, Phase, ShortPaymentBatch, ShortPaymentLine, Wbs } from "@/lib/types";
+import {
+  BTN_EXCEL,
+  BTN_REABRIR,
+  CABECERA,
+  CELL,
+  ESTADO_ROTULO,
+  TABLA,
+  TFOOT,
+  TH,
+  THEAD,
+  chipEstado,
+  rotuloEstado,
+} from "@/lib/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
-const usd = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-// Monto con signo USD: $14,125.00
-function money(v: string | number | null): string {
-  if (v === null || v === "") return "";
-  const n = Number(v);
-  if (Number.isNaN(n)) return "";
-  return n < 0 ? `($${usd.format(Math.abs(n))})` : `$${usd.format(n)}`;
-}
+// ⚠️ Acá vivía una TERCERA copia del mismo formateador de dinero ($14,125.00),
+// idéntica a `usd2` de lib/format y a la que tenía Disbursements. Una sola.
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
-  submitted: "Submitted to corporate",
-  approved: "Approved",
-  funded: "Wire received",
-  transferred: "Transferred to LAFISE",
-  settled: "Settled",
-  cancelled: "Cancelled",
-};
+const STATUS_LABEL = ESTADO_ROTULO;
 
 function batchTitle(b: ShortPaymentBatch): string {
   const d = b.send_date ?? b.period_month;
@@ -72,7 +69,10 @@ function TransferBadge({ t }: { t: string | null }) {
   );
 }
 
-const CELL_INPUT = "w-full rounded border border-slate-300 bg-white px-1 py-0.5 text-xs";
+// ⚠️ El tamaño de celda, el chip de estado y los botones viven en lib/ui:
+// son los MISMOS que la vista de Disbursements, que es la que el owner
+// aprobó. Copiarlos acá es como se separaron la vez pasada.
+const CELL_INPUT = CELL;
 
 // WBS / Project Number (código + título como tooltip). Solo lectura.
 function WbsCell({ line }: { line: ShortPaymentLine }) {
@@ -167,9 +167,11 @@ function CatTypeEdit({
 }) {
   const catId = line.category_id ?? "";
   const catPhases = phases.filter((p) => p.category_id === line.category_id);
-  const SEL = "w-full rounded border border-slate-300 bg-white px-1 py-0.5 text-xs";
+  // ⚠️ LADO A LADO, no apilados. Apilados hacían que CADA fila midiera el
+  // doble que las demás: diez líneas ocupaban lo que ahora ocupan veinte.
+  const SEL = "min-w-0 flex-1 rounded border border-slate-300 bg-white px-1 py-0.5 text-xs";
   return (
-    <div className="space-y-0.5 leading-tight">
+    <div className="flex gap-1">
       <select
         className={SEL}
         value={catId}
@@ -370,14 +372,21 @@ function LineRow({
         <td className="px-2 py-1 text-center">
           <TransferBadge t={line.transfer} />
         </td>
-        {showBank ? <td className="px-2 py-1 text-slate-500">{line.bank_name ?? ""}</td> : null}
-        <td className="tabular px-2 py-1 text-right">{money(line.amount)}</td>
+        {showBank ? (
+          <td
+            className="max-w-[12rem] truncate px-2 py-1 text-slate-500"
+            title={line.bank_name ?? ""}
+          >
+            {line.bank_name ?? ""}
+          </td>
+        ) : null}
+        <td className="tabular px-2 py-1 text-right">{usd2(line.amount)}</td>
       </tr>
     );
   }
 
   return (
-    <tr className="hover:bg-blue-50/40">
+    <tr className="group hover:bg-slate-50/60">
       <td className="px-2 py-1 text-slate-400">{line.line_no}</td>
       <td className="px-1 py-0.5">
         <WbsEdit line={line} wbsList={wbsList} save={save} suggestion={suggestion} />
@@ -432,24 +441,40 @@ function LineRow({
           <option value="LAFISE">LAFISE</option>
         </select>
       </td>
-      {showBank ? <td className="px-2 py-1 text-slate-500">{line.bank_name ?? ""}</td> : null}
-      <td className="px-1 py-0.5 text-right">
-        <div className="flex items-center justify-end">
-          <span className="mr-0.5 text-slate-400">$</span>
-          <input
-            type="number"
-            className={`${CELL_INPUT} text-right`}
-            value={amt}
-            onChange={(e) => setAmt(e.target.value)}
-            onBlur={() => amt !== line.amount && save({ amount: Number(amt || 0) })}
-          />
-        </div>
+      {/* ⚠️ Truncado: el banco es el mismo en todas las filas y repetirlo
+          entero empujaba la columna del monto fuera de la pantalla. */}
+      {showBank ? (
+        <td
+          className="max-w-[12rem] truncate px-2 py-1 text-slate-500"
+          title={line.bank_name ?? ""}
+        >
+          {line.bank_name ?? ""}
+        </td>
+      ) : null}
+      <td className="px-1 py-0.5">
+        {/* Muestra $#,##0.00; al enfocar deja el número plano para editarlo.
+            Es el mismo campo que la vista de Disbursements. */}
+        <input
+          key={line.amount}
+          defaultValue={usd2(line.amount)}
+          className={`${CELL_INPUT} tabular text-right`}
+          onFocus={(e) => {
+            e.target.value = rawNum(e.target.value);
+            e.target.select();
+          }}
+          onBlur={(e) => {
+            const v = rawNum(e.target.value);
+            e.target.value = usd2(v === "" ? 0 : v);
+            if (Number(v || 0) !== Number(line.amount)) save({ amount: Number(v || 0) });
+          }}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        />
       </td>
       <td className="px-1 py-0.5 text-center">
         <button
           type="button"
           title="Delete line"
-          className="rounded px-1.5 text-red-600 hover:bg-red-50"
+          className="rounded px-1.5 text-red-500 opacity-0 transition hover:bg-red-50 focus:opacity-100 group-hover:opacity-100"
           onClick={() => line.id != null && del.mutate({ disbId, lineId: line.id })}
         >
           ✕
@@ -746,9 +771,7 @@ function MonthClose() {
                     timeZone: "UTC",
                   })}
                 </span>
-                <span className="block tabular text-xs text-slate-400">
-                  {money(r.total_amount)}
-                </span>
+                <span className="block tabular text-xs text-slate-400">{usd2(r.total_amount)}</span>
               </span>
               <Step state={r.lines > 0 ? "ok" : "todo"} label="Lines" detail={`${r.lines}`} />
               <Step
@@ -868,20 +891,32 @@ export function ShortPaymentsView() {
           (b.status === "submitted" && canSubmit) || (b.status === "approved" && canApprove);
         return (
           <div key={b.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-[#151916] px-4 py-2 text-white">
+            {/* ⚠️ Cabecera CLARA. Era una barra negra y es lo que mas desentonaba
+                contra la vista de Disbursements, que es la que el owner aprobo
+                («aca se bien», 2026-11-10). El titulo manda, el estado va en un
+                chip y el total en grande a la derecha. */}
+            <div className={CABECERA}>
               <div>
-                <span className="font-semibold">To be sent {batchTitle(b)}</span>
-                <span className="ml-3 text-xs text-slate-300">
-                  Disbursement <BatchNo b={b} editable={canEdit} /> ·{" "}
-                  {STATUS_LABEL[b.status] ?? b.status}
-                  {editable ? " · editable" : ""}
-                </span>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-slate-800">
+                    To be sent {batchTitle(b)}
+                  </h2>
+                  <span className={chipEstado(b.status)}>{rotuloEstado(b.status)}</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Disbursement <BatchNo b={b} editable={canEdit} /> · {b.lines.length} line
+                  {b.lines.length === 1 ? "" : "s"}
+                  {editable ? " · editable" : ""} ·{" "}
+                  <span className="tabular font-semibold text-slate-700">
+                    {usd2(b.total_amount)}
+                  </span>
+                </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => void api.abrir(`/disbursements/${b.id}/lines.xlsx`, true)}
-                  className="rounded border border-white/50 px-2 py-1 text-xs text-white hover:bg-white/10"
+                  className={BTN_EXCEL}
                   title="Download the lines to Excel to edit them"
                 >
                   ⬇ Excel
@@ -891,7 +926,7 @@ export function ShortPaymentsView() {
                     type="button"
                     disabled={reopen.isPending}
                     title="Bring it back to draft to correct it (clears the approvals)"
-                    className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-200 hover:bg-white/10 disabled:opacity-50"
+                    className={`${BTN_REABRIR} disabled:opacity-50`}
                     onClick={() => {
                       if (
                         window.confirm(
@@ -906,7 +941,7 @@ export function ShortPaymentsView() {
                 ) : null}
                 {editable ? (
                   <label
-                    className={`cursor-pointer rounded border border-white/50 px-2 py-1 text-xs text-white hover:bg-white/10 ${uploadingId === b.id ? "opacity-50" : ""}`}
+                    className={`${BTN_EXCEL} cursor-pointer ${uploadingId === b.id ? "opacity-50" : ""}`}
                     title="Upload the edited Excel (replaces the lines)"
                   >
                     {uploadingId === b.id ? "Uploading…" : "⬆ Upload Excel"}
@@ -923,24 +958,23 @@ export function ShortPaymentsView() {
                     />
                   </label>
                 ) : null}
-                <span className="tabular font-semibold">{money(b.total_amount)}</span>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-xs">
-                <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+            <div className={`${TABLA} m-3 border-0`}>
+              <table className="w-full min-w-[1000px] text-sm">
+                <thead className={THEAD}>
                   <tr>
-                    <th className="px-2 py-1.5">#</th>
-                    <th className="px-2 py-1.5">WBS</th>
-                    <th className="px-2 py-1.5">Description</th>
-                    <th className="px-2 py-1.5">Invoice #</th>
-                    <th className="px-2 py-1.5">Note</th>
-                    <th className="px-2 py-1.5">Category / Type</th>
-                    <th className="px-2 py-1.5">Name</th>
-                    <th className="px-2 py-1.5 text-center">Transfer</th>
-                    {showBank ? <th className="px-2 py-1.5">Bank</th> : null}
-                    <th className="px-2 py-1.5 text-right">Amount</th>
-                    {editable ? <th className="px-2 py-1.5" /> : null}
+                    <th className={TH}>#</th>
+                    <th className={TH}>Project</th>
+                    <th className={TH}>Description</th>
+                    <th className={TH}>Invoice #</th>
+                    <th className={TH}>Note</th>
+                    <th className={TH}>Category / Type</th>
+                    <th className={TH}>Name</th>
+                    <th className={`${TH} text-center`}>Transfer</th>
+                    {showBank ? <th className={TH}>Bank</th> : null}
+                    <th className={`${TH} text-right`}>Amount</th>
+                    {editable ? <th className={TH} /> : null}
                   </tr>
                 </thead>
                 <LinesBody
@@ -953,12 +987,12 @@ export function ShortPaymentsView() {
                   wbsList={wbsList}
                   preCols={preCols}
                 />
-                <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                <tfoot className={TFOOT}>
                   <tr>
-                    <td className="px-2 py-1.5" colSpan={preCols}>
-                      Total
+                    <td className="px-2 py-2 text-right" colSpan={preCols}>
+                      TOTAL
                     </td>
-                    <td className="tabular px-2 py-1.5 text-right">{money(b.total_amount)}</td>
+                    <td className="tabular px-2 py-2 text-right">{usd2(b.total_amount)}</td>
                     {editable ? <td /> : null}
                   </tr>
                 </tfoot>

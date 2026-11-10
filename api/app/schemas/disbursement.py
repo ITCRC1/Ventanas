@@ -105,6 +105,10 @@ class LineOut(BaseModel):
     amount: Decimal
     currency: str
     wbs_id: int | None
+    # El proyecto, resuelto: la pantalla muestra el CODIGO, no el id. Owner,
+    # 2026-11-10: *«lo unico que falta es el # de proyecto»*.
+    wbs_code: str | None = None
+    wbs_title: str | None = None
     category_id: int | None
     phase_id: int | None
     reason: str | None

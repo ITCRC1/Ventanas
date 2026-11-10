@@ -21,6 +21,24 @@ export function moneyUsd(value: string | number | null): string {
   return n < 0 ? `($${usd.format(Math.abs(n))})` : `$${usd.format(n)}`;
 }
 
+// Monto con $ y DOS decimales. Es el formato de las tandas de pago: ahí cada
+// centavo es una instrucción al banco, así que no se redondea como en el Job
+// Cost. Negativos entre paréntesis, al estilo contable.
+export function usd2(value: string | number | null): string {
+  const n = typeof value === "string" ? Number(value) : (value ?? 0);
+  if (Number.isNaN(n)) return "";
+  const s = `$${Math.abs(n).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+  return n < 0 ? `(${s})` : s;
+}
+
+/** Deja solo lo que puede ser un número: para volver de «$14,125.00» a «14125.00». */
+export function rawNum(value: string): string {
+  return value.replace(/[^0-9.-]/g, "");
+}
+
 export function isNegative(value: string | number | null): boolean {
   const n = typeof value === "string" ? Number(value) : (value ?? 0);
   return !Number.isNaN(n) && n < 0;
