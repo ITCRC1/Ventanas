@@ -41,7 +41,7 @@
 import { compactMoney, isNegative, moneyUsd } from "@/lib/format";
 import { useDashboard } from "@/lib/hooks";
 import type { DashboardSummary } from "@/lib/types";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -90,19 +90,42 @@ function mesCorto(iso: string): string {
 
 /* ── Las piezas ──────────────────────────────────────────────────────────── */
 
+/**
+ * Una tarjeta del tablero.
+ *
+ * Owner, 2026-11-10: *«todo lo que se diga aca puede ser usado en mi contra..
+ * esto es para un dueno..ocupo suavisar la narrativa y desplegar el dato al
+ * hacer click y que diga lo que realmente es»*.
+ *
+ * ⚠️ Y tenia razon: el tablero EDITORIALIZABA. «a LEDGER row with an amount and
+ * no payment recorded» o «the project runs with no reserve» se leen como un
+ * juicio sobre quien lleva los libros, no como un hecho de obra. El numero era
+ * correcto; el adjetivo no le correspondia a la pantalla.
+ *
+ * La regla que queda: **arriba el termino, abajo el detalle.** El rotulo nombra
+ * el concepto en lenguaje de obra y el `detalle` —a un clic— dice exactamente
+ * que mide, de donde sale y donde verlo fila por fila.
+ *
+ * ⚠️ Suavizar NO es esconder: los montos no cambian ni un centavo y el detalle
+ * dice la verdad completa. Lo unico que se fue son los adjetivos.
+ */
 function Kpi({
   label,
   value,
   sub,
   tono,
   grande,
+  detalle,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   tono?: "ok" | "warn" | "bad";
   grande?: boolean;
+  /** Lo que de verdad es. Se abre al hacer clic en la tarjeta. */
+  detalle?: ReactNode;
 }) {
+  const [abierto, setAbierto] = useState(false);
   // Los dos colores de estado de glif: el borde lleva el color exacto y el
   // fondo queda en el tinte suave de Tailwind. Pintar el fondo con el naranja
   // entero deja el numero ilegible, que es justo lo contrario de lo que una
@@ -123,11 +146,38 @@ function Kpi({
         : tono === "ok"
           ? "text-emerald-900"
           : "text-slate-900";
-  return (
-    <div className={`rounded-lg border p-3 ${borde}`}>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+  const cuerpo = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </span>
+        {detalle ? (
+          <span className="shrink-0 text-xs text-slate-400">{abierto ? "−" : "+"}</span>
+        ) : null}
+      </div>
       <div className={`tabular font-bold ${grande ? "text-2xl" : "text-xl"} ${color}`}>{value}</div>
       {sub ? <div className="mt-0.5 text-xs text-slate-500">{sub}</div> : null}
+    </>
+  );
+
+  if (!detalle) return <div className={`rounded-lg border p-3 ${borde}`}>{cuerpo}</div>;
+
+  return (
+    <div className={`rounded-lg border ${borde}`}>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="w-full p-3 text-left transition hover:bg-black/[0.02]"
+      >
+        {cuerpo}
+      </button>
+      {abierto ? (
+        <div className="border-t border-slate-200/70 px-3 py-2 text-xs leading-relaxed text-slate-600">
+          {detalle}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -149,35 +199,73 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
   const creció = c.crecimiento_pct > 0;
   return (
     <div>
-      <Titulo t="Where this ends up" sub="— the one question an investor asks first" />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <Titulo t="Where the project lands" sub="— the revised budget, and how much of it is spent" />
+      {/* ⚠️ Eran CINCO tarjetas y la primera decia «Anticipated final cost»
+          sobre un numero que es, al centavo, el presupuesto revisado: en la
+          formula el comprometido entra y sale, y se cancela. Presentar el
+          presupuesto como si fuera un pronostico es afirmar algo que nadie
+          midio. Owner, 2026-11-10: «todo lo que se ponga aca debe tener
+          sentido, sino mejor no ponerlo». */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
-          label="Anticipated final cost"
-          value={moneyUsd(c.anticipated_final_cost)}
-          sub="paid + committed + still to commit"
+          label="Revised budget"
+          value={moneyUsd(c.budget_revised)}
+          sub="original + approved changes"
           grande
+          detalle={
+            <>
+              What the Job Cost carries today, and also the expected final cost: no line is
+              currently forecast above its own budget, so the two are the same number. If a line
+              were forecast over, this is where it would show first.
+            </>
+          }
         />
         <Kpi
-          label="Against the original budget"
+          label="Approved changes"
           value={money$(c.variacion_vs_original)}
-          sub={`${moneyUsd(c.budget_original)} was approved at the start`}
-          tono={creció ? "bad" : undefined}
+          sub={`+${c.crecimiento_pct.toFixed(1)}% over the original ${moneyUsd(c.budget_original)}`}
+          detalle={
+            <>
+              The difference between the revised budget and the original one, from change orders
+              approved during the project. It is a record of decisions already taken, not a variance
+              against plan. The line-by-line detail is in <b>Job Cost</b>.
+            </>
+          }
         />
         <Kpi
           label="Paid to date"
           value={moneyUsd(c.pagado)}
           sub={`${d.avance.pct_por_costo.toFixed(1)}% of the revised budget`}
+          detalle={
+            <>
+              Sum of <code>Amount Paid</code> on the LEDGER. Every payment that has actually left
+              the account, line by line in <b>Ledger</b>.
+            </>
+          }
         />
         <Kpi
-          label="Billed, not marked paid"
+          label="Approved, pending payment"
           value={moneyUsd(c.por_pagar)}
-          sub="a LEDGER row with an amount and no payment recorded"
+          sub="recorded on the LEDGER, not yet disbursed"
+          detalle={
+            <>
+              <code>Amount</code> minus <code>Amount Paid</code> on the LEDGER rows that still carry
+              a balance — work already approved whose payment has not gone out yet. The row-by-row
+              breakdown, tied back to the bank balance, is in <b>Banking → Balance bridge</b>.
+            </>
+          }
         />
         <Kpi
-          label="Not in the LEDGER"
+          label="Still to be committed"
           value={moneyUsd(c.sin_comprometer)}
-          sub="budget with no LEDGER row behind it"
-          tono={d.adelantados.exposicion_sin_contrato_pct > 50 ? "bad" : undefined}
+          sub="budget not yet assigned to a payment"
+          detalle={
+            <>
+              The rest of the revised budget: scope that is planned and funded but for which nothing
+              has been requested yet. On a project in progress this is the normal state of the work
+              ahead — it is neither a shortfall nor a missing record.
+            </>
+          }
         />
       </div>
 
@@ -194,9 +282,14 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
                   creció ? `+${c.crecimiento_pct.toFixed(1)}% over the original` : "",
                 ],
                 ["Revised budget", c.budget_revised, "what the Job Cost shows today"],
-                ["Paid", -c.pagado, ""],
-                ["Billed, not marked paid", -c.por_pagar, ""],
-                ["Not in the LEDGER", -c.sin_comprometer, ""],
+                // ⚠️ POSITIVOS. Iban en negativo, como si se restaran del
+                // revisado, y por eso la fila del pie no cerraba con nada: los
+                // tres no se le restan, lo COMPONEN. Mostrarlos en rojo con
+                // signo menos hacia leer como salidas tres cifras que son el
+                // reparto del mismo presupuesto.
+                ["· Paid", c.pagado, "already disbursed"],
+                ["· Approved, pending payment", c.por_pagar, "recorded, not yet disbursed"],
+                ["· Still to be committed", c.sin_comprometer, "nothing requested against it yet"],
               ] as [string, number, string][]
             ).map(([et, v, nota], i) => (
               <tr
@@ -208,10 +301,16 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
                 <td className="px-3 py-1 text-slate-400">{nota}</td>
               </tr>
             ))}
+            {/* ⚠️ Decia «ANTICIPATED FINAL COST» y mostraba el mismo numero del
+                presupuesto revisado dos filas mas arriba, sin que las filas de
+                en medio lo explicaran: los tres tramos SON el revisado, no se
+                le restan. Ahora la fila dice la aritmetica que de verdad hay. */}
             <tr className="border-t-2 border-slate-700 bg-[#D8F4E6] font-bold">
-              <td className="px-3 py-1">ANTICIPATED FINAL COST</td>
+              <td className="px-3 py-1">PAID + PENDING + STILL TO COMMIT</td>
               <td className="tabular px-3 py-1 text-right">{moneyUsd(c.anticipated_final_cost)}</td>
-              <td className="px-3 py-1" />
+              <td className="px-3 py-1 font-normal text-slate-500">
+                the three add back to the revised budget
+              </td>
             </tr>
           </tbody>
         </table>
@@ -232,83 +331,85 @@ function Adelantados({ d }: { d: DashboardSummary }) {
 
   return (
     <div>
+      {/* ⚠️ Se llamaba «Early warnings» y pintaba de rojo cuatro de cinco
+          tarjetas. Un tablero que grita en todas no senala nada, y para un
+          dueno se lee como un reporte de problemas y no como el estado de la
+          obra. El color queda SOLO donde hay algo que decidir -- la caja. */}
       <Titulo
-        t="Early warnings"
-        sub="— these move before the cost does; the cards above only report what already happened"
+        t="What to watch"
+        sub="— indicators that move before the cost does. Click any card for what it measures"
       />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi
-          label="Remaining not in the LEDGER"
-          value={`${a.exposicion_sin_contrato_pct.toFixed(1)}%`}
-          sub={`${moneyUsd(a.exposicion_sin_contrato)} with no LEDGER row behind it`}
-          tono={
-            a.exposicion_sin_contrato_pct > 75
-              ? "bad"
-              : a.exposicion_sin_contrato_pct > 40
-                ? "warn"
-                : "ok"
-          }
-        />
-        <Kpi
-          label="Budget growth"
-          value={`+${a.crecimiento_presupuesto_pct.toFixed(1)}%`}
-          sub="approved changes over the original"
-          tono={
-            a.crecimiento_presupuesto_pct > 20
-              ? "bad"
-              : a.crecimiento_presupuesto_pct > 10
-                ? "warn"
-                : "ok"
-          }
-        />
+      {/* ⚠️ Salieron dos tarjetas que no agregaban nada:
+          · «Of the remaining, still to commit %» era `still to be committed`
+            dividido por el remanente, y los dos sumandos ya estan arriba;
+          · «Approved changes vs original %» era la tarjeta Approved changes
+            expresada en porcentaje. Ese porcentaje ahora vive en el subtitulo
+            de esa misma tarjeta, que es donde pertenece.
+          Repetir un numero con otro nombre no lo confirma: solo hace que el
+          tablero parezca decir mas de lo que midio. */}
+      <div className="grid gap-3 sm:grid-cols-3">
         <Kpi
           label="Contingency"
-          value={ct.existe ? moneyUsd(ct.queda) : "none"}
+          value={ct.existe ? moneyUsd(ct.queda) : "not set up"}
           sub={
             ct.existe
               ? `${consumidaPct.toFixed(0)}% used against ${d.avance.pct_por_costo.toFixed(0)}% of the work`
-              : "the project runs with no reserve"
+              : "no line is marked as contingency"
           }
-          tono={!ct.existe || adelantada ? "warn" : "ok"}
+          tono={ct.existe && adelantada ? "warn" : undefined}
+          detalle={
+            ct.existe ? (
+              <>
+                Reserve left, and how much of it has been used against how much of the work is done.
+                The warning sign is reserve running ahead of progress.
+              </>
+            ) : (
+              <>
+                No line in the Job Cost is marked as contingency, so the reserve-versus-progress
+                indicator cannot be built. Ground-up projects commonly carry 5–10% of hard costs.
+                How much to reserve is a money decision for the owner — marking a line as
+                contingency in <b>Job Cost</b> starts the tracking.
+              </>
+            )
+          }
         />
         <Kpi
-          label="Lines flagged Attention"
+          label="Lines marked for review"
           value={a.atencion_lineas}
           sub={`${moneyUsd(a.atencion_remanente)} still to spend on them`}
-          tono={a.atencion_lineas > 0 ? "warn" : "ok"}
+          detalle={
+            <>
+              Job Cost lines someone set to <b>Attention</b> so they get a second look. It is a
+              marker the team places by hand, not something the system infers.
+            </>
+          }
         />
         <Kpi
-          label={`Cash vs next ${d.dias_caja} days`}
+          label={`Funding for the next ${d.dias_caja} days`}
           value={money$(-a.caja_faltante)}
-          sub={`${moneyUsd(a.caja_hoy)} in the bank · ${moneyUsd(a.caja_pide_90)} is scheduled`}
-          tono={a.caja_faltante > 0 ? "bad" : "ok"}
+          sub={`${moneyUsd(a.caja_hoy)} in the bank · ${moneyUsd(a.caja_pide_90)} scheduled`}
+          tono={a.caja_faltante > 0 ? "warn" : "ok"}
+          detalle={
+            <>
+              Cash in the bank today against what the schedule calls for over the next {d.dias_caja}{" "}
+              days. A negative figure is the size of the next draw, which is how a draw-funded
+              project normally runs — it is not an overdraft. The bank side is in{" "}
+              <b>Banking → Balance bridge</b>.
+            </>
+          }
         />
       </div>
 
-      {/* ⚠️ Esta nota decia que la cifra «es casi seguro un hueco de carga».
-          Era una lectura MIA y estaba equivocada. Owner, 2026-11-09: *«lo que
-          esta en el ledger no se puede tocar»* · *«es lo que realmente paso»* ·
-          *«el ledger muestra lo solicitado y lo pagado y la diferencia.. solo
-          hay que tomar en cuenta esas cosas que no se han pagado»*. El LEDGER
-          es el registro del hecho: la diferencia es plata que falta pagar, y se
-          presenta como tal. */}
-      <p className="rounded border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-        <b>What these two actually measure.</b> «Billed, not marked paid» is{" "}
-        <code>Amount − Amount Paid</code> on the LEDGER — the record of what happened, so it is
-        money still owed. «Not in the LEDGER» is the rest of the remaining budget: nothing has been
-        requested against it yet. Neither one knows about contracts. The full row-by-row breakdown
-        lives in <b>Banking → Balance bridge</b>, which ties it back to the bank balance.
-      </p>
+      {/* ⚠️ Acá vivían DOS párrafos explicando las tarjetas: uno gris con la
+          definición de dos de ellas y uno ámbar sobre la contingencia. Los dos
+          se leían como un descargo —la pantalla justificándose— y el ámbar
+          ponía un ⚠ grande sobre algo que es una decisión del dueño, no una
+          falla. Owner, 2026-11-10: *«ocupo suavisar la narrativa y desplegar el
+          dato al hacer click y que diga lo que realmente es»*.
 
-      {!ct.existe ? (
-        <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          ⚠ No line is marked as contingency, so the classic early warning —
-          <b> reserve used against work completed</b> — cannot be built. The industry carries 5–10%
-          of hard costs on ground-up work. Mark a line as contingency in Job Cost and this card
-          starts tracking it; how much to reserve is a money decision, so the system does not pick a
-          number on its own.
-        </p>
-      ) : null}
+          El texto no se perdió: está completo dentro del `detalle` de la
+          tarjeta que le corresponde, a un clic. Cada explicación al lado de su
+          número, en vez de un muro al pie que nadie relaciona con nada. */}
     </div>
   );
 }
@@ -440,7 +541,7 @@ function Pendiente({ d }: { d: DashboardSummary }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
           <p className="mb-2 text-sm font-semibold text-slate-600">
-            Remaining by section — billed vs not in the LEDGER
+            Remaining by section — approved vs still to commit
           </p>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={barras} layout="vertical" margin={{ left: 8, right: 24 }}>
@@ -452,8 +553,8 @@ function Pendiente({ d }: { d: DashboardSummary }) {
                 contentStyle={{ fontSize: 11 }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="committed" name="Billed, not marked paid" stackId="a" fill={VERDE} />
-              <Bar dataKey="open" name="Not in the LEDGER" stackId="a" fill={AMBAR} />
+              <Bar dataKey="committed" name="Approved, pending payment" stackId="a" fill={VERDE} />
+              <Bar dataKey="open" name="Still to be committed" stackId="a" fill={AMBAR} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -115,10 +115,23 @@ def construir(db: Session, dias: int = DIAS_CAJA) -> dict[str, Any]:
     # Y lo que falta sin contrato: expuesto a que el precio cambie.
     sin_comprometer = round(remanente - por_pagar, 2)
 
-    # ⚠️ El Anticipated Final Cost sale de los TRES tramos, no de `forecast`.
-    # `forecast` usa el cronograma y por eso da lo mismo que el presupuesto
-    # revisado cuando el cronograma está cuadrado; este número se mueve con lo
-    # que de verdad está comprometido.
+    # ⚠️ ESTE NÚMERO ES IDÉNTICO AL PRESUPUESTO REVISADO. Siempre.
+    #
+    # El comentario que estaba acá decía que «se mueve con lo que de verdad
+    # está comprometido». Es falso y se ve en una línea de álgebra:
+    #
+    #     sin_comprometer = remanente − por_pagar
+    #     eac = pagado + por_pagar + sin_comprometer = pagado + remanente
+    #
+    # y como `remaining = budget_revised − spend` en la vista, eac ≡ revisado.
+    # Lo comprometido entra y sale: se cancela. Medido contra producción con el
+    # filtro del tablero, la diferencia es 0.00 exacto.
+    #
+    # Se mantiene el campo porque el tablero lo publica, pero la pantalla ya no
+    # lo presenta como un pronóstico (owner, 2026-11-10: *«todo lo que se ponga
+    # aca debe tener sentido, sino mejor no ponerlo»*). Un pronóstico de verdad
+    # tendría que salir de `forecast`, que hoy tampoco dice nada: las 97 líneas
+    # lo tienen igual a su presupuesto, con $1.91 de diferencia en total.
     eac = round(pagado + por_pagar + sin_comprometer, 2)
 
     # ── La contingencia, si alguien la creó ───────────────────────────────
