@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
+import { BLOQUES, type BloquePermisos, DATOS, UBICADOS } from "@/lib/permisos";
 
 // --- tipos -------------------------------------------------------------------
 
@@ -111,12 +112,24 @@ function Profiles() {
     savePerms.mutate({ id: selected.id, permissions: next });
   }
 
-  const groups = useMemo(() => {
-    const view = (perms.data ?? []).filter((p) => p.group === "view");
-    const admin = (perms.data ?? []).filter((p) => p.group === "admin");
-    const action = (perms.data ?? []).filter((p) => p.group === "action");
-    return { view: [...view, ...admin], action };
-  }, [perms.data]);
+  // Lo que la base tiene y esta pantalla todavía no sabe dónde poner.
+  const sueltos = useMemo(
+    () => (perms.data ?? []).filter((p) => !UBICADOS.has(p.code)),
+    [perms.data],
+  );
+
+  // Prender o apagar varios de una (el «all / none» de cada pestaña). Va en UNA
+  // llamada: hacerlo con un togglePerm por casilla dispara seis guardados
+  // pisándose entre sí, y el último en llegar deja el perfil a medias.
+  const setPerms = (codes: string[], prender: boolean) => {
+    if (!selected) return;
+    const actual = new Set(selected.permissions);
+    for (const c of codes) {
+      if (prender) actual.add(c);
+      else actual.delete(c);
+    }
+    savePerms.mutate({ id: selected.id, permissions: [...actual] });
+  };
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-[260px_1fr]">
@@ -196,36 +209,143 @@ function Profiles() {
               <p className="mb-2 text-xs text-red-600">{delRole.error.problem.detail}</p>
             )}
 
-            <p className="mb-1 text-xs font-semibold uppercase text-slate-500">
-              Sections this profile can see
+            {/* ⚠️ Un bloque por pestaña de la barra, con sus pantallas dentro.
+                Antes eran diecisiete casillas en dos columnas sin relacion
+                visible con lo que abren, y una sola casilla abria las SEIS
+                pantallas de Invoices de golpe. */}
+            <p className="mb-2 text-xs text-slate-500">
+              One block per tab in the top bar. Tick only the screens this profile should see — a
+              tab shows up as soon as it has one screen ticked.
             </p>
-            <div className="mb-4 grid grid-cols-1 gap-1 sm:grid-cols-2">
-              {groups.view.map((p) => (
-                <PermRow
-                  key={p.code}
-                  label={p.description}
-                  checked={selected.permissions.includes(p.code)}
-                  onToggle={() => togglePerm(p.code)}
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+              {BLOQUES.map((b) => (
+                <BloqueTab
+                  key={b.tab}
+                  bloque={b}
+                  activos={selected.permissions}
+                  onToggle={togglePerm}
+                  onTodo={(codes, prender) => setPerms(codes, prender)}
                 />
               ))}
             </div>
-            <p className="mb-1 text-xs font-semibold uppercase text-slate-500">
-              Actions (edit / approve)
+
+            <p className="mt-4 mb-1 text-xs font-semibold uppercase text-slate-500">
+              Data — not tabs
             </p>
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-              {groups.action.map((p) => (
-                <PermRow
-                  key={p.code}
-                  label={p.description}
-                  checked={selected.permissions.includes(p.code)}
-                  onToggle={() => togglePerm(p.code)}
-                />
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2">
+              {DATOS.map((d) => (
+                <label
+                  key={d.code}
+                  className="flex cursor-pointer items-start gap-2 rounded px-2 py-1 text-sm hover:bg-white/60"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={selected.permissions.includes(d.code)}
+                    onChange={() => togglePerm(d.code)}
+                  />
+                  <span>
+                    <span
+                      className={
+                        selected.permissions.includes(d.code) ? "text-slate-800" : "text-slate-600"
+                      }
+                    >
+                      {d.label}
+                    </span>
+                    <span className="block text-xs text-slate-500">{d.nota}</span>
+                  </span>
+                </label>
               ))}
             </div>
+
+            {/* ⚠️ Un permiso que esta pantalla no ubica NO se esconde: un
+                permiso invisible es un permiso que nadie revoca. */}
+            {sueltos.length > 0 && (
+              <>
+                <p className="mt-4 mb-1 text-xs font-semibold uppercase text-slate-500">
+                  Other <span className="font-normal normal-case">— not mapped to a tab yet</span>
+                </p>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {sueltos.map((p) => (
+                    <PermRow
+                      key={p.code}
+                      label={p.description}
+                      checked={selected.permissions.includes(p.code)}
+                      onToggle={() => togglePerm(p.code)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
             {savePerms.isPending && <p className="mt-2 text-xs text-slate-400">Saving…</p>}
           </>
         ) : (
           <p className="text-sm text-slate-400">Select a profile.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Una pestaña de la barra, con sus pantallas y lo que se puede hacer dentro. */
+function BloqueTab({
+  bloque,
+  activos,
+  onToggle,
+  onTodo,
+}: {
+  bloque: BloquePermisos;
+  activos: string[];
+  onToggle: (code: string) => void;
+  onTodo: (codes: string[], prender: boolean) => void;
+}) {
+  const codes = bloque.pantallas.map((p) => p.code);
+  const puestos = codes.filter((c) => activos.includes(c)).length;
+  const todas = puestos === codes.length;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-1.5">
+        <span className="text-sm font-semibold text-slate-800">{bloque.tab}</span>
+        <span className="flex items-center gap-2 text-xs text-slate-400">
+          {/* Con una sola pantalla, «2 de 2» no dice nada que la casilla no diga. */}
+          {codes.length > 1 && (
+            <span className="tabular">
+              {puestos} of {codes.length}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => onTodo(codes, !todas)}
+            className="rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-600 transition hover:bg-white"
+          >
+            {todas ? "none" : "all"}
+          </button>
+        </span>
+      </div>
+      <div className="p-1">
+        {bloque.pantallas.map((p) => (
+          <PermRow
+            key={p.code}
+            label={p.label}
+            checked={activos.includes(p.code)}
+            onToggle={() => onToggle(p.code)}
+          />
+        ))}
+        {bloque.acciones && (
+          <>
+            <p className="mt-1 border-t border-slate-100 px-2 pt-1 text-xs uppercase tracking-wide text-slate-400">
+              Can do
+            </p>
+            {bloque.acciones.map((a) => (
+              <PermRow
+                key={a.code}
+                label={a.label}
+                checked={activos.includes(a.code)}
+                onToggle={() => onToggle(a.code)}
+              />
+            ))}
+          </>
         )}
       </div>
     </div>

@@ -20,7 +20,7 @@ type NavItem = NavLink | { label: string; items: NavLink[]; perm?: string };
 // El Cronograma sigue fuera del menú (redundante con la edición semanal de Job
 // Cost); la ruta /schedule sigue viva.
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", hint: "Executive summary", perm: "report.view" },
+  { href: "/dashboard", label: "Dashboard", hint: "Executive summary", perm: "view.dashboard" },
   {
     href: "/job-cost",
     label: "Job Cost",
@@ -29,17 +29,26 @@ const NAV: NavItem[] = [
   },
   {
     label: "Timeline",
-    perm: "view.timeline",
     items: [
-      { href: "/timeline", label: "Timeline", hint: "Roll-up by category" },
-      { href: "/timeline-detail", label: "Timeline Detail", hint: "Week by week, per task" },
+      {
+        href: "/timeline",
+        label: "Timeline",
+        hint: "Roll-up by category",
+        perm: "view.timeline",
+      },
+      {
+        href: "/timeline-detail",
+        label: "Timeline Detail",
+        hint: "Week by week, per task",
+        perm: "view.timeline.detail",
+      },
     ],
   },
   {
     href: "/reporting",
     label: "Reporting",
     hint: "Reports to print or export",
-    perm: "report.view",
+    perm: "view.reporting",
   },
   {
     href: "/planning",
@@ -57,33 +66,67 @@ const NAV: NavItem[] = [
     href: "/budget-proposal",
     label: "Budget Proposal",
     hint: "The year by week, from the schedule and the LEDGER",
-    perm: "report.view",
+    perm: "view.budget",
   },
   // La grilla vive como sub-tab DENTRO de Budget Proposal (pedido del owner,
   // 2026-11-09: «debe ser un sub tab en Budget»). La ruta /budget-grid sigue
   // existiendo para quien tenga el link, pero no ocupa un lugar en la barra.
   {
     label: "Payments",
-    perm: "view.payments",
     items: [
-      { href: "/payments", label: "Short Term Payments", hint: "The batch sent to corporate" },
-      { href: "/disbursements", label: "Disbursements", hint: "Build and submit the batch" },
-      { href: "/credit", label: "Credits", hint: "Credit balance and adjustments" },
+      {
+        href: "/payments",
+        label: "Short Term Payments",
+        hint: "The batch sent to corporate",
+        perm: "view.payments",
+      },
+      {
+        href: "/disbursements",
+        label: "Disbursements",
+        hint: "Build and submit the batch",
+        perm: "view.disbursements",
+      },
+      {
+        href: "/credit",
+        label: "Credits",
+        hint: "Credit balance and adjustments",
+        perm: "view.credits",
+      },
     ],
   },
   {
     label: "Invoices",
-    perm: "view.invoices",
     items: [
-      { href: "/invoice-receipts", label: "Invoice Receipts", hint: "Inbox — invoices by email" },
+      {
+        href: "/invoice-receipts",
+        label: "Invoice Receipts",
+        hint: "Inbox — invoices by email",
+        perm: "view.invoices.receipts",
+      },
       {
         href: "/invoices-applied",
         label: "Invoices Applied",
         hint: "Invoiced vs spent, by project",
+        perm: "view.invoices.applied",
       },
-      { href: "/match-review", label: "Match Review", hint: "Confirm the suggested matches" },
-      { href: "/ledger-invoices", label: "Ledger + Invoices", hint: "Which lines have no invoice" },
-      { href: "/invoices", label: "Invoices (manual)", hint: "Invoices captured by hand" },
+      {
+        href: "/match-review",
+        label: "Match Review",
+        hint: "Confirm the suggested matches",
+        perm: "view.invoices.match",
+      },
+      {
+        href: "/ledger-invoices",
+        label: "Ledger + Invoices",
+        hint: "Which lines have no invoice",
+        perm: "view.invoices.ledger",
+      },
+      {
+        href: "/invoices",
+        label: "Invoices (manual)",
+        hint: "Invoices captured by hand",
+        perm: "view.invoices.manual",
+      },
       // Un proveedor con contratos por etapas: lo que importa no es el total
       // de la factura sino sus LINEAS, porque una sola trae el cierre de un
       // contrato y el arranque de otro.
@@ -91,27 +134,43 @@ const NAV: NavItem[] = [
         href: "/dehc-invoices",
         label: "DEHC Invoices",
         hint: "Every line DEHC bills, with its PDF",
+        perm: "view.invoices.dehc",
       },
     ],
   },
   { href: "/ledger", label: "Ledger", hint: "Every payment, as in the Excel", perm: "view.ledger" },
   {
     label: "Banking",
-    perm: "bank.view",
     items: [
-      { href: "/bank", label: "Banks", hint: "Statements and reconciliation" },
+      {
+        href: "/bank",
+        label: "Banks",
+        hint: "Statements and reconciliation",
+        perm: "view.banking",
+      },
       {
         href: "/bank-reconciliation",
         label: "Bank Reconciliation",
         hint: "LAFISE statement vs Ledger, Short Payments & invoices",
+        perm: "view.banking.recon",
       },
-      { href: "/us-wires", label: "US Wire Transfers", hint: "Owner contributions" },
+      {
+        href: "/us-wires",
+        label: "US Wire Transfers",
+        hint: "Owner contributions",
+        perm: "view.banking.wires",
+      },
     ],
   },
   // La bitacora del proyecto. Va antes de Admin porque se consulta, no se
   // administra, y sin `perm`: leerla puede cualquiera con sesion. Escribir
   // pide `blog.post`, y eso lo resuelve la propia pantalla.
-  { href: "/blog", label: "Blog", hint: "Project log — findings, numbered and permanent" },
+  {
+    href: "/blog",
+    label: "Blog",
+    hint: "Project log — findings, numbered and permanent",
+    perm: "view.blog",
+  },
   { href: "/admin", label: "Admin", hint: "Profiles & users", perm: "admin.users" },
 ];
 
@@ -121,28 +180,31 @@ const ROUTE_PERM = (
   [
     ["/job-cost", "view.jobcost"],
     ["/schedule", "view.jobcost"],
-    ["/timeline-detail", "view.timeline"],
+    ["/timeline-detail", "view.timeline.detail"],
     ["/timeline", "view.timeline"],
-    ["/dashboard", "report.view"],
+    ["/dashboard", "view.dashboard"],
+    ["/reporting", "view.reporting"],
     ["/planning", "view.planning"],
     // ⚠️ `/budget-grid` va ANTES que `/budget-proposal`: el buscador usa
     // startsWith y el primero que coincide gana. Al reves, la grilla caeria en
     // la regla de la propuesta y se abriria con permiso de solo lectura —
     // cuando es la unica pantalla de presupuesto que ESCRIBE.
     ["/budget-grid", "schedule.edit"],
-    ["/budget-proposal", "report.view"],
+    ["/budget-proposal", "view.budget"],
     ["/payments", "view.payments"],
-    ["/disbursements", "view.payments"],
-    ["/credit", "view.payments"],
-    ["/invoice-receipts", "view.invoices"],
-    ["/invoices-applied", "view.invoices"],
-    ["/match-review", "view.invoices"],
-    ["/ledger-invoices", "view.invoices"],
-    ["/invoices", "view.invoices"],
+    ["/disbursements", "view.disbursements"],
+    ["/credit", "view.credits"],
+    ["/invoice-receipts", "view.invoices.receipts"],
+    ["/invoices-applied", "view.invoices.applied"],
+    ["/match-review", "view.invoices.match"],
+    ["/ledger-invoices", "view.invoices.ledger"],
+    ["/dehc-invoices", "view.invoices.dehc"],
+    ["/invoices", "view.invoices.manual"],
     ["/ledger", "view.ledger"],
-    ["/bank-reconciliation", "bank.view"],
-    ["/bank", "bank.view"],
-    ["/us-wires", "bank.view"],
+    ["/bank-reconciliation", "view.banking.recon"],
+    ["/bank", "view.banking"],
+    ["/us-wires", "view.banking.wires"],
+    ["/blog", "view.blog"],
     ["/admin", "admin.users"],
   ] as [string, string][]
 ).sort((a, b) => b[0].length - a[0].length);
@@ -158,7 +220,10 @@ function firstAllowedRoute(perms: string[]): string | null {
   const can = (p?: string) => !p || perms.includes(p);
   for (const n of NAV) {
     if (isGroup(n)) {
-      if (can(n.perm)) return n.items[0].href;
+      // ⚠️ El primer HIJO permitido, no el primero a secas: desde que cada
+      // sub-pestana tiene su permiso, el grupo puede verse por el tercero.
+      const abierto = n.items.find((i) => can(i.perm));
+      if (abierto) return abierto.href;
     } else if (can(n.perm)) {
       return n.href;
     }
@@ -302,7 +367,15 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const perms = me.data.permissions ?? [];
   const can = (p?: string) => !p || perms.includes(p);
-  const visibleNav = NAV.filter((n) => can(n.perm));
+  // ⚠️ Un grupo se muestra si el perfil ve ALGUNA de sus pantallas, y con solo
+  // esas. Antes el grupo tenia su propio permiso y abria las seis de golpe:
+  // no habia forma de dar Invoice Receipts sin dar tambien Match Review.
+  // Owner, 2026-11-10: «puede que tenga acceso a un sub tab pero no a todos».
+  const visibleNav: NavItem[] = NAV.flatMap((n): NavItem[] => {
+    if (!isGroup(n)) return can(n.perm) ? [n] : [];
+    const items = n.items.filter((i) => can(i.perm));
+    return items.length ? [{ ...n, items }] : [];
+  });
   const need = requiredPerm(pathname);
   const blocked = need !== null && !perms.includes(need);
 
