@@ -26,7 +26,7 @@ import {
   BTN_EXCEL,
   BTN_REABRIR,
   CABECERA,
-  CELL,
+  CELL_PLANA,
   ESTADO_ROTULO,
   TABLA,
   TFOOT,
@@ -72,7 +72,10 @@ function TransferBadge({ t }: { t: string | null }) {
 // ⚠️ El tamaño de celda, el chip de estado y los botones viven en lib/ui:
 // son los MISMOS que la vista de Disbursements, que es la que el owner
 // aprobó. Copiarlos acá es como se separaron la vez pasada.
-const CELL_INPUT = CELL;
+// ⚠️ Payments usa la celda PLANA: diez filas x seis campos eran sesenta
+// recuadros peleando, y la mitad repetian el mismo texto. Disbursements
+// sigue con CELL (con borde) porque es la vista que el owner aprobo.
+const CELL_INPUT = CELL_PLANA;
 
 // WBS / Project Number (código + título como tooltip). Solo lectura.
 function WbsCell({ line }: { line: ShortPaymentLine }) {
@@ -102,11 +105,15 @@ function WbsEdit({
   // Solo se ofrece si la línea sigue sin proyecto: es una propuesta, no un default.
   const show = suggestion && !line.wbs_code && !code.trim();
   return (
-    <div className="flex flex-col gap-0.5">
+    /* ⚠️ El chip va AL LADO, no debajo. Apilado hacía que solo las filas CON
+       sugerencia midieran mas alto: en la tanda #29 las cuatro primeras se
+       veian mas grandes que las otras seis y la tabla quedaba dispareja. Es lo
+       que el owner leyo como «desordenado» (2026-11-10). */
+    <div className="flex items-center gap-1">
       <input
         list="wbs-codes"
         value={code}
-        placeholder="WBS"
+        placeholder="—"
         title={match?.title ?? line.wbs_title ?? "Project number"}
         onChange={(e) => setCode(e.target.value)}
         onBlur={() => {
@@ -120,8 +127,10 @@ function WbsEdit({
           }
           save({ wbs_id: w.id });
         }}
-        className={`w-16 rounded border px-1 py-0.5 font-mono text-xs ${
-          code && !match ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
+        className={`w-14 rounded border px-1 py-0.5 text-center font-mono text-sm transition focus:outline-none ${
+          code && !match
+            ? "border-red-300 bg-red-50"
+            : "border-transparent bg-transparent hover:border-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
         }`}
       />
       {show && suggestion ? (
@@ -132,9 +141,9 @@ function WbsEdit({
             setCode(suggestion.wbs_code);
             save({ wbs_id: suggestion.wbs_id });
           }}
-          className="w-16 rounded bg-amber-100 px-1 font-mono text-xs text-amber-800 hover:bg-amber-200"
+          className="shrink-0 rounded bg-amber-100 px-1 font-mono text-xs leading-5 text-amber-800 hover:bg-amber-200"
         >
-          ≈ {suggestion.wbs_code}
+          {suggestion.wbs_code}
         </button>
       ) : null}
     </div>
@@ -169,7 +178,9 @@ function CatTypeEdit({
   const catPhases = phases.filter((p) => p.category_id === line.category_id);
   // ⚠️ LADO A LADO, no apilados. Apilados hacían que CADA fila midiera el
   // doble que las demás: diez líneas ocupaban lo que ahora ocupan veinte.
-  const SEL = "min-w-0 flex-1 rounded border border-slate-300 bg-white px-1 py-0.5 text-xs";
+  const SEL =
+    "min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs " +
+    "transition hover:border-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white";
   return (
     <div className="flex gap-1">
       <select
@@ -431,7 +442,7 @@ function LineRow({
       </td>
       <td className="px-1 py-0.5 text-center">
         <select
-          className="rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
+          className="rounded border border-transparent bg-transparent px-1 py-0.5 text-xs transition hover:border-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
           value={line.transfer ?? ""}
           onChange={(e) => save({ transfer: e.target.value })}
         >
@@ -740,16 +751,60 @@ function RunMonthButton({ disbNo, lines }: { disbNo: number; lines: number }) {
 function MonthClose() {
   const cycle = useCycleStatus(26);
   const rows = cycle.data ?? [];
+  // Owner, 2026-11-10: *«puedes darme la opcion de esconder o visulizar con
+  // click esto»*. Es el bloque más alto de la pantalla y el que menos mira
+  // quien solo viene a ver una tanda.
+  //
+  // ⚠️ Se recuerda en el navegador: si hubiera que volver a cerrarlo en cada
+  // visita, la opción no serviría de nada. Va en try/catch porque en una
+  // ventana privada `localStorage` tira excepción al leerlo.
+  //
+  // ⚠️ Y se lee en un `useEffect`, no al pintar: leerlo durante el render hace
+  // que el servidor arme una cosa y el navegador otra, y React tira el árbol
+  // entero. El precio es que, si estaba cerrado, se ve un parpadeo al cargar.
+  const [abierto, setAbierto] = useState(true);
+  useEffect(() => {
+    try {
+      setAbierto(localStorage.getItem("mes-cierre-cerrado") !== "1");
+    } catch {
+      /* sin localStorage: queda abierto, que es el default */
+    }
+  }, []);
+  const alternar = () => {
+    setAbierto((v) => {
+      try {
+        localStorage.setItem("mes-cierre-cerrado", v ? "1" : "0");
+      } catch {
+        /* no poder recordarlo no debe impedir abrirlo o cerrarlo */
+      }
+      return !v;
+    });
+  };
+
   if (rows.length === 0) return null;
   return (
     <div className="rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-2">
+      <button
+        type="button"
+        onClick={alternar}
+        aria-expanded={abierto}
+        className="flex w-full items-center gap-2 rounded-t-lg px-4 py-2 text-left transition hover:bg-slate-50"
+      >
+        <span className={`text-slate-400 transition-transform ${abierto ? "rotate-90" : ""}`}>
+          ▶
+        </span>
         <span className="text-sm font-semibold text-slate-800">Month close</span>
-        <span className="ml-2 text-xs text-slate-400">
+        <span className="text-xs text-slate-400">
           where each batch stands · from #26 onward (earlier months are already validated)
         </span>
-      </div>
-      <div className="divide-y divide-slate-100">
+        {/* Cerrado, el encabezado tiene que decir qué se está escondiendo. */}
+        <span className="ml-auto text-xs text-slate-400">
+          {abierto ? "hide" : `show · ${rows.length} batches`}
+        </span>
+      </button>
+      <div
+        className={`divide-y divide-slate-100 border-t border-slate-200 ${abierto ? "" : "hidden"}`}
+      >
         {rows.map((r) => {
           const sent = r.status !== "draft";
           const inLedger = r.ledger_rows > 0;

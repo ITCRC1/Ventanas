@@ -25,6 +25,23 @@ export const TH = "px-2 py-2 text-xs font-semibold uppercase tracking-wide text-
 /** Celda editable. Es el tamaño que el owner aprobó: `text-sm`, no `text-xs`. */
 export const CELL = "w-full rounded border border-slate-300 bg-white px-1.5 py-0.5 text-sm";
 
+/** Celda editable PLANA: se ve como texto y el borde aparece al pasar por
+ *  encima o al enfocar.
+ *
+ *  Owner, 2026-11-10, sobre la pestaña Payments ya reformateada: *«lo veo
+ *  desordenado todavia»*. Y tenía razón: diez filas × seis campos son SESENTA
+ *  recuadros peleando por la atención, y la mitad repiten el mismo texto
+ *  («Overhead», «Overhead / Personnel», el mismo banco). Con el borde apagado
+ *  se leen los datos y no las cajas, y sigue siendo editable: el borde vuelve
+ *  en cuanto el mouse entra.
+ *
+ *  ⚠️ `focus:` además de `hover:` — con solo hover, quien navega con el teclado
+ *  no ve nunca dónde está parado. */
+export const CELL_PLANA =
+  "w-full rounded border border-transparent bg-transparent px-1.5 py-0.5 text-sm " +
+  "transition hover:border-slate-300 hover:bg-white focus:border-slate-400 " +
+  "focus:bg-white focus:outline-none";
+
 /** Marco de la tabla y sus filas. */
 export const TABLA = "overflow-x-auto rounded-md border border-slate-200";
 export const THEAD = "border-b border-slate-200 bg-slate-100 text-left";
