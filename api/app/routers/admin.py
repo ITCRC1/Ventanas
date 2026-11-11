@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import require_permission
 from app.core.problems import Problem
 from app.core.security import INVITE_DAYS, nueva_invitacion
-from app.deps import get_current_user, get_db
+from app.deps import CurrentUser, get_current_user, get_db
 from app.models.access import AppUser
 from app.schemas.admin import (
     InviteOut,
@@ -112,15 +112,94 @@ def rename_role(role_id: int, data: RoleUpdate, db: Session = Depends(get_db)) -
     return dict(row)
 
 
+# ── El candado contra quedarse afuera ───────────────────────────────────────
+#
+# Owner, 2026-11-10: *«me cambie el usuario a corporativo para ver que veia pero
+# ahora no puedo regresar a mi vista..y no me puedo cambiar»*. Se cambio su
+# propio perfil a uno sin `admin.users`, perdio la pestaña Admin y con ella la
+# unica forma de volver. Hubo que devolverle el perfil desde la base.
+#
+# ⚠️ Antes del 2026-11-10 esto NO encerraba: el menu escondia la pestaña pero
+# la URL seguia abriendo. Al cerrar la API por pantalla, la trampa se volvio
+# real — el candado no es una mejora opcional, es la contraparte de ese cambio.
+#
+# Dos reglas, y hacen falta las dos: la primera para no encerrarse uno mismo,
+# la segunda para no dejar el sistema entero sin quien lo administre.
+
+# ⚠️ Los CAST no son decoracion. Sin ellos Postgres no puede deducir el tipo de
+# un parametro que llega NULL --«could not determine data type of parameter
+# $1»-- y la consulta revienta. Eso convierte el candado en un 500 la primera
+# vez que alguien edita un perfil: en vez de frenar el cambio, rompe la
+# pantalla. Lo encontro la prueba contra produccion, no el linter.
+_ADMINS_ACTIVOS = """
+SELECT COUNT(*) FROM app_user u
+  JOIN role_permission rp ON rp.role_id = u.role_id AND rp.permission = 'admin.users'
+ WHERE u.is_active
+   AND (CAST(:excluir_usuario AS integer) IS NULL OR u.id <> CAST(:excluir_usuario AS integer))
+   AND (CAST(:excluir_rol AS integer) IS NULL OR u.role_id <> CAST(:excluir_rol AS integer))
+"""
+
+
+def _admins_restantes(
+    db: Session, *, excluir_usuario: int | None = None, excluir_rol: int | None = None
+) -> int:
+    """Cuantas personas ACTIVAS podrian administrar si se aplica el cambio."""
+    return int(
+        db.execute(
+            text(_ADMINS_ACTIVOS),
+            {"excluir_usuario": excluir_usuario, "excluir_rol": excluir_rol},
+        ).scalar_one()
+    )
+
+
+def _rol_administra(db: Session, role_id: int) -> bool:
+    return (
+        db.execute(
+            text(
+                "SELECT 1 FROM role_permission "
+                " WHERE role_id = :i AND permission = 'admin.users'"
+            ),
+            {"i": role_id},
+        ).scalar_one_or_none()
+        is not None
+    )
+
+
 @router.put("/roles/{role_id}/permissions")
 def set_role_permissions(
-    role_id: int, data: RolePermsIn, db: Session = Depends(get_db)
+    role_id: int,
+    data: RolePermsIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     """Reemplaza el set de permisos del perfil por el recibido."""
     if db.execute(text("SELECT 1 FROM role WHERE id = :i"), {"i": role_id}).scalar_one_or_none() is None:
         raise Problem(status_code=404, title="Perfil no encontrado")
     valid = set(db.execute(text("SELECT code FROM permission")).scalars())
     wanted = [p for p in data.permissions if p in valid]
+
+    # ⚠️ Se le esta quitando «administrar» a un perfil que hoy lo tiene.
+    if "admin.users" not in wanted and _rol_administra(db, role_id):
+        if role_id == user.role_id:
+            raise Problem(
+                status_code=409,
+                title="No puede quitarse a sí mismo la administración",
+                detail=(
+                    "Está en este perfil. Si le quita «Admin — manage profiles and "
+                    "users» pierde la pestaña Admin y ya no podría devolvérsela. "
+                    "Páselo antes a otro perfil que administre."
+                ),
+            )
+        if _admins_restantes(db, excluir_rol=role_id) == 0:
+            raise Problem(
+                status_code=409,
+                title="Quedaría sin ningún administrador",
+                detail=(
+                    "Es el único perfil con administración que tiene usuarios "
+                    "activos. Déle el permiso a otro perfil antes de quitárselo "
+                    "a este."
+                ),
+            )
     db.execute(text("DELETE FROM role_permission WHERE role_id = :i"), {"i": role_id})
     for p in wanted:
         db.execute(
@@ -237,7 +316,12 @@ def create_user(
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
-def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)) -> dict[str, Any]:
+def update_user(
+    user_id: int,
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
     fields = data.model_dump(exclude_unset=True)
     if "email" in fields and fields["email"]:
         fields["email"] = fields["email"].strip().lower()
@@ -251,6 +335,49 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)) -
         text("SELECT 1 FROM role WHERE id = :i"), {"i": fields["role_id"]}
     ).scalar_one_or_none() is None:
         raise Problem(status_code=422, title="Perfil inválido")
+
+    # ⚠️ El camino por el que el owner se encerro: cambiarse el perfil a uno
+    # mismo. Tambien se cubre desactivarse, que deja igual de afuera.
+    nuevo_rol = fields.get("role_id")
+    se_desactiva = fields.get("is_active") is False
+    propio = user_id == user.id
+    if propio and nuevo_rol is not None and not _rol_administra(db, nuevo_rol):
+        raise Problem(
+            status_code=409,
+            title="Ese perfil no administra",
+            detail=(
+                "Es su propio usuario. Con ese perfil pierde la pestaña Admin y "
+                "ya no podría volver. Para ver lo que ve otro perfil, cree un "
+                "usuario de prueba y entre con él en otra ventana."
+            ),
+        )
+    if propio and se_desactiva:
+        raise Problem(
+            status_code=409,
+            title="No puede desactivar su propio usuario",
+            detail="Pídaselo a otra persona que administre.",
+        )
+    # Y que no se quede el sistema sin nadie, aunque el cambio sea sobre otro.
+    if (nuevo_rol is not None and not _rol_administra(db, nuevo_rol)) or se_desactiva:
+        era_admin = db.execute(
+            text(
+                "SELECT 1 FROM app_user u"
+                "  JOIN role_permission rp ON rp.role_id = u.role_id"
+                "   AND rp.permission = 'admin.users'"
+                " WHERE u.id = :i AND u.is_active"
+            ),
+            {"i": user_id},
+        ).scalar_one_or_none()
+        if era_admin and _admins_restantes(db, excluir_usuario=user_id) == 0:
+            raise Problem(
+                status_code=409,
+                title="Quedaría sin ningún administrador",
+                detail=(
+                    "Es la única persona activa que puede administrar. Désela a "
+                    "alguien más antes de hacer este cambio."
+                ),
+            )
+
     allowed = {"full_name", "email", "role_id", "is_active"}
     sets = {k: v for k, v in fields.items() if k in allowed}
     if sets:
