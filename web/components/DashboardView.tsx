@@ -621,120 +621,18 @@ function Pendiente({ d }: { d: DashboardSummary }) {
         </table>
       </div>
 
-      {/* ⚠️ Estos dos paneles tampoco decian nada (owner, 2026-11-10), y por el
-          mismo motivo: listaban TODO en vez de lo que hay que mirar.
+      {/* ⚠️ Acá vivían «Permits and approvals» y «Flagged for review».
+          Owner, 2026-11-11: *«quita esto»*, señalando todo el bloque debajo de
+          la tabla por sección.
 
-          · «Permits and approvals» traia 15 filas y TRECE decian «Approved».
-            El dato eran las dos que faltan, perdidas entre trece iguales.
-          · «Flagged Attention» traia 12 lineas y CUATRO no tienen nada que
-            gastar -- los $0, el — y el ($0) de la pantalla. Una marca sobre una
-            linea sin remanente no le dice nada a nadie.
-
-          Ahora cada panel abre con el recuento y lista solo lo que queda por
-          resolver. Lo que ya esta cerrado se cuenta, no se enumera. */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Destrabar
-          titulo="Permits and approvals"
-          nota="— what is still in process"
-          total={d.pendiente.permisos.length}
-          cerradoRotulo="approved"
-          filas={d.pendiente.permisos
-            .filter((p) => (p.state ?? "").toLowerCase() !== "approved")
-            .map((p) => ({
-              code: p.wbs_code,
-              title: p.title,
-              estado: p.state ?? "no status",
-              monto: p.budget_revised,
-            }))}
-          vacio="All permits on the list are approved."
-        />
-
-        <Destrabar
-          titulo="Flagged for review"
-          nota="— marked by the team, with budget still to spend"
-          total={d.pendiente.atencion.length}
-          cerradoRotulo="with nothing left to spend"
-          ambar
-          filas={d.pendiente.atencion
-            .filter((l) => l.remaining > 0.5)
-            .sort((x, y) => y.remaining - x.remaining)
-            .map((l) => ({ code: l.wbs_code, title: l.title, monto: l.remaining }))}
-          vacio="Nothing flagged with budget left."
-        />
-      </div>
+          Son listas de trabajo del EQUIPO —qué permiso falta tramitar, qué
+          línea alguien marcó para revisar—, no información para el dueño. Su
+          lugar es Job Cost, que es donde se trabajan; acá solo alargaban la
+          pantalla. El recuento que importa sigue arriba, en la tarjeta «Lines
+          marked for review». */}
     </div>
   );
 }
-
-/**
- * Un panel de «lo que falta destrabar».
- *
- * ⚠️ La regla que lo define: **se enumera lo abierto y se cuenta lo cerrado.**
- * Los dos paneles que reemplaza listaban todo, y en los dos casos la mayoría de
- * las filas decían lo mismo — trece «Approved» seguidos, o cuatro líneas con
- * cero por gastar. Una lista donde casi todo dice lo mismo no es información:
- * es trabajo de lectura que el dueño tiene que hacer para encontrar las dos que
- * importan.
- */
-function Destrabar({
-  titulo,
-  nota,
-  total,
-  cerradoRotulo,
-  filas,
-  vacio,
-  ambar,
-}: {
-  titulo: string;
-  nota: string;
-  /** Cuántas había en total, para poder decir cuántas ya están cerradas. */
-  total: number;
-  cerradoRotulo: string;
-  filas: { code: string; title: string; estado?: string; monto: number }[];
-  vacio: string;
-  ambar?: boolean;
-}) {
-  const cerradas = total - filas.length;
-  return (
-    <div
-      className={`overflow-hidden rounded-lg border bg-white ${ambar ? "border-amber-300" : "border-slate-200"}`}
-    >
-      <p
-        className={`flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2 text-sm font-semibold ${
-          ambar
-            ? "border-amber-200 bg-amber-50 text-amber-900"
-            : "border-slate-200 bg-slate-50 text-slate-600"
-        }`}
-      >
-        {titulo}
-        <span className={`font-normal ${ambar ? "text-amber-700" : "text-slate-400"}`}>{nota}</span>
-        <span className="tabular ml-auto font-normal text-slate-500">
-          {filas.length} of {total} · {cerradas} {cerradoRotulo}
-        </span>
-      </p>
-      {filas.length === 0 ? (
-        <p className="px-3 py-3 text-xs text-slate-400">{vacio}</p>
-      ) : (
-        <table className="w-full text-xs">
-          <tbody className="divide-y divide-slate-50">
-            {filas.map((f) => (
-              <tr key={f.code}>
-                <td className="px-3 py-1.5 font-mono text-xs text-blue-700">{f.code}</td>
-                <td className="px-3 py-1.5">{f.title}</td>
-                {f.estado ? <td className="px-3 py-1.5 text-slate-400">{f.estado}</td> : null}
-                <td className="tabular px-3 py-1.5 text-right font-semibold">
-                  {f.monto > 0.5 ? moneyUsd(f.monto) : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
-/* ── La pantalla ─────────────────────────────────────────────────────────── */
 
 export function DashboardView() {
   const q = useDashboard();
@@ -759,12 +657,17 @@ export function DashboardView() {
       </div>
       <Pendiente d={d} />
 
+      {/* ⚠️ Acá iba un párrafo explicando por qué NO se muestran Profit on
+          Cost, Yield on Cost e IRR. Owner, 2026-11-11: «quita esto».
+
+          Era un descargo: la pantalla justificándose ante quien la lee. Y para
+          un dueño es peor que inútil — le nombra tres indicadores que no va a
+          ver y le deja la sensación de que falta algo. El motivo real (el
+          sistema no guarda el GDV del proyecto) sigue documentado arriba, en
+          el encabezado de este archivo, que es donde le sirve a quien lo vaya
+          a construir. */}
       <p className="text-xs text-slate-400">
-        Figures as of {d.fecha}, from the LEDGER and the Job Cost schedule.{" "}
-        <b>Profit on cost, yield on cost and IRR are not shown</b> because the system does not hold
-        the project&apos;s expected value (GDV): there is {moneyUsd(d.costo.budget_revised)} of cost
-        against a single unrealised sale line. Once the expected value is captured, the margin
-        computes against the anticipated final cost and nothing else here changes.
+        Figures as of {d.fecha}, from the LEDGER and the Job Cost schedule.
       </p>
     </div>
   );
