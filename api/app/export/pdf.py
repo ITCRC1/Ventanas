@@ -69,12 +69,16 @@ _HOLDING_SEND = HOLDING_SEND
 _HOLDING_BANK = HOLDING_BANK
 
 
-_CSS_BD = """
-@page { size: letter landscape; margin: 0.7cm; }
-* { font-family: "DejaVu Sans", Arial, sans-serif; }
-body { color: #1a1a1a; font-size: 7.5px; }
-h1 { font-size: 12px; margin: 0 0 1px; }
-.sub { color: #666; font-size: 8px; margin: 0 0 5px; }
+# ── La tabla del Breakdown, en UN solo lugar ────────────────────────────────
+#
+# ⚠️ Estas reglas estaban ESCRITAS DOS VECES: una en `_CSS_BD` (el Breakdown
+# suelto) y otra en `_CSS_INSTR` (la misma tabla, embebida en la Instruction).
+# El 2026-11-10 se corrigio el desborde en la primera y la segunda quedo igual,
+# asi que el Instruction PDF siguio cortando el total — owner, 2026-11-11:
+# *«SALE el monto en el PDF corrido»*, señalando justamente ese.
+#
+# Dos copias de la misma hoja se separan en cuanto alguien arregla una. Una.
+_TABLA_BD = """
 table.bd { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.bd th, table.bd td {
   /* ⚠️ `box-sizing: border-box` NO es cosmetico: sin el, con `table-layout:
@@ -87,13 +91,13 @@ table.bd th, table.bd td {
   vertical-align: middle; word-wrap: break-word; overflow-wrap: anywhere;
 }
 table.bd th { background: #fff; color: #000; font-weight: bold; text-align: center; }
-th.first { color: #c00000; text-align: left; }
-td.desc { text-align: left; }
+table.bd th.first { color: #c00000; text-align: left; }
+table.bd td.desc { text-align: left; }
 /* Vendor: izquierda y en negrita. Es la primera columna y es lo que se
    busca de un vistazo al repasar la tanda. */
-td.vendor { text-align: left; font-weight: bold; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-td.mid { text-align: center; vertical-align: middle; }
+table.bd td.vendor { text-align: left; font-weight: bold; }
+table.bd td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.bd td.mid { text-align: center; vertical-align: middle; }
 /* ⚠️ `table.bd td.grand` y no `td.grand`: `table.bd th, table.bd td` ya fija
    7.5px y le gana por especificidad (0,1,2 contra 0,1,1). El gran total venia
    saliendo del mismo tamano que el resto desde que se escribio esta hoja. */
@@ -101,9 +105,20 @@ table.bd td.grand {
   text-align: right; vertical-align: middle; font-weight: bold;
   font-size: 9px; white-space: nowrap;
 }
-tr.total td { background: #d7e5f5; font-weight: bold; }
-tr.credit td { color: #005C40; }
+table.bd tr.total td { background: #d7e5f5; font-weight: bold; }
+table.bd tr.credit td { color: #005C40; }
 """
+
+_CSS_BD = (
+    """
+@page { size: letter landscape; margin: 0.7cm; }
+* { font-family: "DejaVu Sans", Arial, sans-serif; }
+body { color: #1a1a1a; font-size: 7.5px; }
+h1 { font-size: 12px; margin: 0 0 1px; }
+.sub { color: #666; font-size: 8px; margin: 0 0 5px; }
+"""
+    + _TABLA_BD
+)
 
 
 def _sent_when(disb: Any) -> str:
@@ -244,7 +259,8 @@ def breakdown_html(disb: Any, rows: list[dict[str, Any]], *, show_bank: bool) ->
 </body></html>"""
 
 
-_CSS_INSTR = """
+_CSS_INSTR = (
+    """
 @page { size: letter; margin: 2.2cm 2.3cm; }
 @page bdpage { size: letter landscape; margin: 0.7cm; }
 * { font-family: "DejaVu Sans", Arial, sans-serif; }
@@ -271,20 +287,9 @@ table.pi td { border: 1px solid #9fb6d0; padding: 10px 12px; font-size: 13px; ve
 table.pi td.k { background: #e8f0f8; font-weight: bold; width: 34%; }
 .page-break { page-break-before: always; }
 .bd-page { page: bdpage; page-break-before: always; }
-table.bd { width: 100%; border-collapse: collapse; table-layout: fixed; }
-table.bd th, table.bd td { border: 0.7px solid #7a7a7a; padding: 1px 3px; font-size: 7.5px;
-  vertical-align: middle; word-wrap: break-word; overflow-wrap: anywhere; }
-table.bd th { background: #fff; color: #000; font-weight: bold; text-align: center; }
-table.bd th.first { color: #c00000; text-align: left; }
-table.bd td.desc { text-align: left; }
-table.bd td.vendor { text-align: left; font-weight: bold; }
-table.bd td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-table.bd td.mid { text-align: center; vertical-align: middle; }
-table.bd td.grand { text-align: right; vertical-align: middle; font-weight: bold; font-size: 9px;
-  white-space: nowrap; }
-table.bd tr.total td { background: #d7e5f5; font-weight: bold; }
-table.bd tr.credit td { color: #005C40; }
 """
+    + _TABLA_BD
+)
 
 # Orden y etiquetas de la página "Payment Instructions" (llaves del payment_block).
 _PI_ROWS = [
