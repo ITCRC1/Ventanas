@@ -242,9 +242,9 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
           }
         />
         <Kpi
-          label="Approved, pending payment"
+          label="Pending Reconcile"
           value={moneyUsd(c.por_pagar)}
-          sub="recorded on the LEDGER, not yet disbursed"
+          sub="recorded, not yet matched to a payment"
           detalle={
             <>
               <code>Amount</code> minus <code>Amount Paid</code> on the LEDGER rows that still carry
@@ -254,9 +254,9 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
           }
         />
         <Kpi
-          label="Still to be committed"
+          label="Forecast"
           value={moneyUsd(c.sin_comprometer)}
-          sub="budget not yet assigned to a payment"
+          sub="budget with no payment requested yet"
           detalle={
             <>
               The rest of the revised budget: scope that is planned and funded but for which nothing
@@ -286,8 +286,8 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
                 // signo menos hacia leer como salidas tres cifras que son el
                 // reparto del mismo presupuesto.
                 ["· Paid", c.pagado, "already disbursed"],
-                ["· Approved, pending payment", c.por_pagar, "recorded, not yet disbursed"],
-                ["· Still to be committed", c.sin_comprometer, "nothing requested against it yet"],
+                ["· Pending Reconcile", c.por_pagar, "recorded, not yet matched to a payment"],
+                ["· Forecast", c.sin_comprometer, "nothing requested against it yet"],
               ] as [string, number, string][]
             ).map(([et, v, nota], i) => (
               <tr
@@ -304,7 +304,7 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
                 en medio lo explicaran: los tres tramos SON el revisado, no se
                 le restan. Ahora la fila dice la aritmetica que de verdad hay. */}
             <tr className="border-t-2 border-slate-700 bg-[#D8F4E6] font-bold">
-              <td className="px-3 py-1">PAID + PENDING + STILL TO COMMIT</td>
+              <td className="px-3 py-1">PAID + PENDING RECONCILE + FORECAST</td>
               <td className="tabular px-3 py-1 text-right">{moneyUsd(c.anticipated_final_cost)}</td>
               <td className="px-3 py-1 font-normal text-slate-500">
                 the three add back to the revised budget
@@ -430,8 +430,12 @@ function Avance({ d }: { d: DashboardSummary }) {
             coinciden por construcción en el pasado: comparar ahí es comparar un
             número contra sí mismo. Lo que esta curva muestra es la FORMA de lo
             que viene. */}
+        {/* ⚠️ Decia «the Forecast cut-off». Desde que la columna de la tabla se
+            llama Forecast (owner, 2026-11-10), esa palabra ya significa otra
+            cosa en esta misma pantalla: el presupuesto sin pago solicitado. La
+            nota habla del corte del CRONOGRAMA, que es otra cosa. */}
         <p className="mb-2 text-xs text-slate-400">
-          The planned line before the Forecast cut-off was rebuilt from the LEDGER, so the two agree
+          The planned line before the schedule cut-off was rebuilt from the LEDGER, so the two agree
           in the past by construction — what this shows is the shape of what is still ahead.
         </p>
         <ResponsiveContainer width="100%" height={260}>
@@ -526,84 +530,19 @@ function Avance({ d }: { d: DashboardSummary }) {
 /* ── 4 · Qué falta ───────────────────────────────────────────────────────── */
 
 function Pendiente({ d }: { d: DashboardSummary }) {
-  // ⚠️ Acá habia una barra horizontal apilada por seccion y NO decia nada
-  // (owner, 2026-11-10: «esto no dice nada»). Tres razones, y las tres son de
-  // la forma, no del dato:
+  // ⚠️ Aca llegue a poner una tabla por seccion ordenada por remanente, para
+  // reemplazar una barra apilada que no se podia leer. Estaba DE MAS: mas
+  // abajo en esta misma pantalla ya habia una tabla por seccion, y mejor --
+  // trae tambien Lines, el % ejecutado y la fila de TOTAL.
   //
-  //   · los nombres se cortaban a 18 caracteres («7 ITEMS FOR CONVE…») y el eje
-  //     ademas salteaba una de cada dos etiquetas, asi que ni se sabia cual era;
-  //   · una seccion se lleva 4.56M de los 6.47M que faltan -- el 70%--, y con
-  //     esa escala las otras diez quedan en slivers de dos pixeles;
-  //   · la serie verde son 259,724 repartidos entre once secciones: invisible.
-  //
-  // Una tabla ordenada por remanente muestra los nombres enteros, pone el
-  // numero al lado y la barrita da el peso relativo sin pelear con un eje.
-  const secs = [...d.pendiente.secciones]
-    .filter((s) => s.remaining > 0.5)
-    .sort((x, y) => y.remaining - x.remaining);
-  const mayor = secs.length ? secs[0].remaining : 0;
-  const totalRem = secs.reduce((a, s) => a + s.remaining, 0);
-
+  // Dos tablas del mismo dato en una pantalla es exactamente el problema que
+  // el owner venia senalando («todo lo que se ponga aca debe tener sentido»).
+  // Queda la que ya existia; aca solo van los llamados de caja.
   return (
     <div className="space-y-4">
-      <Titulo t="What is left" sub="— by section, largest first" />
+      <Titulo t="What is left" sub="— the cash the schedule calls for, and by section below" />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white lg:col-span-2">
-          <table className="w-full text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 text-left text-slate-500">
-              <tr>
-                <th className="px-3 py-2 font-semibold">Section</th>
-                <th className="px-3 py-2 text-right font-semibold">Budget</th>
-                <th className="px-3 py-2 text-right font-semibold">Paid</th>
-                <th className="px-3 py-2 text-right font-semibold">Pending payment</th>
-                <th className="px-3 py-2 text-right font-semibold">Still to commit</th>
-                <th className="px-3 py-2 text-right font-semibold">Remaining</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {secs.map((s) => (
-                <tr key={s.category} className="hover:bg-slate-50/60">
-                  <td className="px-3 py-1.5">
-                    <div>{s.category}</div>
-                    {/* El peso de la seccion, sin eje: ancho proporcional a la mayor. */}
-                    <div className="mt-1 h-1 w-full rounded bg-slate-100">
-                      <div
-                        className="h-1 rounded bg-brand-600"
-                        style={{ width: `${mayor ? (s.remaining / mayor) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </td>
-                  <td className="tabular px-3 py-1.5 text-right text-slate-500">
-                    {moneyUsd(s.budget_revised)}
-                  </td>
-                  <td className="tabular px-3 py-1.5 text-right text-slate-500">
-                    {moneyUsd(s.spend)}
-                    <span className="ml-1 text-slate-400">{s.pct.toFixed(0)}%</span>
-                  </td>
-                  <td className="tabular px-3 py-1.5 text-right">
-                    {s.por_pagar > 0.5 ? moneyUsd(s.por_pagar) : "—"}
-                  </td>
-                  <td className="tabular px-3 py-1.5 text-right">
-                    {s.sin_comprometer > 0.5 ? moneyUsd(s.sin_comprometer) : "—"}
-                  </td>
-                  <td className="tabular px-3 py-1.5 text-right font-semibold">
-                    {moneyUsd(s.remaining)}
-                    <span className="ml-1 font-normal text-slate-400">
-                      {totalRem ? ((s.remaining / totalRem) * 100).toFixed(0) : 0}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              <tr className="border-t-2 border-slate-700 bg-slate-50 font-bold">
-                <td className="px-3 py-2">TOTAL</td>
-                <td className="px-3 py-2" colSpan={4} />
-                <td className="tabular px-3 py-2 text-right">{moneyUsd(totalRem)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
+      <div className="grid gap-4">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="mb-2 text-sm font-semibold text-slate-600">Cash calls ahead</p>
           <table className="w-full text-xs">
@@ -638,8 +577,11 @@ function Pendiente({ d }: { d: DashboardSummary }) {
               <th className="px-3 py-2 text-right">Lines</th>
               <th className="px-3 py-2 text-right">Budget</th>
               <th className="px-3 py-2 text-right">Paid</th>
-              <th className="px-3 py-2 text-right">Billed, not paid</th>
-              <th className="px-3 py-2 text-right">Not in LEDGER</th>
+              {/* Owner, 2026-11-10: «el 1 debe llamarse Forecast y el 2
+                  Pending Reconcile». Son los mismos numeros de siempre;
+                  lo que cambia es el nombre con el que los lee el dueno. */}
+              <th className="px-3 py-2 text-right">Pending Reconcile</th>
+              <th className="px-3 py-2 text-right">Forecast</th>
               <th className="px-3 py-2 text-right">Remaining</th>
               <th className="px-3 py-2 text-right">%</th>
             </tr>
