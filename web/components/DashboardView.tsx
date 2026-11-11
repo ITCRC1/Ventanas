@@ -241,18 +241,17 @@ function EnQueTermina({ d }: { d: DashboardSummary }) {
             </>
           }
         />
-        <Kpi
-          label="Pending Reconcile"
-          value={moneyUsd(c.por_pagar)}
-          sub="recorded, not yet matched to a payment"
-          detalle={
-            <>
-              <code>Amount</code> minus <code>Amount Paid</code> on the LEDGER rows that still carry
-              a balance — work already approved whose payment has not gone out yet. The row-by-row
-              breakdown, tied back to the bank balance, is in <b>Banking → Balance bridge</b>.
-            </>
-          }
-        />
+        {/* ⚠️ Acá iba la tarjeta «Pending Reconcile» ($259,724). Owner,
+            2026-11-11: «quita esto».
+
+            El numero NO se fue del tablero: sigue en la cascada de abajo
+            --donde hace falta, porque Paid + Pending Reconcile + Forecast es
+            lo que suma el presupuesto revisado-- y en su columna de la tabla
+            por seccion. Lo que se fue es la TARJETA, que lo ascendia al mismo
+            rango que el presupuesto y lo pagado siendo el 1.2% de ellos.
+
+            De paso la fila queda de cuatro y desaparece el hueco que dejaba la
+            quinta al envolverse sola. */}
         <Kpi
           label="Forecast"
           value={moneyUsd(c.sin_comprometer)}
